@@ -1,0 +1,148 @@
+package uk.co.proviewtech.label;
+
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothSocket;
+import android.content.Context;
+import android.os.Build;
+import android.util.Base64;
+
+import com.getcapacitor.JSArray;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
+
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * Sends raw ESC/POS bytes to a thermal label printer, over Bluetooth (classic SPP)
+ * or the network (raw TCP, usually port 9100).
+ */
+@CapacitorPlugin(
+    name = "LabelPrinter",
+    permissions = {
+        @Permission(alias = "bluetooth", strings = { Manifest.permission.BLUETOOTH_CONNECT })
+    }
+)
+public class LabelPrinterPlugin extends Plugin {
+
+    private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+
+    private boolean needsBtPermission() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && getPermissionState("bluetooth") != PermissionState.GRANTED;
+    }
+
+    private BluetoothAdapter adapter() {
+        BluetoothManager m = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+        return m != null ? m.getAdapter() : null;
+    }
+
+    @PluginMethod
+    public void listPaired(PluginCall call) {
+        if (needsBtPermission()) { requestPermissionForAlias("bluetooth", call, "btPermsList"); return; }
+        doList(call);
+    }
+
+    @PermissionCallback
+    private void btPermsList(PluginCall call) {
+        if (needsBtPermission()) { call.reject("Bluetooth permission denied"); return; }
+        doList(call);
+    }
+
+    @SuppressLint("MissingPermission")
+    private void doList(PluginCall call) {
+        BluetoothAdapter a = adapter();
+        if (a == null) { call.reject("This device has no Bluetooth"); return; }
+        if (!a.isEnabled()) { call.reject("Bluetooth is turned off"); return; }
+        JSArray list = new JSArray();
+        Set<BluetoothDevice> bonded = a.getBondedDevices();
+        if (bonded != null) for (BluetoothDevice d : bonded) {
+            JSObject o = new JSObject();
+            o.put("name", d.getName());
+            o.put("address", d.getAddress());
+            list.put(o);
+        }
+        JSObject ret = new JSObject();
+        ret.put("devices", list);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void print(PluginCall call) {
+        String mode = call.getString("mode", "bluetooth");
+        if ("bluetooth".equals(mode) && needsBtPermission()) { requestPermissionForAlias("bluetooth", call, "btPermsPrint"); return; }
+        doPrint(call);
+    }
+
+    @PermissionCallback
+    private void btPermsPrint(PluginCall call) {
+        if (needsBtPermission()) { call.reject("Bluetooth permission denied"); return; }
+        doPrint(call);
+    }
+
+    private void doPrint(final PluginCall call) {
+        final String mode = call.getString("mode", "bluetooth");
+        final String address = call.getString("address", "");
+        final int port = call.getInt("port", 9100);
+        final String data = call.getString("data", "");
+        if (address == null || address.isEmpty()) { call.reject("No printer address set"); return; }
+        final byte[] bytes;
+        try { bytes = Base64.decode(data, Base64.DEFAULT); } catch (Exception e) { call.reject("Bad print data"); return; }
+
+        new Thread(() -> {
+            try {
+                if ("tcp".equals(mode)) printTcp(address, port, bytes);
+                else printBluetooth(address, bytes);
+                call.resolve();
+            } catch (Exception e) {
+                call.reject("Print failed: " + e.getMessage(), e);
+            }
+        }).start();
+    }
+
+    private void printTcp(String host, int port, byte[] bytes) throws Exception {
+        try (Socket s = new Socket()) {
+            s.connect(new InetSocketAddress(host, port), 5000);
+            s.setSoTimeout(5000);
+            OutputStream out = s.getOutputStream();
+            out.write(bytes);
+            out.flush();
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void printBluetooth(String mac, byte[] bytes) throws Exception {
+        BluetoothAdapter a = adapter();
+        if (a == null) throw new Exception("no Bluetooth");
+        BluetoothDevice d = a.getRemoteDevice(mac);
+        a.cancelDiscovery();
+        BluetoothSocket sock = null;
+        try {
+            sock = d.createRfcommSocketToServiceRecord(SPP);
+            sock.connect();
+            OutputStream out = sock.getOutputStream();
+            // write in chunks – many cheap printers have small buffers
+            int chunk = 512;
+            for (int i = 0; i < bytes.length; i += chunk) {
+                out.write(bytes, i, Math.min(chunk, bytes.length - i));
+                out.flush();
+                Thread.sleep(20);
+            }
+            Thread.sleep(300);
+        } finally {
+            if (sock != null) try { sock.close(); } catch (Exception ignored) {}
+        }
+    }
+}

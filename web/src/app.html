@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141418">
+<title>Proview Label</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#1E88E5; --blue-d:#1E73BE; --blue-l:#E3F0FC; --ink:#000; --ink2:#333; --mute:#69727D; --line:#E4E7EB;
+  --bg:#F9F9F9; --ok:#2E9E4F; --warn:#F4A100; --bad:#D32F2F; --pink:#CC3366;
+  --r:10px; --font:Poppins,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;font-family:var(--font);color:var(--ink);background:#fff;overscroll-behavior:none}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+/* desktop preview frame (hidden on phones / in the APK) */
+body.framed{background:linear-gradient(135deg,#0d1b2a 0%,#13293d 55%,#1E73BE 140%);display:flex;align-items:center;justify-content:center;gap:56px;min-height:100vh;height:auto;padding:28px}
+.pitch{color:#fff;max-width:340px;display:none}
+body.framed .pitch{display:block}
+.pitch h1{font-size:34px;line-height:1.08;margin:12px 0 14px;font-weight:800;text-transform:uppercase;letter-spacing:-.5px}
+.pitch h1 span{color:#64B5F6}
+.pitch p{opacity:.82;font-size:14px;line-height:1.6;margin:0 0 10px}
+.pitch ul{padding:0;margin:18px 0 0;list-style:none;font-size:13px;line-height:1.5}
+.pitch li{padding:7px 0;border-top:1px solid rgba(255,255,255,.14);opacity:.9}
+.pitch li b{color:#64B5F6;font-weight:600}
+.device{position:relative;width:100%;height:100%;display:flex;flex-direction:column;background:#fff;overflow:hidden}
+body.framed .device{width:400px;height:820px;max-height:calc(100vh - 56px);border-radius:38px;border:12px solid #111;box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 2px #333;flex:none}
+body.framed .device:before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:22px;background:#111;border-radius:0 0 14px 14px;z-index:200}
+/* header */
+.hdr{flex:none;background:var(--blue);color:#fff;padding:calc(10px + var(--safe-t)) 12px 10px;display:flex;align-items:center;gap:10px;min-height:62px}
+body.framed .hdr{padding-top:24px}
+.hdr .ic{width:40px;height:40px;display:grid;place-items:center;border-radius:8px;color:#fff}
+.hdr .ic:active{background:rgba(255,255,255,.18)}
+.hdr h1{flex:1;margin:0;font-size:21px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.avatar{width:40px;height:40px;border-radius:50%;background:#fff;color:var(--blue);font-weight:700;font-size:14px;display:grid;place-items:center}
+.status{flex:none;background:#0F5FA8;color:#fff;font-size:12px;text-align:center;padding:4px 8px;display:flex;justify-content:center;gap:6px;align-items:center}
+.status.off{background:#5b6570}
+.status.ok{background:var(--ok)}
+.main{flex:1;overflow-y:auto;overflow-x:hidden;background:#fff;-webkit-overflow-scrolling:touch}
+.main.grey{background:var(--bg)}
+/* footer */
+.ftr{flex:none;display:flex;gap:8px;padding:10px 10px calc(10px + var(--safe-b));background:#111;align-items:stretch}
+.ftr .fb{background:var(--blue);color:#fff;border-radius:8px;padding:0 16px;font-weight:600;font-size:16px;min-height:52px;display:flex;align-items:center;gap:6px;position:relative}
+.ftr .loc{flex:1;background:#fff;border-radius:8px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-weight:600;font-size:18px;min-height:52px}
+.ftr .loc small{display:block;font-size:11px;color:var(--mute);font-weight:500;line-height:1}
+.badge{position:absolute;top:-6px;right:-6px;background:var(--pink);color:#fff;border-radius:10px;font-size:11px;min-width:20px;height:20px;display:grid;place-items:center;padding:0 5px}
+/* tabs */
+.seg{display:flex;background:#EEF1F4;margin:12px 14px 0;border-radius:10px;padding:4px}
+.seg button{flex:1;padding:11px 6px;border-radius:7px;font-weight:600;font-size:17px;color:var(--mute);text-transform:uppercase;letter-spacing:.5px}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg.sm button{font-size:14px;text-transform:none;letter-spacing:0;padding:9px 6px}
+.seg.blue button.on{background:var(--blue);color:#fff}
+/* grids & tiles */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px}
+.grid.two{grid-template-columns:repeat(2,1fr)}
+.tile{min-height:96px;border-radius:10px;color:#fff;background:#546E7A;font-weight:600;font-size:17px;padding:8px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;word-break:break-word;box-shadow:0 2px 0 rgba(0,0,0,.12)}
+.tile:active{transform:scale(.97)}
+.ptile{min-height:84px;border-radius:10px;background:#fff;border:1px solid var(--line);font-weight:600;font-size:16px;padding:10px 8px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;line-height:1.15}
+.ptile:active{background:var(--blue-l)}
+.chips{display:flex;flex-wrap:wrap;gap:3px;justify-content:center}
+.chip{font-size:9.5px;font-weight:600;background:#FFF1E0;color:#9A5B00;border-radius:4px;padding:1px 4px;text-transform:uppercase}
+.addnew{display:flex;justify-content:center;padding:4px 0 18px}
+.addnew button{border:1.5px dashed #9AA5B1;border-radius:10px;padding:12px 22px;font-weight:600;font-size:17px;display:flex;align-items:center;gap:6px;color:var(--ink2)}
+.empty{text-align:center;color:var(--mute);padding:40px 24px}
+.empty b{display:block;color:var(--ink);font-size:18px;margin:10px 0 4px}
+.searchbar{margin:12px 14px 0;display:flex;gap:8px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:0 12px}
+.searchbar input{border:0;outline:0;flex:1;padding:12px 0;font-size:16px;background:none}
+/* sheet */
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:40;opacity:0;pointer-events:none;transition:opacity .25s}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-height:94%;background:#fff;z-index:50;border-radius:16px 16px 0 0;transform:translateY(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;box-shadow:0 -10px 30px rgba(0,0,0,.2)}
+.sheet.on{transform:none}
+.sheet .sh{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.sheet .sh h2{flex:1;margin:0;font-size:20px;font-weight:600}
+.sheet .sb{flex:1;overflow-y:auto;padding:14px 16px 8px}
+.sheet .sf{padding:12px 16px calc(14px + var(--safe-b));border-top:1px solid var(--line);display:flex;gap:10px}
+.ver{font-size:11px;background:#EEF1F4;border-radius:6px;padding:3px 7px;color:var(--mute)}
+.modal{position:absolute;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.5)}
+.modal .box{background:#fff;border-radius:14px;padding:20px;width:100%;max-height:90%;overflow:auto}
+.modal h3{margin:0 0 12px;font-size:20px}
+/* form */
+.fld{margin-bottom:16px}
+.lbl{font-size:13px;color:var(--mute);font-weight:500;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.inp{width:100%;border:1px solid #CfD5DB;border-radius:8px;padding:12px;font-size:17px;background:#fff;outline:0}
+.inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-l)}
+textarea.inp{min-height:90px;resize:vertical}
+.rte{min-height:110px;line-height:1.45;font-size:15px}
+.rte b{font-weight:800}
+.row{display:flex;gap:10px;align-items:center}
+.btn{flex:1;border-radius:10px;min-height:54px;font-weight:600;font-size:18px;background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 14px}
+.btn.blue{background:var(--blue)}
+.btn.dark{background:#111}
+.btn.ghost{background:#fff;color:var(--ink);border:1.5px solid #CfD5DB}
+.btn.red{background:var(--bad)}
+.btn:disabled{opacity:.4}
+.btn.sm{min-height:42px;font-size:15px;flex:none}
+.toggle2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 18px}
+.tg{border:1.5px solid #CfD5DB;border-radius:10px;padding:16px 8px;font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;gap:8px}
+.tg .dot{width:22px;height:22px;border-radius:50%;display:none;place-items:center;color:#fff;font-size:13px}
+.tg.on .dot{display:grid}
+.stepper{display:flex;align-items:center;justify-content:space-between}
+.stepper .sv{display:flex;align-items:center;gap:18px}
+.stepper button{width:48px;height:48px;border:1px solid #CfD5DB;border-radius:8px;font-size:24px;font-weight:500;display:grid;place-items:center}
+.stepper b{font-size:22px;min-width:28px;text-align:center}
+.check{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--line);font-size:16px;width:100%;text-align:left}
+.check .bx{width:28px;height:28px;border-radius:7px;border:1.5px solid #9AA5B1;display:grid;place-items:center;color:#fff;flex:none}
+.check.on .bx{background:var(--blue);border-color:var(--blue)}
+.check .rd{width:28px;height:28px;border-radius:50%;border:1.5px solid #9AA5B1;flex:none}
+.check.on .rd{border:8px solid var(--blue)}
+.switch{width:52px;height:30px;border-radius:15px;background:#CfD5DB;position:relative;flex:none;transition:background .2s}
+.switch:after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch.on{background:var(--blue)}
+.switch.on:after{left:25px}
+.pill{display:inline-flex;align-items:center;gap:6px;background:#EEF1F4;border-radius:20px;padding:6px 12px;font-size:13px;font-weight:600}
+.pill.blue{background:var(--blue-l);color:var(--blue-d)}
+.selbox{display:flex;justify-content:space-between;align-items:center;width:100%;border:1px solid #CfD5DB;border-radius:8px;padding:12px;font-size:17px;background:#fff}
+.selbox small{color:var(--mute);font-size:13px}
+.divider{height:1px;background:var(--line);margin:6px 0 16px}
+.reasons{display:flex;flex-wrap:wrap;gap:8px}
+.reasons button{border:1.5px solid #CfD5DB;border-radius:20px;padding:9px 14px;font-size:14px;font-weight:500}
+.reasons button.on{border-color:var(--blue);background:var(--blue-l);color:var(--blue-d);font-weight:600}
+/* menu drawer */
+.drawer{position:absolute;top:0;bottom:0;left:0;width:84%;max-width:340px;background:#fff;z-index:60;transform:translateX(-102%);transition:transform .26s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;box-shadow:10px 0 30px rgba(0,0,0,.25)}
+.drawer.on{transform:none}
+.drawer .dh{padding:calc(18px + var(--safe-t)) 18px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+body.framed .drawer .dh{padding-top:30px}
+.drawer .dl{flex:1;overflow-y:auto;padding:10px}
+.mi{display:flex;align-items:center;gap:14px;width:100%;padding:14px 12px;border-radius:10px;font-size:17px;font-weight:500;text-align:left}
+.mi:active,.mi.on{background:var(--blue-l);color:var(--blue-d)}
+.mi svg{flex:none;color:var(--blue)}
+.mi.inv{color:var(--ink2);font-size:15px;padding:11px 12px}
+.mi.inv svg{color:var(--mute)}
+.drawer .who{padding:14px 18px calc(16px + var(--safe-b));border-top:1px solid var(--line);display:flex;gap:12px;align-items:center;background:var(--bg)}
+.drawer .who .avatar{background:var(--blue);color:#fff}
+/* lists */
+.list{padding:10px 14px}
+.li{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;gap:10px;align-items:center}
+.li .t{flex:1;min-width:0}
+.li .t b{display:block;font-size:16px;font-weight:600}
+.li .t small{color:var(--mute);font-size:12.5px;display:block;margin-top:2px}
+.tag{font-size:11px;font-weight:700;border-radius:5px;padding:3px 7px;text-transform:uppercase;white-space:nowrap}
+.tag.bad{background:#FDECEA;color:var(--bad)} .tag.warn{background:#FFF4DE;color:#A86B00} .tag.ok{background:#E6F5EB;color:var(--ok)} .tag.mute{background:#EEF1F4;color:var(--mute)}
+.sect{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--mute);margin:14px 2px 8px}
+.acc{background:#fff;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;overflow:hidden}
+.acc .ah{display:flex;align-items:center;justify-content:space-between;padding:14px;width:100%;font-weight:600;font-size:17px;text-align:left}
+.acc .ah span.cnt{color:var(--blue);font-size:13px;font-weight:600;margin-left:6px}
+.acc .ab{border-top:1px solid var(--line);padding:4px 14px}
+.acc .ar{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F0F2F4}
+.acc .ar:last-child{border-bottom:0}
+.acc .ar .stepper button{width:40px;height:40px;font-size:20px}
+.acc .ar .stepper .sv{gap:12px}
+.bottombar{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.kv{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:15px}
+.kv span{color:var(--mute)}
+.kv b{font-weight:600;text-align:right}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.big{font-size:28px;font-weight:700;line-height:1}
+/* pin */
+.pinpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.pinpad button{height:62px;border-radius:12px;background:#F1F3F5;font-size:24px;font-weight:600}
+.pinpad button:active{background:var(--blue-l)}
+.pindots{display:flex;justify-content:center;gap:14px;margin:8px 0}
+.pindots i{width:16px;height:16px;border-radius:50%;border:2px solid var(--blue)}
+.pindots i.f{background:var(--blue)}
+.users{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}
+.users button{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;border-radius:10px;font-size:12.5px;width:80px}
+.users button.on{background:var(--blue-l)}
+.users .avatar{background:var(--blue);color:#fff;width:48px;height:48px}
+/* scanner */
+.scanbox{margin:12px 14px;border-radius:12px;background:#111;aspect-ratio:4/3;position:relative;overflow:hidden;display:grid;place-items:center;color:#9AA5B1;text-align:center;font-size:14px}
+.scanbox video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.scanbox .laser{position:absolute;left:10%;right:10%;top:50%;height:2px;background:#ff3b3b;box-shadow:0 0 12px #ff3b3b;animation:las 1.8s ease-in-out infinite}
+@keyframes las{0%,100%{top:28%}50%{top:72%}}
+/* toast */
+.toast{position:absolute;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);background:#111;color:#fff;padding:11px 18px;border-radius:24px;font-size:14px;font-weight:500;z-index:120;opacity:0;transition:all .25s;pointer-events:none;max-width:88%;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%)}
+/* printing animation */
+.printout{position:absolute;left:0;right:0;top:0;z-index:100;display:flex;flex-direction:column;align-items:center;pointer-events:none}
+.printout .slot{width:92%;height:10px;background:#222;border-radius:0 0 6px 6px;position:relative;z-index:2}
+.printout .paper{overflow:hidden;width:86%}
+.printout .paper .lab{animation:feed 2.6s ease-out forwards;transform:translateY(-110%)}
+@keyframes feed{0%{transform:translateY(-110%)}30%{transform:translateY(0)}85%{transform:translateY(0);opacity:1}100%{transform:translateY(0);opacity:0}}
+.printout .pq{margin-top:10px;background:#fff;border-radius:10px;padding:10px 14px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:14px;font-weight:600;display:flex;gap:10px;align-items:center}
+.spin{width:16px;height:16px;border:2.5px solid var(--blue-l);border-top-color:var(--blue);border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* thermal label */
+.lab{background:#fff;color:#000;font-family:"Arial Narrow",Arial,Helvetica,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.3);padding:8px 10px 6px;width:100%;line-height:1.15}
+.lab .ln{font-size:22px;font-weight:800;text-align:center;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.lab .ub{display:flex;justify-content:space-between;background:#000;color:#fff;padding:3px 6px;font-size:14px;font-weight:700;margin:0 -10px 4px}
+.lab .ub span:first-child{font-weight:500}
+.lab .r2{display:flex;justify-content:space-between;font-size:11px;font-weight:700}
+.lab .al{font-size:10.5px;font-weight:700;margin-top:2px;text-transform:uppercase}
+.lab .bt{display:flex;justify-content:space-between;align-items:flex-end;margin-top:4px;gap:6px}
+.lab .flag{background:#000;color:#fff;font-size:11px;font-weight:800;padding:2px 6px}
+.lab .bc svg{height:30px;width:auto;max-width:150px;display:block}
+.lab .ing{font-size:9.5px;line-height:1.2;margin:3px 0;text-align:left}
+.lab .ing b{font-weight:900;text-decoration:underline}
+.lab .price{font-size:20px;font-weight:800}
+.lab .meta{font-size:9px;color:#000}
+.lab.dbl .ing{font-size:10.5px}
+.preview-wrap{background:#EEF1F4;border-radius:12px;padding:16px;display:flex;justify-content:center}
+.preview-wrap .lab{max-width:300px}
+.hint{font-size:12.5px;color:var(--mute);line-height:1.5}
+a{color:var(--blue-d)}
+.pv-logo{display:flex;align-items:center;gap:8px;font-weight:800;letter-spacing:.2px}
+.pv-logo .mk{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,#1E88E5,#1E3A5F);color:#fff;display:grid;place-items:center;font-size:15px;font-style:italic}
+.pv-logo .wd{font-size:16px;line-height:1}
+.pv-logo .wd span{color:var(--blue)}
+.pv-logo .wd small{display:block;font-size:10px;font-weight:600;color:var(--mute);letter-spacing:1.6px;margin-top:2px}
+body.framed .pv-logo .wd{color:#fff}
+body.framed .pitch .pv-logo .wd small{color:#9CC6EE}
+.drawer .pv-logo .wd{color:#000}
+
+/* ===== Proview CRM theme (same tokens as Bookings / Employee / the Label back-office) ===== */
+:root{--blue:#4a6cd0;--blue-d:#3a59b8;--blue-l:#edf2fd;--grad:linear-gradient(135deg,#2f84d4 0%,#5a5fbb 100%);--grad-light:linear-gradient(90deg,#62b0ec 0%,#8b88dc 100%);
+  --ink:#17171c;--ink2:#26262e;--mute:#55555f;--line:#e4e2dc;--bg:#f4f3ef;--ok:#12a150;--warn:#d48a00;--bad:#d92d20;--pink:#d92d20;
+  --font:Inter,"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;--r:12px}
+body{font-size:15px}
+body.framed{background:#141418;background-image:radial-gradient(circle at 78% 30%,rgba(74,108,208,.45),transparent 45%)}
+.pitch h1{text-transform:none;letter-spacing:-.03em;font-size:38px;line-height:1.05}
+.pitch h1 span{background:var(--grad-light);-webkit-background-clip:text;background-clip:text;color:transparent}
+.pitch p{color:#9a9aa4;opacity:1}
+.pitch li{border-top-color:#26262e;color:#c9c9d1}
+.pitch li b{color:#8fb3f2}
+.pv-logo .mk{background:url(%%MARK_SM%%) center/contain no-repeat;color:transparent;width:36px;height:26px;border-radius:0;font-size:0}
+.pv-logo .wd{font-weight:500;letter-spacing:.04em;font-size:15px}
+.pv-logo .wd span{background:var(--grad-light);-webkit-background-clip:text;background-clip:text;color:transparent}
+.pv-logo .wd small{letter-spacing:.08em;color:#8b8b95;font-weight:500;text-transform:uppercase}
+body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 2px #26262e}
+.hdr{background:#141418}
+.hdr h1{font-weight:650;font-size:20px;letter-spacing:-.01em}
+.hdr .ic:active{background:#26262e}
+.avatar{background:var(--grad);color:#fff;font-weight:700}
+.status{background:#26262e;color:#c9c9d1}
+.status.ok{background:#1f1f25;color:#9fdcc5}
+.status.off{background:#3a1f1f;color:#f2b8be}
+.main{background:var(--bg)}
+.main.grey{background:var(--bg)}
+.ftr{background:#141418}
+.ftr .fb{background:#26262e;border-radius:10px}
+.ftr .loc{border-radius:10px}
+.badge{background:var(--bad)}
+.seg{background:#fff;border:1px solid var(--line);border-radius:12px;padding:3px}
+.seg button{color:var(--mute);font-weight:600;letter-spacing:.02em}
+.seg button.on{background:var(--blue-l);color:var(--blue);box-shadow:none}
+.seg.blue button.on{background:var(--grad);color:#fff}
+.tile{border-radius:var(--r);box-shadow:0 1px 2px rgba(20,20,30,.08),0 4px 12px rgba(20,20,30,.06);font-weight:650}
+.ptile{border-radius:var(--r);border-color:var(--line);box-shadow:0 1px 2px rgba(20,20,30,.05)}
+.ptile:active{background:var(--blue-l);border-color:var(--blue)}
+.chip{background:#fdf3de;color:#9a6400;border-radius:20px;padding:1px 7px;text-transform:none;font-size:10.5px}
+.addnew button{border:1px dashed #cfccc4;border-radius:12px;background:#fff;color:var(--ink)}
+.searchbar{border-radius:12px;border-color:var(--line)}
+.sheet{border-radius:20px 20px 0 0}
+.sheet .sh h2{font-weight:650}
+.inp{border-color:var(--line);border-radius:10px}
+.inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-l)}
+.btn{background:var(--grad);border-radius:12px;font-weight:600}
+.btn.blue{background:var(--grad)}
+.btn.dark{background:#141418}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.red{background:var(--bad)}
+.tg{border-color:var(--line);border-radius:12px;background:#fff}
+.stepper button{border-color:var(--line);border-radius:50%;background:#fff}
+.check{border-bottom-color:var(--line)}
+.check.on .bx{background:var(--blue);border-color:var(--blue)}
+.check.on .rd{border-color:var(--blue)}
+.switch.on{background:var(--blue)}
+.pill{background:#efeee9;border-radius:20px}
+.pill.blue{background:var(--blue-l);color:var(--blue)}
+.reasons button{border-color:var(--line);background:#fff}
+.reasons button.on{border-color:var(--blue);background:var(--blue-l);color:var(--blue)}
+.li,.card,.acc{border-color:var(--line);border-radius:var(--r);box-shadow:0 1px 2px rgba(20,20,30,.05)}
+.tag{border-radius:20px;text-transform:none;letter-spacing:0;font-size:11.5px}
+.tag.bad{background:#fdf0ef;color:var(--bad)}.tag.warn{background:#fdf3de;color:var(--warn)}.tag.ok{background:#e7f6ed;color:var(--ok)}.tag.mute{background:#efeee9;color:var(--mute)}
+.sect{letter-spacing:.08em;font-weight:600;font-size:11.5px;color:#6e6e78}
+.kv{border-bottom-color:var(--line)}
+.big{letter-spacing:-.02em}
+/* menu drawer = CRM sidebar */
+.drawer{background:#141418;color:#c9c9d1}
+.drawer .dh{border-bottom:1px solid #26262e}
+.drawer .dh .ic{color:#c9c9d1!important}
+.drawer .pv-logo .wd{color:#fff}
+.drawer .dl{padding:10px}
+.mi{color:#c9c9d1;border-radius:9px;font-size:16px;padding:12px}
+.mi svg{color:#8b8b95}
+.mi:active,.mi.on{background:#26262e;color:#fff}
+.mi.on svg{color:#8fb3f2}
+.mi.inv{color:#9a9aa4}
+.drawer .divider{background:#26262e!important}
+.drawer .who{background:#1f1f25;border-top:1px solid #26262e;color:#fff}
+.drawer .who .hint{color:#8b8b95}
+.drawer .who .avatar{background:var(--grad)}
+.users .avatar{background:var(--grad)}
+.pindots i{border-color:var(--blue)}.pindots i.f{background:var(--blue)}
+.pinpad button{background:#f4f3ef;border-radius:14px}
+.modal .box{border-radius:20px}
+.toast{background:#141418;border-radius:12px}
+.preview-wrap{background:#efeee9}
+.spin{border-color:var(--blue-l);border-top-color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="pitch">
+  <div class="pv-logo"><div class="mk">PV</div><div class="wd">PROVIEW<span>LABEL</span><small>Android app preview</small></div></div>
+  <h1>Print a label in <span>three taps.</span></h1>
+  <p>Try it: <b>Dairy → Brie → Print</b>. This is the Android app running in your browser with demo data. Everything you do here is saved on this screen only.</p>
+  <ul>
+    <li><b>Prep labels</b> with use-by dates from storage rules</li>
+    <li><b>Natasha's Law</b> sale labels with allergens in bold</li>
+    <li><b>Bulk print</b>, <b>scan to reprint</b>, <b>expiry tracking</b></li>
+    <li><b>Wastage logging</b> with photos, <b>label re-ordering</b></li>
+    <li>Staff <b>profiles with PINs</b> and permissions</li>
+    <li>Syncs live with the <b>Proview Label back-office</b></li>
+  </ul>
+</div>
+<div class="device" id="device">
+  <div class="hdr" id="hdr"></div>
+  <div class="status" id="status"></div>
+  <div class="main" id="main"></div>
+  <div class="ftr" id="ftr"></div>
+  <div class="scrim" id="scrim"></div>
+  <div class="drawer" id="drawer"></div>
+  <div class="sheet" id="sheet"></div>
+  <div id="modal"></div>
+  <div class="printout" id="printout"></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>/*JSBARCODE*/</script>
+<script>/*SUPABASE*/</script>
+<script>/*CONFIG*/</script>
+<script>/*CORE*/</script>
+<script>/*CLOUD*/</script>
+<script>
+(function(){
+'use strict';
+const P = window.PVL;
+const $ = (s, r) => (r || document).querySelector(s);
+const esc = P.esc;
+const APP_VERSION = '1.1.0';
+const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
+
+// framed preview on wide screens (never in the APK)
+function frame(){ document.body.classList.toggle('framed', !isNative && window.innerWidth >= 760); }
+frame(); window.addEventListener('resize', frame);
+
+// ---------- icons ----------
+const I = {
+  menu:'<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>',
+  back:'<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  close:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  sync:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/></svg>',
+  search:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+  plus:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  chev:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+  down:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  tick:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
+  print:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/></svg>',
+  log:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>',
+  stack:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="14" height="14" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v12"/></svg>',
+  scan:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>',
+  bin:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
+  box:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>',
+  users:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/></svg>',
+  swap:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',
+  info:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
+  help:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.5"/></svg>',
+  gear:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  queue:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h7"/></svg>',
+  edit:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
+  cam:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
+};
+
+// ---------- state ----------
+let S = P.load();
+// ---------- Proview Label cloud (live sync with the back-office) ----------
+const Cloud = window.PVLCloud || { enabled: false };
+const DEV_KEY = 'pvl-device';
+let CONN = null;   // { uid, email, orgId, siteId } once this handheld is connected
+try { CONN = JSON.parse(localStorage.getItem(DEV_KEY) || 'null'); } catch (e) { CONN = null; }
+if (Cloud.enabled && CONN) S = P.useStore('cloud:' + CONN.uid, { blank: true });
+const connected = () => !!(Cloud.enabled && CONN);
+const ui = {
+  screen: 'home', stack: [], tab: localStorageGet('pvl_tab') || 'prep', category: null, sort: 'alpha',
+  ruleId: localStorageGet('pvl_rule') || 'r_fridge', queue: [], printing: false, syncing: false,
+  bulk: {}, bulkOpen: {}, logFilter: 'all', search: ''
+};
+function localStorageGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+function localStorageSet(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
+const user = () => P.byId('users', S.currentUserId) || P.live('users').find(u=>(u.siteIds||[]).includes(S.currentSiteId)) || P.live('users')[0] || { id:'-', name:'Not signed in', role:'manager', siteIds:[] };
+const site = () => P.byId('sites', S.currentSiteId) || P.live('sites')[0] || { id:null, name:'No site yet', address:'', orgId:null };
+const ORG = () => (site()||{}).orgId || null;
+// this device only sees its own business's catalogue (products, categories, rules)
+const L = (coll) => P.live(coll).filter(x => !x.orgId || !ORG() || x.orgId === ORG());
+// everything the device creates belongs to its business
+const up = (coll, rec) => P.upsert(coll, { orgId: ORG(), ...rec });
+const orgSet = (k) => { const o=(S.orgs||[]).find(x=>x.id===ORG()); const v=o&&o.settings?o.settings[k]:undefined; return v!==undefined?v:S.settings[k]; };
+const rule = (id) => P.byId('rules', id) || L('rules').find(r=>r.name==='Fridge') || L('rules')[0] || { id:'_fridge', name:'Fridge', units:2, period:'days' };
+const canManage = () => ['admin','manager'].includes(user().role);
+const canEditProducts = () => canManage() || !!orgSet('staffCanEdit');
+const siteUsers = () => P.live('users').filter(u => (u.siteIds||[]).includes(S.currentSiteId));
+
+// ---------- helpers ----------
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),2400); }
+function go(screen, opts){ ui.stack.push({screen:ui.screen, category:ui.category}); ui.screen=screen; Object.assign(ui, opts||{}); closeDrawer(); render(); $('#main').scrollTop=0; }
+function back(){ const p=ui.stack.pop(); if(p){ ui.screen=p.screen; ui.category=p.category; } else ui.screen='home'; stopScanner(); render(); }
+function root(screen){ ui.stack=[]; ui.screen=screen; stopScanner(); closeDrawer(); render(); $('#main').scrollTop=0; }
+function rel(iso){ const m=Math.round((Date.now()-new Date(iso))/60000); if(m<1) return 'just now'; if(m<60) return m+' min ago'; const h=Math.round(m/60); if(h<24) return h+' hr ago'; return Math.round(h/24)+' days ago'; }
+function confirmBox(title, text, okLabel, cb, danger){
+  $('#modal').innerHTML = `<div class="modal"><div class="box"><h3>${esc(title)}</h3><p class="hint" style="font-size:15px;color:#333">${esc(text)}</p><div class="row" style="margin-top:18px"><button class="btn ghost" data-x>Cancel</button><button class="btn ${danger?'red':'blue'}" data-ok>${esc(okLabel)}</button></div></div></div>`;
+  $('#modal [data-x]').onclick=()=>$('#modal').innerHTML='';
+  $('#modal [data-ok]').onclick=()=>{ $('#modal').innerHTML=''; cb(); };
+}
+function needManager(fn){ if(canManage()) return fn(); confirmBox('Manager access needed', 'Only managers and admins can do this. Switch to a manager profile to continue.', 'Switch profile', openSwitch); }
+
+// ---------- chrome ----------
+const TITLES = { home:'Categories', products:'Products', search:'Search', storage:'Storage Location', bulk:'Bulk Print', scan:'Scan to Print', logs:'Logs', 'log-expiry':'Expiry Report', 'log-print':'Print Log', 'log-waste':'Wastage Log', wastage:'Log Wastage', order:'Label Order', profiles:'Manage Profiles', about:'About Device', support:'Support', settings:'Settings' };
+const MENU_ROOTS = ['home','logs','bulk','scan','wastage','order','profiles','about','support','settings'];
+function renderHeader(){
+  const isRoot = MENU_ROOTS.includes(ui.screen) && ui.stack.length===0 || ui.screen==='home';
+  const title = ui.screen==='products' && ui.category ? ui.category.name : TITLES[ui.screen];
+  $('#hdr').innerHTML = `
+    <button class="ic" id="hNav" aria-label="${isRoot?'Menu':'Back'}">${isRoot?I.menu:I.back}</button>
+    <h1>${esc(title)}</h1>
+    ${['home','products'].includes(ui.screen)?`<button class="ic" id="hSearch" aria-label="Search">${I.search}</button>`:''}
+    <button class="ic" id="hSync" aria-label="Sync">${I.sync}</button>
+    <button class="avatar" id="hUser" aria-label="Switch profile">${esc(P.initials(user().name))}</button>`;
+  $('#hNav').onclick = isRoot ? openDrawer : back;
+  const hs=$('#hSearch'); if(hs) hs.onclick=()=>go('search',{search:''});
+  $('#hSync').onclick = doSync;
+  $('#hUser').onclick = openSwitch;
+  if(ui.syncing) $('#hSync svg').style.animation='sp 1s linear infinite';
+}
+function renderStatus(){
+  const st=$('#status'); const cfg=S.settings.sync;
+  if(ui.syncing){ st.className='status'; st.innerHTML='<span class="spin" style="border-color:rgba(255,255,255,.3);border-top-color:#fff"></span> Syncing…'; return; }
+  if(!navigator.onLine){ st.className='status off'; st.textContent='Offline – printing still works · '+site().name; }
+  else if(connected()){ st.className='status ok'; st.textContent=(cfg.lastSync?'Synced '+rel(cfg.lastSync):'Connected')+' · '+site().name; }
+  else { st.className='status'; st.textContent='Demo data · '+site().name; }
+}
+function renderFooter(){
+  const f=$('#ftr');
+  if(!['home','products','search'].includes(ui.screen)){ f.style.display='none'; return; }
+  f.style.display='flex';
+  const r=rule(ui.ruleId); const qn=ui.queue.reduce((a,x)=>a+x.qty,0);
+  f.innerHTML = `<button class="fb" id="fMisc">Misc</button>
+    ${qn?`<button class="fb" id="fQueue" aria-label="Print queue">${I.queue}<span class="badge">${qn}</span></button>`:''}
+    <button class="loc" id="fLoc"><div style="text-align:left"><small>Storage</small>${esc(r.name)}</div>${I.down}</button>`;
+  $('#fMisc').onclick=openMisc;
+  $('#fLoc').onclick=()=>go('storage');
+  const fq=$('#fQueue'); if(fq) fq.onclick=showQueue;
+}
+function openDrawer(){
+  const items=[['home','Print Screen',I.print],['logs','Logs',I.log],['bulk','Bulk Print',I.stack],['scan','Scan to print mode',I.scan],['wastage','Wastage',I.bin],['order','Label Order',I.box]];
+  const inv=[['profiles','Manage Profiles',I.users],['switch','Switch Profiles',I.swap],['about','About Device',I.info],['support','Support',I.help],['settings','Settings',I.gear]];
+  $('#drawer').innerHTML = `<div class="dh"><div class="pv-logo"><div class="mk">PV</div><div class="wd">PROVIEW<span>LABEL</span><small>${esc(site().name.toUpperCase())}</small></div></div><button class="ic" id="dClose" style="color:#000">${I.close}</button></div>
+    <div class="dl">${items.map(([k,l,ic])=>`<button class="mi ${ui.screen===k?'on':''}" data-k="${k}">${ic}${l}</button>`).join('')}
+      <div class="divider" style="margin:10px 8px"></div>
+      ${inv.map(([k,l,ic])=>`<button class="mi inv" data-k="${k}">${ic}${l}</button>`).join('')}</div>
+    <div class="who"><div class="avatar">${esc(P.initials(user().name))}</div><div style="flex:1"><b style="font-size:15px">${esc(user().name)}</b><div class="hint">${P.ROLES[user().role]} · v${APP_VERSION}</div></div></div>`;
+  $('#drawer').classList.add('on'); $('#scrim').classList.add('on'); $('#scrim').onclick=closeAll;
+  $('#dClose').onclick=closeDrawer;
+  $('#drawer').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.k; closeDrawer();
+    if(k==='switch') return openSwitch();
+    if(k==='profiles'||k==='settings') return needManager(()=>root(k));
+    root(k);
+  });
+}
+function closeDrawer(){ $('#drawer').classList.remove('on'); if(!$('#sheet').classList.contains('on')) $('#scrim').classList.remove('on'); }
+function closeAll(){ closeDrawer(); closeSheet(); }
+function openSheet(title, body, foot, right){
+  const sh=$('#sheet');
+  sh.innerHTML = `<div class="sh"><button class="ic" data-close style="width:36px">${I.close}</button><h2>${esc(title)}</h2>${right||''}</div><div class="sb">${body}</div>${foot?`<div class="sf">${foot}</div>`:''}`;
+  sh.classList.add('on'); $('#scrim').classList.add('on'); $('#scrim').onclick=closeAll;
+  sh.querySelector('[data-close]').onclick=closeSheet;
+  return sh;
+}
+function closeSheet(){ $('#sheet').classList.remove('on'); $('#scrim').classList.remove('on'); }
+
+// ---------- screens ----------
+const screens = {};
+function catsFor(type){ return L('categories').filter(c=>c.type===type); }
+function prodsFor(catId){ return L('products').filter(p=>p.categoryId===catId); }
+function segHTML(){ return `<div class="seg" id="seg"><button data-t="prep" class="${ui.tab==='prep'?'on':''}">Prep</button><button data-t="sale" class="${ui.tab==='sale'?'on':''}">Sale</button></div>`; }
+function bindSeg(after){ $('#seg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ ui.tab=b.dataset.t; localStorageSet('pvl_tab',ui.tab); after?after():render(); }); }
+
+screens.home = () => {
+  const cats=catsFor(ui.tab);
+  $('#main').innerHTML = segHTML() + `<div class="grid">${cats.map(c=>`<button class="tile" data-c="${c.id}" style="background:${c.color||'#546E7A'}">${esc(c.name)}</button>`).join('')}</div>
+    ${cats.length?'':'<div class="empty">No categories yet</div>'}
+    <div class="addnew"><button id="addCat">${I.plus} Add new</button></div>`;
+  bindSeg();
+  $('#main').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>go('products',{category:P.byId('categories',b.dataset.c)}));
+  $('#addCat').onclick=()=>needManager(newCategory);
+};
+
+function productTile(p){ const al=P.productAllergens(p); return `<button class="ptile" data-p="${p.id}">${esc(p.name)}${al.length?`<span class="chips">${al.slice(0,3).map(a=>`<span class="chip">${esc(a)}</span>`).join('')}${al.length>3?`<span class="chip">+${al.length-3}</span>`:''}</span>`:''}${p.price!=null&&ui.tab==='sale'?`<span class="hint">${P.money(p.price)}</span>`:''}</button>`; }
+screens.products = () => {
+  const c=ui.category; if(!c) return root('home');
+  let ps=prodsFor(c.id);
+  ps = ui.sort==='alpha' ? ps.sort((a,b)=>a.name.localeCompare(b.name)) : ps.sort((a,b)=>(b.timesPrinted||0)-(a.timesPrinted||0));
+  $('#main').classList.add('grey');
+  $('#main').innerHTML = `<div class="seg sm blue" id="sortSeg"><button data-s="alpha" class="${ui.sort==='alpha'?'on':''}">Sort A–Z</button><button data-s="freq" class="${ui.sort==='freq'?'on':''}">Freq. Printed</button></div>
+    ${ps.length?`<div class="grid">${ps.map(productTile).join('')}</div>`:`<div class="empty">${I.box}<b>No products found</b>Create a new product and it will be stored here.</div>`}
+    <div class="addnew"><button id="addProd">${I.plus} Add new</button></div>`;
+  $('#sortSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.sort=b.dataset.s;render();});
+  $('#main').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>openPrint(P.byId('products',b.dataset.p)));
+  $('#addProd').onclick=()=>canEditProducts()?productForm(null,c):needManager(()=>productForm(null,c));
+};
+
+screens.search = () => {
+  $('#main').classList.add('grey');
+  $('#main').innerHTML = `<div class="searchbar">${I.search}<input id="q" placeholder="Search products or scan barcode" value="${esc(ui.search)}" autocomplete="off"></div><div id="res"></div>`;
+  const draw=()=>{
+    const q=ui.search.trim().toLowerCase();
+    const ps=L('products').filter(p=>!q || p.name.toLowerCase().includes(q) || (p.barcode||'')===q);
+    $('#res').innerHTML = ps.length?`<div class="grid">${ps.map(p=>{const c=P.byId('categories',p.categoryId);return productTile(p).replace('</button>',`<span class="hint">${esc(c?c.name:'')} · ${c&&c.type==='sale'?'Sale':'Prep'}</span></button>`);}).join('')}</div>`:'<div class="empty"><b>No matches</b>Try another name.</div>';
+    $('#res').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ const p=P.byId('products',b.dataset.p); const c=P.byId('categories',p.categoryId); if(c) ui.tab=c.type; openPrint(p); });
+  };
+  const q=$('#q'); q.oninput=()=>{ui.search=q.value;draw();}; draw(); setTimeout(()=>q.focus(),50);
+};
+
+screens.storage = () => {
+  const rs=L('rules');
+  $('#main').innerHTML = `<div class="grid two">${rs.map(r=>`<button class="tile" data-r="${r.id}" style="background:${r.id===ui.ruleId?'#4a6cd0':'#26262e'};min-height:104px;flex-direction:column;gap:6px">${esc(r.name)}<span style="font-size:13px;font-weight:500;opacity:.85">${P.ruleText(r)}</span></button>`).join('')}</div>
+    <div class="addnew"><button id="addRule">${I.plus} Add new</button></div>
+    <p class="hint" style="padding:0 18px">Storage location sets the default use-by date for prep labels. Products with their own expiry rule always use that rule.</p>`;
+  $('#main').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{ ui.ruleId=b.dataset.r; localStorageSet('pvl_rule',ui.ruleId); toast('Storage: '+rule(ui.ruleId).name); back(); });
+  $('#addRule').onclick=()=>needManager(newRule);
+};
+
+screens.logs = () => {
+  const active=P.live('labels').filter(l=>l.siteId===S.currentSiteId && l.type==='prep');
+  const exp=active.filter(l=>P.expiryStatus(l)==='expired').length, today=active.filter(l=>P.expiryStatus(l)==='today').length;
+  $('#main').innerHTML = `<div class="list">
+    <button class="li" style="width:100%" data-g="log-expiry"><div class="t"><b>Expiry Report</b><small>${exp} expired · ${today} expiring within 24 hrs</small></div>${exp?'<span class="tag bad">Action</span>':''}${I.chev}</button>
+    <button class="li" style="width:100%" data-g="log-print"><div class="t"><b>Print Log</b><small>Every label printed and who printed it</small></div>${I.chev}</button>
+    <button class="li" style="width:100%" data-g="log-waste"><div class="t"><b>Wastage Log</b><small>Discarded items with reason and quantity</small></div>${I.chev}</button>
+  </div>`;
+  $('#main').querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>go(b.dataset.g));
+};
+screens['log-expiry'] = () => {
+  const ls=P.live('labels').filter(l=>l.siteId===S.currentSiteId && l.type==='prep' && (!l.status||l.status==='active')).sort((a,b)=>new Date(a.expiry)-new Date(b.expiry));
+  const groups={expired:[],today:[],ok:[]}; ls.forEach(l=>groups[P.expiryStatus(l)].push(l));
+  const row=(l,st)=>`<div class="li"><div class="t"><b>${esc(l.name)}${l.qty>1?' ×'+l.qty:''}</b><small>Use by ${P.fmtDay(l.expiry)} ${P.fmtDate(l.expiry, l.ruleName==='Hot Holding')} · ${esc(l.ruleName||'')} · ${esc(l.code)}</small></div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><span class="tag ${st==='expired'?'bad':st==='today'?'warn':'ok'}">${st==='expired'?'Expired':st==='today'?'Today':'OK'}</span>
+      <div class="row" style="gap:6px"><button class="pill" data-used="${l.id}">Used</button><button class="pill" style="background:#FDECEA;color:#D32F2F" data-waste="${l.id}">Waste</button></div></div></div>`;
+  $('#main').classList.add('grey');
+  $('#main').innerHTML = `<div class="list">
+    ${groups.expired.length?`<div class="sect" style="color:#D32F2F">Expired – remove now (${groups.expired.length})</div>${groups.expired.map(l=>row(l,'expired')).join('')}`:''}
+    ${groups.today.length?`<div class="sect" style="color:#A86B00">Expiring within 24 hours (${groups.today.length})</div>${groups.today.map(l=>row(l,'today')).join('')}`:''}
+    <div class="sect">In date (${groups.ok.length})</div>${groups.ok.map(l=>row(l,'ok')).join('')||'<div class="hint">Nothing else tracked.</div>'}
+  </div>`;
+  $('#main').querySelectorAll('[data-used]').forEach(b=>b.onclick=()=>{ const l=P.byId('labels',b.dataset.used); up('labels',{...l,status:'used'}); S=P.get(); toast(l.name+' marked as used'); render(); });
+  $('#main').querySelectorAll('[data-waste]').forEach(b=>b.onclick=()=>{ const l=P.byId('labels',b.dataset.waste); wasteForm({productId:l.productId, labelId:l.id, qty:l.qty, reason: P.expiryStatus(l)==='expired'?'Expired':''}); });
+};
+screens['log-print'] = () => {
+  const f=ui.logFilter;
+  let ls=P.live('labels').filter(l=>l.siteId===S.currentSiteId).sort((a,b)=>new Date(b.printedAt)-new Date(a.printedAt));
+  const day=864e5; if(f==='today') ls=ls.filter(l=>new Date(l.printedAt).toDateString()===new Date().toDateString()); if(f==='7d') ls=ls.filter(l=>Date.now()-new Date(l.printedAt)<7*day);
+  const total=ls.reduce((a,l)=>a+(l.qty||1),0);
+  $('#main').classList.add('grey');
+  $('#main').innerHTML = `<div class="seg sm blue" id="lf"><button data-f="today" class="${f==='today'?'on':''}">Today</button><button data-f="7d" class="${f==='7d'?'on':''}">7 days</button><button data-f="all" class="${f==='all'?'on':''}">All</button></div>
+    <div class="list"><div class="sect">${total} labels · ${ls.length} print jobs</div>
+    ${ls.slice(0,200).map(l=>{const u=P.byId('users',l.userId);return `<button class="li" style="width:100%;text-align:left" data-r="${l.id}"><div class="t"><b>${esc(l.name)}${l.qty>1?' ×'+l.qty:''}</b><small>${P.fmtDate(l.printedAt,true)} · ${esc(u?u.name:'—')} · ${l.type==='sale'?'Sale':esc(l.ruleName||'')}</small></div><span class="tag mute">Reprint</span></button>`;}).join('')||'<div class="empty">No labels printed in this period.</div>'}</div>`;
+  $('#lf').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.logFilter=b.dataset.f;render();});
+  $('#main').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>reprintLabel(P.byId('labels',b.dataset.r)));
+};
+screens['log-waste'] = () => {
+  const ws=P.live('wastage').filter(w=>w.siteId===S.currentSiteId).sort((a,b)=>new Date(b.at)-new Date(a.at));
+  const cost=ws.reduce((a,w)=>a+(+w.cost||0),0);
+  $('#main').classList.add('grey');
+  $('#main').innerHTML = `<div class="list"><div class="card" style="display:flex;justify-content:space-around;text-align:center"><div><div class="big">${ws.reduce((a,w)=>a+(+w.qty||0),0)}</div><div class="hint">items wasted</div></div><div><div class="big">${P.money(cost)}</div><div class="hint">estimated cost</div></div></div>
+    <button class="btn blue" id="newW" style="width:100%;margin-bottom:12px">${I.plus} Log wastage</button>
+    ${ws.map(w=>{const u=P.byId('users',w.userId);return `<div class="li">${w.photo?`<img src="${w.photo}" style="width:46px;height:46px;border-radius:8px;object-fit:cover">`:''}<div class="t"><b>${esc(w.name)} ×${w.qty}</b><small>${esc(w.reason)} · ${P.fmtDate(w.at,true)} · ${esc(u?u.name:'')}${w.notes?' · '+esc(w.notes):''}</small></div><b>${P.money(w.cost)}</b></div>`;}).join('')||'<div class="empty">No wastage logged.</div>'}</div>`;
+  $('#newW').onclick=()=>wasteForm({});
+};
+
+screens.wastage = () => {
+  $('#main').classList.add('grey');
+  $('#main').innerHTML = `<div class="list"><p class="hint" style="font-size:14px">Record anything thrown away. Managers see wastage reports in the Proview back-office.</p>
+  <button class="btn blue" id="newW" style="width:100%;margin:8px 0 16px">${I.plus} Log wastage</button>
+  <button class="li" style="width:100%" id="toLog"><div class="t"><b>View wastage log</b><small>${P.live('wastage').filter(w=>w.siteId===S.currentSiteId).length} entries at this site</small></div>${I.chev}</button></div>`;
+  $('#newW').onclick=()=>wasteForm({});
+  $('#toLog').onclick=()=>go('log-waste');
+};
+
+screens.bulk = () => {
+  const cats=catsFor(ui.tab);
+  const total=Object.values(ui.bulk).reduce((a,x)=>a+x.qty,0);
+  $('#main').innerHTML = segHTML() + `<div class="list">${cats.map(c=>{
+      const ps=prodsFor(c.id).sort((a,b)=>a.name.localeCompare(b.name));
+      const n=ps.reduce((a,p)=>a+((ui.bulk[p.id]||{}).qty||0),0);
+      const open=ui.bulkOpen[c.id];
+      return `<div class="acc"><button class="ah" data-acc="${c.id}"><span><i style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${c.color||'#546E7A'};margin-right:8px"></i>${esc(c.name)}${n?`<span class="cnt">(${n} labels selected)</span>`:''}</span>${open?I.down:I.chev}</button>
+      ${open?`<div class="ab">${ps.map(p=>`<div class="ar"><span style="font-size:16px">${esc(p.name)}</span><div class="stepper"><div class="sv"><button data-dec="${p.id}">−</button><b>${(ui.bulk[p.id]||{}).qty||0}</b><button data-inc="${p.id}">+</button></div></div></div>`).join('')||'<p class="hint">No products found in this category.</p>'}</div>`:''}</div>`;
+    }).join('')}</div>
+    <div class="bottombar">${total?`<div style="text-align:center;font-weight:600">${total} label${total!==1?'s':''} selected</div>`:''}<div class="row"><button class="btn ghost" id="bReset" ${total?'':'disabled'}>Reset</button><button class="btn" id="bPrev" ${total?'':'disabled'}>Preview</button></div></div>`;
+  bindSeg(()=>{ ui.bulk={}; render(); });
+  $('#main').querySelectorAll('[data-acc]').forEach(b=>b.onclick=()=>{ ui.bulkOpen[b.dataset.acc]=!ui.bulkOpen[b.dataset.acc]; render(); });
+  const setQ=(id,d)=>{ const p=P.byId('products',id); const q=Math.max(0,Math.min(50,((ui.bulk[id]||{}).qty||0)+d)); if(q) ui.bulk[id]={product:p,qty:q}; else delete ui.bulk[id]; const y=$('#main').scrollTop; render(); $('#main').scrollTop=y; };
+  $('#main').querySelectorAll('[data-inc]').forEach(b=>b.onclick=()=>setQ(b.dataset.inc,1));
+  $('#main').querySelectorAll('[data-dec]').forEach(b=>b.onclick=()=>setQ(b.dataset.dec,-1));
+  $('#bReset').onclick=()=>{ ui.bulk={}; render(); };
+  $('#bPrev').onclick=()=>{
+    const items=Object.values(ui.bulk);
+    const sh=openSheet('Bulk Print', `<div class="sect" style="margin-top:0">${total} labels · storage ${esc(rule(ui.ruleId).name)}</div>${items.map(x=>`<div class="kv"><span><b style="color:#000">${x.qty} ×</b></span><b>${esc(x.product.name)}</b></div>`).join('')}`, `<button class="btn" id="bGo">${I.print} Print</button>`);
+    sh.querySelector('#bGo').onclick=()=>{ items.forEach(x=>enqueue(buildJob(x.product,{qty:x.qty}))); ui.bulk={}; closeSheet(); render(); };
+  };
+};
+
+let scanStream=null, scanTimer=null;
+function stopScanner(){ if(scanTimer) clearInterval(scanTimer); scanTimer=null; if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; } }
+screens.scan = () => {
+  const recent=P.live('labels').filter(l=>l.siteId===S.currentSiteId).sort((a,b)=>new Date(b.printedAt)-new Date(a.printedAt)).slice(0,5);
+  $('#main').innerHTML = `<div style="padding:14px 14px 0"><p style="margin:0 0 8px;font-size:15px">All labels will be re-printed with a date of:</p><div class="selbox"><b>${P.fmtDay(new Date())} ${P.fmtDate(new Date())}</b><span class="pill blue">Today</span></div></div>
+    <div class="scanbox" id="scanbox"><div><div style="font-size:40px;line-height:1">${I.scan.replace('width="24" height="24"','width="56" height="56"')}</div><div style="margin:8px 0 12px">Point the camera at a label barcode</div><button class="btn blue sm" id="camOn" style="margin:auto">${I.cam} Start camera</button></div></div>
+    <div style="padding:0 14px"><div class="row"><input class="inp" id="code" placeholder="Or type / scan code (e.g. PV…)" autocomplete="off"><button class="btn blue sm" id="codeGo" style="min-height:50px">Print</button></div>
+    <p class="hint">Scan to print mode ignores any custom expiry date and storage location. Handheld scanners that type into the box work too.</p>
+    ${recent.length?`<div class="sect">Recent labels (tap to simulate a scan)</div>${recent.map(l=>`<button class="li" style="width:100%" data-code="${esc(l.code)}"><div class="t"><b>${esc(l.name)}</b><small>${esc(l.code)} · ${P.fmtDate(l.printedAt,true)}</small></div>${I.scan}</button>`).join('')}`:''}</div>`;
+  const handle=(code)=>{ code=String(code||'').trim(); if(!code) return;
+    const l=P.live('labels').find(x=>x.code.toUpperCase()===code.toUpperCase());
+    if(l) return reprintLabel(l, true);
+    const p=L('products').find(x=>x.barcode && x.barcode===code);
+    if(p) return enqueue(buildJob(p,{fromScan:true}));
+    toast('No label or product found for '+code);
+  };
+  $('#codeGo').onclick=()=>{ handle($('#code').value); $('#code').value=''; };
+  $('#code').onkeydown=e=>{ if(e.key==='Enter'){ handle($('#code').value); $('#code').value=''; } };
+  $('#main').querySelectorAll('[data-code]').forEach(b=>b.onclick=()=>handle(b.dataset.code));
+  $('#camOn').onclick=async()=>{
+    if(!('BarcodeDetector' in window) || !navigator.mediaDevices){ toast('Camera scanning needs the Android app. Type the code instead.'); return; }
+    try{
+      scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+      const v=document.createElement('video'); v.setAttribute('playsinline',''); v.muted=true; v.srcObject=scanStream; await v.play();
+      $('#scanbox').innerHTML=''; $('#scanbox').appendChild(v); $('#scanbox').insertAdjacentHTML('beforeend','<div class="laser"></div>');
+      const det=new BarcodeDetector({formats:['code_128','ean_13','ean_8','upc_a','qr_code','code_39']});
+      let last='', lastAt=0;
+      scanTimer=setInterval(async()=>{ try{ const r=await det.detect(v); if(r[0]){ const c=r[0].rawValue; if(c!==last||Date.now()-lastAt>3000){ last=c; lastAt=Date.now(); if(navigator.vibrate) navigator.vibrate(60); handle(c); } } }catch(e){} },350);
+    }catch(e){ toast('Camera unavailable: '+(e.message||e.name)); }
+  };
+};
+
+screens.order = () => {
+  const st=S.settings; const o=ui.order || (ui.order={mode:'on-demand',labelType:'single',rolls:10,royal:false,freq:'Every 4 weeks'});
+  const printed=P.live('labels').filter(l=>l.siteId===S.currentSiteId).reduce((a,l)=>a+(l.qty||1),0);
+  const lt=P.LABEL_TYPES.find(x=>x.id===o.labelType);
+  const weeks=Math.max(0.1, st.labelsInStock/(st.avgWeekly||1));
+  $('#main').innerHTML = `<div style="padding:14px">
+    <div class="seg sm" style="margin:0 0 14px" id="om"><button data-m="on-demand" class="${o.mode==='on-demand'?'on':''}">On-demand</button><button data-m="recurring" class="${o.mode==='recurring'?'on':''}">Recurring</button></div>
+    <div class="kv"><span>Labels printed to date</span><b>${printed}</b></div>
+    <div class="kv"><span>Stock last ordered</span><b>${P.fmtDate(st.stockLastOrdered)}</b></div>
+    <div class="kv"><span>Average weekly labels</span><b>${st.avgWeekly}</b></div>
+    <div class="kv"><span>Labels left on roll</span><b style="color:${st.labelsInStock<60?'#D32F2F':'inherit'}">${st.labelsInStock} (~${weeks<1?Math.round(weeks*7)+' days':weeks.toFixed(1)+' weeks'})</b></div>
+    <div class="sect" style="margin-top:18px">Label type</div>
+    ${P.LABEL_TYPES.map(t=>`<button class="check ${o.labelType===t.id?'on':''}" data-lt="${t.id}"><span><b style="font-weight:600">${esc(t.name)}</b><br><small class="hint">${esc(t.description)}</small></span><span class="rd"></span></button>`).join('')}
+    ${o.mode==='recurring'?`<div class="fld" style="margin-top:14px"><div class="lbl">Frequency</div><select class="inp" id="ofreq">${['Every 2 weeks','Every 4 weeks','Every 8 weeks'].map(f=>`<option ${o.freq===f?'selected':''}>${f}</option>`).join('')}</select></div>`:''}
+    <div class="stepper" style="margin:16px 0"><span style="font-weight:500">Quantity (rolls)</span><div class="sv"><button id="rm">−</button><b>${o.rolls}</b><button id="rp">+</button></div></div>
+    <div class="hint" style="text-align:right;margin-top:-8px">${o.rolls*lt.perRoll} labels · £${(o.rolls*(1.95+(o.labelType==='easy'?0.2:0))).toFixed(2)} ex. VAT</div>
+    <div class="sect">Delivery</div>
+    <button class="check ${o.royal?'on':''}" id="oroyal"><span>Send via Royal Mail 24 Hour Service</span><span class="bx">${I.tick}</span></button>
+    <button class="btn" id="oGo" style="width:100%;margin-top:18px">${o.mode==='recurring'?'Set up recurring order':'Order label rolls'}</button>
+    <div class="sect" style="margin-top:22px">Previous orders</div>
+    ${P.live('orders').filter(x=>x.siteId===S.currentSiteId).sort((a,b)=>new Date(b.at)-new Date(a.at)).map(x=>`<div class="li"><div class="t"><b>${x.rolls} × ${esc((P.LABEL_TYPES.find(t=>t.id===x.labelType)||{}).name||x.labelType)}</b><small>${P.fmtDate(x.at)} · ${esc(x.mode)}${x.freq?' · '+esc(x.freq):''}</small></div><span class="tag ${x.status==='pending'?'warn':x.status==='dispatched'?'ok':'mute'}">${esc(x.status)}</span></div>`).join('')||'<div class="hint">No orders yet.</div>'}
+  </div>`;
+  $('#om').querySelectorAll('button').forEach(b=>b.onclick=()=>{o.mode=b.dataset.m;render();});
+  $('#main').querySelectorAll('[data-lt]').forEach(b=>b.onclick=()=>{o.labelType=b.dataset.lt;render();});
+  $('#rm').onclick=()=>{o.rolls=Math.max(1,o.rolls-1);render();}; $('#rp').onclick=()=>{o.rolls=Math.min(100,o.rolls+1);render();};
+  $('#oroyal').onclick=()=>{o.royal=!o.royal;render();};
+  const fq=$('#ofreq'); if(fq) fq.onchange=()=>o.freq=fq.value;
+  $('#oGo').onclick=()=>confirmBox('Confirm order', `${o.rolls} rolls of ${lt.name}${o.mode==='recurring'?', '+o.freq.toLowerCase():''}. Delivery: ${o.royal?'Royal Mail 24':'standard (free)'}. Proview will invoice your account.`, 'Place order', ()=>{
+    up('orders',{id:P.uid('o_'),siteId:S.currentSiteId,mode:o.mode,freq:o.mode==='recurring'?o.freq:'',labelType:o.labelType,rolls:o.rolls,delivery:o.royal?'Royal Mail 24':'Standard (free)',status:'pending',at:P.now(),userId:user().id});
+    S.settings.stockLastOrdered=P.now(); P.save(); P.audit(user().name,'created','Label order',o.rolls+' rolls '+lt.name); S=P.get();
+    toast('Order sent to Proview'); render(); trySync();
+  });
+};
+
+screens.profiles = () => {
+  const us=P.live('users').filter(u=>(u.siteIds||[]).includes(S.currentSiteId));
+  $('#main').classList.add('grey');
+  $('#main').innerHTML = `<div class="list">${us.map(u=>`<button class="li" style="width:100%" data-u="${u.id}"><div class="avatar" style="background:var(--grad);color:#fff">${esc(P.initials(u.name))}</div><div class="t"><b>${esc(u.name)}</b><small>${P.ROLES[u.role]}${u.id===user().id?' · signed in':''}</small></div>${I.edit}</button>`).join('')}
+    <button class="btn blue" id="addU" style="width:100%;margin-top:6px">${I.plus} Add profile</button>
+    <p class="hint">Staff can print, scan and log wastage. Managers can also edit products, categories, storage rules and profiles. Admins manage everything, including other sites, from the back-office.</p></div>`;
+  $('#main').querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>userForm(P.byId('users',b.dataset.u)));
+  $('#addU').onclick=()=>userForm(null);
+};
+
+screens.about = () => {
+  const d=P.byId('devices',S.deviceId)||{}; const pr=S.settings.printer;
+  $('#main').innerHTML = `<div style="padding:14px"><div class="card" style="display:flex;gap:14px;align-items:center"><div class="pv-logo"><div class="mk" style="width:52px;height:52px;font-size:20px;border-radius:12px">PV</div></div><div><b style="font-size:18px">${esc(d.name||'Proview Label device')}</b><div class="hint">${esc(site().name)}</div></div></div>
+    <div class="kv"><span>App version</span><b>${APP_VERSION}</b></div>
+    <div class="kv"><span>Device ID</span><b>${esc(S.deviceId)}</b></div>
+    <div class="kv"><span>Platform</span><b>${isNative?'Android app':'Web preview'}</b></div>
+    <div class="kv"><span>Battery</span><b id="bat">${d.battery!=null?d.battery+'%':'—'}</b></div>
+    <div class="kv"><span>Network</span><b>${navigator.onLine?'Online':'Offline'}</b></div>
+    <div class="kv"><span>Printer</span><b>${pr.mode==='preview'?'Screen preview only':esc((pr.mode==='tcp'?'Network ':'Bluetooth ')+(pr.name||pr.address||''))}</b></div>
+    <div class="kv"><span>Labels left on roll</span><b>${S.settings.labelsInStock}</b></div>
+    <div class="kv"><span>Products / categories</span><b>${L('products').length} / ${L('categories').length}</b></div>
+    <div class="kv"><span>Back-office sync</span><b>${connected()?(S.settings.sync.lastSync?rel(S.settings.sync.lastSync):'Connected'):'Not connected'}</b></div>
+    <div class="kv"><span>Site address</span><b style="max-width:60%">${esc(site().address||'')}</b></div></div>`;
+  if(navigator.getBattery) navigator.getBattery().then(b=>{ const el=$('#bat'); if(el) el.textContent=Math.round(b.level*100)+'%'+(b.charging?' (charging)':''); }).catch(()=>{});
+};
+
+screens.support = () => {
+  const sp=S.settings.support;
+  $('#main').innerHTML = `<div style="padding:14px">
+    <div class="card" style="background:var(--grad);color:#fff;border:0"><div style="font-weight:700;font-size:19px">Proview support</div><div style="opacity:.9;font-size:14px;margin-top:4px">UK-based support, ${esc(sp.hours)}. Messages outside these hours are picked up the next working day.</div></div>
+    <div class="kv"><span>Phone</span><b><a href="tel:${sp.phone.replace(/\s/g,'')}">${esc(sp.phone)}</a></b></div>
+    <div class="kv"><span>Email</span><b><a href="mailto:${esc(sp.email)}">${esc(sp.email)}</a></b></div>
+    <div class="sect" style="margin-top:18px">Report a problem</div>
+    <div class="fld"><select class="inp" id="stype"><option>Printer not printing</option><option>Label quality / jams</option><option>Product or allergen data</option><option>Device or battery</option><option>Something else</option></select></div>
+    <div class="fld"><textarea class="inp" id="smsg" placeholder="What happened?"></textarea></div>
+    <button class="btn blue" id="ssend" style="width:100%">Send to Proview</button>
+    <div class="sect" style="margin-top:22px">Quick fixes</div>
+    <div class="card hint" style="font-size:14px;line-height:1.6"><b style="color:#000">Labels printing blank?</b> Thermal labels print on one side only – reload the roll with the shiny side facing the print head.<br><br><b style="color:#000">Wrong use-by date?</b> Check the storage location at the bottom of the print screen, or the product's custom expiry rule.<br><br><b style="color:#000">Products missing?</b> Tap the sync button at the top to pull the latest from the back-office.</div></div>`;
+  $('#ssend').onclick=()=>{ const m=$('#smsg').value.trim(); if(!m) return toast('Describe the problem first');
+    P.audit(user().name,'support request',$('#stype').value,m); S=P.get(); $('#smsg').value=''; toast('Sent. Ticket logged for Proview support.'); trySync(); };
+};
+
+screens.settings = () => {
+  const pr=S.settings.printer, sy=S.settings.sync;
+  $('#main').innerHTML = `<div style="padding:14px">
+    <div class="sect" style="margin-top:0">Site</div>
+    <div class="fld"><select class="inp" id="site">${(connected()?P.live('sites').filter(x=>x.orgId===ORG()):P.live('sites')).map(s=>`<option value="${s.id}" ${s.id===S.currentSiteId?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
+    <div class="sect">Printer</div>
+    <div class="seg sm" id="pm" style="margin:0 0 12px"><button data-m="preview" class="${pr.mode==='preview'?'on':''}">Preview</button><button data-m="bluetooth" class="${pr.mode==='bluetooth'?'on':''}">Bluetooth</button><button data-m="tcp" class="${pr.mode==='tcp'?'on':''}">Network</button></div>
+    ${pr.mode==='bluetooth'?`<div class="fld"><div class="lbl">Paired printer <button class="pill blue" id="bt">Find printers</button></div><select class="inp" id="btsel"><option value="">${pr.address?esc((pr.name||'')+' '+pr.address):'Tap “Find printers”'}</option></select></div>`:''}
+    ${pr.mode==='tcp'?`<div class="row"><div class="fld" style="flex:2"><div class="lbl">Printer IP</div><input class="inp" id="ip" value="${esc(pr.address)}" placeholder="192.168.1.50" inputmode="decimal"></div><div class="fld" style="flex:1"><div class="lbl">Port</div><input class="inp" id="port" value="${esc(pr.port||9100)}" inputmode="numeric"></div></div>`:''}
+    <p class="hint">${pr.mode==='preview'?'Labels show on screen only. Choose Bluetooth or Network to print to an ESC/POS thermal label printer (e.g. built-in printers on Sunmi-style handhelds, or any 58/80mm thermal printer).':'Uses ESC/POS commands. Works with most 58mm/80mm thermal printers.'}</p>
+    <button class="btn ghost" id="test" style="width:100%">Print test label</button>
+    <div class="sect" style="margin-top:22px">Proview Label cloud</div>
+    ${connected()?`<div class="card" style="margin-bottom:10px"><b style="font-size:15px">Connected</b><div class="hint">${esc(CONN.email)} · ${esc(((S.orgs||[]).find(o=>o.id===ORG())||{}).name||'')}<br>Last sync ${S.settings.sync.lastSync?rel(S.settings.sync.lastSync):'—'}</div></div>
+      <div class="row"><button class="btn blue sm" style="flex:1" id="synow">Sync now</button><button class="btn ghost sm" style="flex:1;color:#d92d20" id="disc">Disconnect</button></div>`
+    :Cloud.enabled?`<p class="hint" style="margin-top:0">Sync this handheld with the back-office at label.proviewcrm.co.uk: products, staff and settings come down; labels, expiry and wastage go up.</p><button class="btn blue" id="conn" style="width:100%">Connect to Proview Label</button>`
+    :`<p class="hint" style="margin-top:0">This preview runs on demo data. In the Android app, connect here to sync with the live back-office.</p>`}
+    <div class="sect" style="margin-top:22px">Data</div>
+    <div class="row"><button class="btn ghost sm" style="flex:1" id="exp">Export data</button><label class="btn ghost sm" style="flex:1">Import data<input type="file" id="imp" accept=".json,application/json" hidden></label></div>
+    ${connected()?'':'<button class="btn ghost sm" id="rst" style="width:100%;margin-top:10px;color:#D32F2F">Reset demo data</button>'}
+  </div>`;
+  $('#site').onchange=()=>{ S.currentSiteId=$('#site').value; P.save(); const u=user(); if(!(u.siteIds||[]).includes(S.currentSiteId)){ const su=siteUsers()[0]; if(su) S.currentUserId=su.id; P.save(); } toast('Site: '+site().name); render(); };
+  $('#pm').querySelectorAll('button').forEach(b=>b.onclick=()=>{ pr.mode=b.dataset.m; P.save(); render(); });
+  const ip=$('#ip'); if(ip){ ip.onchange=()=>{pr.address=ip.value.trim();P.save();}; $('#port').onchange=()=>{pr.port=+$('#port').value||9100;P.save();}; }
+  const bt=$('#bt'); if(bt) bt.onclick=async()=>{
+    const N=Native().LabelPrinter; if(!N){ toast('Bluetooth printing is available in the Android app'); return; }
+    try{ const r=await N.listPaired(); const sel=$('#btsel'); sel.innerHTML=r.devices.map(d=>`<option value="${esc(d.address)}" ${d.address===pr.address?'selected':''}>${esc(d.name||'Unknown')} – ${esc(d.address)}</option>`).join('')||'<option>No paired printers. Pair one in Android Bluetooth settings.</option>';
+      sel.onchange=()=>{ pr.address=sel.value; pr.name=(r.devices.find(d=>d.address===sel.value)||{}).name||''; P.save(); };
+      if(r.devices[0]&&!pr.address){ pr.address=r.devices[0].address; pr.name=r.devices[0].name; P.save(); } }catch(e){ toast(e.message||'Bluetooth error'); } };
+  $('#test').onclick=()=>enqueue({id:P.uid('j'),name:'Test label',type:'prep',qty:1,expiry:P.computeExpiry(rule('r_fridge')).toISOString(),ruleName:'Fridge',rule:rule('r_fridge'),allergens:['Milk'],mayContain:'',customAllergens:'',batch:'TEST',useFirst:true,defrost:false,code:P.labelCode(),test:true});
+  const cn=$('#conn'); if(cn) cn.onclick=connectSheet;
+  const sn=$('#synow'); if(sn) sn.onclick=doSync;
+  const dc=$('#disc'); if(dc) dc.onclick=disconnect;
+  $('#exp').onclick=exportData;
+  $('#imp').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ P.importJSON(rd.result); S=P.get(); toast('Data imported'); render(); }catch(err){ toast('Not a valid Proview export'); } }; rd.readAsText(f); };
+  const rs0=$('#rst'); if(rs0) rs0.onclick=()=>confirmBox('Reset demo data?','This deletes everything on this device and reloads the sample products and logs.','Reset',()=>{ S=P.reset(); ui.queue=[]; toast('Demo data restored'); root('home'); },true);
+};
+
+// ---------- forms ----------
+function newCategory(){
+  let colour=null;
+  const sh=openSheet('New Category', `<div class="fld"><div class="lbl">Category Name</div><input class="inp" id="cn" maxlength="30"></div><div class="lbl">Colour Code</div>
+    ${P.CATEGORY_COLOURS.map(c=>`<button class="check" data-col="${c.colour||''}"><span style="display:flex;align-items:center;gap:10px"><i style="width:22px;height:22px;border-radius:6px;background:${c.colour||'#546E7A'}"></i>${c.name}</span><span class="rd"></span></button>`).join('')}
+    <p class="hint">Created under <b>${ui.tab==='prep'?'Prep':'Sale'}</b>.</p>`, `<button class="btn" id="cGo" disabled>Create category</button>`);
+  const cn=sh.querySelector('#cn'); cn.oninput=()=>sh.querySelector('#cGo').disabled=!cn.value.trim();
+  const btns=sh.querySelectorAll('[data-col]'); btns[0].classList.add('on');
+  btns.forEach(b=>b.onclick=()=>{ btns.forEach(x=>x.classList.remove('on')); b.classList.add('on'); colour=b.dataset.col||null; });
+  sh.querySelector('#cGo').onclick=()=>{ up('categories',{id:P.uid('c_'),name:cn.value.trim(),type:ui.tab,color:colour}); P.audit(user().name,'created','Category',cn.value.trim()); S=P.get(); closeSheet(); toast('Category created'); render(); };
+  setTimeout(()=>cn.focus(),300);
+}
+function newRule(){
+  const sh=openSheet('New Storage Location', `<div class="fld"><div class="lbl">Name</div><input class="inp" id="rn" placeholder="e.g. Blast chiller"></div><div class="row"><div class="fld" style="flex:1"><div class="lbl">Shelf life</div><input class="inp" id="ru" type="number" min="1" value="3"></div><div class="fld" style="flex:1"><div class="lbl">Unit</div><select class="inp" id="rp"><option value="hours">hours</option><option value="days" selected>days</option><option value="months">months</option></select></div></div>`, `<button class="btn" id="rGo">Create</button>`);
+  sh.querySelector('#rGo').onclick=()=>{ const n=sh.querySelector('#rn').value.trim(); if(!n) return toast('Enter a name'); up('rules',{id:P.uid('r_'),name:n,units:+sh.querySelector('#ru').value||1,period:sh.querySelector('#rp').value}); P.audit(user().name,'created','Expiry rule',n); S=P.get(); closeSheet(); render(); };
+}
+
+function productForm(p, cat){
+  const isNew=!p; const c=cat||P.byId('categories',p.categoryId); const sale=c.type==='sale';
+  p = p ? JSON.parse(JSON.stringify(p)) : {id:P.uid('p_'),categoryId:c.id,name:'',allergens:[],mayContain:'',customAllergens:'',ingredients:'',price:null,barcode:'',ruleId:null,dateType:'use-by',prepGuide:'',timesPrinted:0,approved:true};
+  const rs=L('rules');
+  const body = `<div class="fld"><div class="lbl">Product Name</div><input class="inp" id="pn" maxlength="50" value="${esc(p.name)}"></div>
+    ${sale?`<div class="fld"><div class="lbl">Ingredients <span><button class="pill" id="boldB" type="button"><b>B</b></button> <button class="pill blue" id="autoB" type="button">Auto-bold allergens</button></span></div><div class="inp rte" id="ing" contenteditable="true">${p.ingredients||''}</div><div class="hint" id="detected"></div></div>
+      <div class="row"><div class="fld" style="flex:1"><div class="lbl">Price (£)</div><input class="inp" id="pr" inputmode="decimal" value="${p.price!=null?p.price:''}"></div><div class="fld" style="flex:1"><div class="lbl">Date type</div><select class="inp" id="dt"><option value="use-by" ${p.dateType==='use-by'?'selected':''}>Use by</option><option value="best-before" ${p.dateType==='best-before'?'selected':''}>Best before</option></select></div></div>`:''}
+    <div class="fld"><div class="lbl">Custom Expiry Rule</div><select class="inp" id="pr2"><option value="">Use storage location</option>${rs.map(r=>`<option value="${r.id}" ${p.ruleId===r.id?'selected':''}>${esc(r.name)} (${P.ruleText(r)})</option>`).join('')}</select></div>
+    ${!sale?`<div class="lbl" style="margin-top:4px">Allergens</div>${P.ALLERGENS.map(a=>`<button class="check ${p.allergens.includes(a)?'on':''}" data-al="${a}"><span>${esc(P.ALLERGEN_LABEL[a]||a)}</span><span class="bx">${I.tick}</span></button>`).join('')}<div style="height:14px"></div>`:''}
+    <div class="fld"><div class="lbl">May Contain</div><input class="inp" id="mc" maxlength="100" value="${esc(p.mayContain)}" placeholder="e.g. Nuts, Sesame"></div>
+    <div class="fld"><div class="lbl">Custom Allergens</div><input class="inp" id="ca" maxlength="100" value="${esc(p.customAllergens)}" placeholder="e.g. Garlic"></div>
+    <div class="fld"><div class="lbl">Barcode</div><input class="inp" id="bc" value="${esc(p.barcode)}" placeholder="Optional – scan to print this product" inputmode="numeric"></div>
+    ${!sale?`<div class="fld"><div class="lbl">Prep Guide</div><textarea class="inp" id="pg" placeholder="Method, temperatures, portion sizes…">${esc(p.prepGuide||'')}</textarea></div>`:''}
+    ${!isNew?`<button class="btn ghost sm" id="pDel" style="width:100%;color:#D32F2F">Delete product</button>`:''}`;
+  const sh=openSheet(isNew?'New Product':'Edit Product', body, `<button class="btn" id="pGo">${isNew?'Create product':'Save changes'}</button>`);
+  sh.querySelectorAll('[data-al]').forEach(b=>b.onclick=()=>{ const a=b.dataset.al; const i=p.allergens.indexOf(a); if(i>=0) p.allergens.splice(i,1); else p.allergens.push(a); b.classList.toggle('on'); });
+  const ing=sh.querySelector('#ing');
+  if(ing){ const upd=()=>{ const d=P.detectAllergens(ing.innerHTML); sh.querySelector('#detected').innerHTML=d.length?'Detected: <b>'+d.join(', ')+'</b>':'No allergens detected yet'; }; ing.oninput=upd; upd();
+    sh.querySelector('#boldB').onmousedown=e=>{ e.preventDefault(); document.execCommand('bold'); };
+    sh.querySelector('#autoB').onclick=()=>{ ing.innerHTML=P.boldAllergens(ing.innerHTML); upd(); }; }
+  sh.querySelector('#pGo').onclick=()=>{
+    const name=sh.querySelector('#pn').value.trim(); if(!name) return toast('Enter a product name');
+    p.name=name; p.mayContain=sh.querySelector('#mc').value.trim(); p.customAllergens=sh.querySelector('#ca').value.trim(); p.barcode=sh.querySelector('#bc').value.trim(); p.ruleId=sh.querySelector('#pr2').value||null;
+    if(sale){ p.ingredients=P.boldAllergens(ing.innerHTML); p.allergens=P.detectAllergens(p.ingredients); const pr=parseFloat(sh.querySelector('#pr').value); p.price=isNaN(pr)?null:pr; p.dateType=sh.querySelector('#dt').value; }
+    else p.prepGuide=sh.querySelector('#pg').value.trim();
+    if(isNew && orgSet('requireApproval') && !canManage()) p.approved=false;
+    up('products',p); P.audit(user().name,isNew?'created':'updated','Product',p.name+(p.allergens.length?' ['+p.allergens.join(', ')+']':'')); S=P.get();
+    closeSheet(); toast(isNew?'Product created':'Saved'); render(); trySync();
+  };
+  const del=sh.querySelector('#pDel'); if(del) del.onclick=()=>confirmBox('Delete '+p.name+'?','It will be removed from all devices at next sync.','Delete',()=>{ P.remove('products',p.id); P.audit(user().name,'deleted','Product',p.name); S=P.get(); closeSheet(); render(); },true);
+  if(isNew) setTimeout(()=>sh.querySelector('#pn').focus(),300);
+}
+
+function userForm(u){
+  const isNew=!u; u=u?{...u}:{id:P.uid('u_'),name:'',role:'staff',pin:'',siteIds:[S.currentSiteId]};
+  const canAdmin=user().role==='admin';
+  const sh=openSheet(isNew?'New Profile':'Edit Profile', `<div class="fld"><div class="lbl">Name</div><input class="inp" id="un" value="${esc(u.name)}"></div>
+    <div class="fld"><div class="lbl">4-digit PIN</div><input class="inp" id="up" value="${esc(u.pin)}" inputmode="numeric" maxlength="4" type="password"></div>
+    <div class="lbl">Role</div>${Object.entries(P.ROLES).map(([k,v])=>`<button class="check ${u.role===k?'on':''}" data-r="${k}" ${k==='admin'&&!canAdmin?'disabled style="opacity:.4"':''}><span>${v}</span><span class="rd"></span></button>`).join('')}
+    ${!isNew&&u.id!==user().id?'<button class="btn ghost sm" id="uDel" style="width:100%;margin-top:16px;color:#D32F2F">Remove profile</button>':''}`, `<button class="btn" id="uGo">${isNew?'Create profile':'Save'}</button>`);
+  sh.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{ if(b.disabled) return; sh.querySelectorAll('[data-r]').forEach(x=>x.classList.remove('on')); b.classList.add('on'); u.role=b.dataset.r; });
+  sh.querySelector('#uGo').onclick=()=>{ u.name=sh.querySelector('#un').value.trim(); u.pin=sh.querySelector('#up').value.trim(); if(!u.name) return toast('Enter a name'); if(!/^\d{4}$/.test(u.pin)) return toast('PIN must be 4 digits');
+    up('users',u); P.audit(user().name,isNew?'created':'updated','Profile',u.name+' ('+P.ROLES[u.role]+')'); S=P.get(); closeSheet(); render(); };
+  const del=sh.querySelector('#uDel'); if(del) del.onclick=()=>confirmBox('Remove '+u.name+'?','They will no longer be able to sign in on this site.','Remove',()=>{ P.remove('users',u.id); S=P.get(); closeSheet(); render(); },true);
+}
+
+function openSwitch(){
+  const us=siteUsers(); let sel=us.find(u=>u.id!==S.currentUserId)||us[0]; let pin='';
+  const draw=()=>{
+    $('#modal').innerHTML = `<div class="modal"><div class="box"><h3>Switch profile</h3><div class="users">${us.map(u=>`<button data-u="${u.id}" class="${sel&&sel.id===u.id?'on':''}"><span class="avatar">${esc(P.initials(u.name))}</span>${esc(u.name.split(' ')[0])}</button>`).join('')}</div>
+      <p class="hint" style="text-align:center;margin:10px 0 0">Enter PIN for <b>${esc(sel?sel.name:'')}</b><br><small>${connected()?'':'(demo PINs: Laura 1111, Jamal 2222, Priya 1234)'}</small></p>
+      <div class="pindots">${[0,1,2,3].map(i=>`<i class="${i<pin.length?'f':''}"></i>`).join('')}</div>
+      <div class="pinpad">${[1,2,3,4,5,6,7,8,9,'✕',0,'⌫'].map(k=>`<button data-k="${k}">${k}</button>`).join('')}</div></div></div>`;
+    $('#modal').querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>{ sel=P.byId('users',b.dataset.u); pin=''; draw(); });
+    $('#modal').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
+      const k=b.dataset.k; if(k==='✕'){ $('#modal').innerHTML=''; return; } if(k==='⌫'){ pin=pin.slice(0,-1); draw(); return; }
+      pin+=k; if(pin.length===4){ if(sel && pin===sel.pin){ S.currentUserId=sel.id; P.save(); $('#modal').innerHTML=''; toast('Signed in as '+sel.name); render(); } else { pin=''; draw(); toast('Wrong PIN'); if(navigator.vibrate) navigator.vibrate([60,40,60]); } } else draw();
+    });
+  };
+  draw();
+}
+
+function wasteForm(pre){
+  let w={productId:pre.productId||'',qty:pre.qty||1,reason:pre.reason||'',notes:'',photo:'',labelId:pre.labelId||null};
+  const ps=L('products').sort((a,b)=>a.name.localeCompare(b.name));
+  const draw=()=>{
+    const p=P.byId('products',w.productId); const unit=p&&p.price?p.price:2.5;
+    const sh=openSheet('Log Wastage', `<div class="fld"><div class="lbl">Product</div><select class="inp" id="wp"><option value="">Choose product…</option>${ps.map(x=>`<option value="${x.id}" ${x.id===w.productId?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
+      <div class="stepper" style="margin-bottom:16px"><span style="font-weight:500">Quantity</span><div class="sv"><button id="wm">−</button><b>${w.qty}</b><button id="wpl">+</button></div></div>
+      <div class="lbl">Reason</div><div class="reasons" style="margin-bottom:16px">${P.WASTE_REASONS.map(r=>`<button data-r="${esc(r)}" class="${w.reason===r?'on':''}">${esc(r)}</button>`).join('')}</div>
+      <div class="fld"><div class="lbl">Notes</div><input class="inp" id="wn" value="${esc(w.notes)}" placeholder="Optional"></div>
+      <div class="fld"><div class="lbl">Photo ${orgSet('requirePhoto')?'(required)':''}</div>${w.photo?`<img src="${w.photo}" style="width:100%;max-height:180px;object-fit:cover;border-radius:10px;margin-bottom:8px">`:''}<label class="btn ghost sm" style="width:100%">${I.cam} ${w.photo?'Retake photo':'Add photo'}<input type="file" accept="image/*" capture="environment" id="wph" hidden></label></div>
+      <div class="kv"><span>Estimated cost</span><b>${P.money(unit*w.qty)}</b></div>`, `<button class="btn red" id="wGo">Log wastage</button>`);
+    sh.querySelector('#wp').onchange=e=>{w.productId=e.target.value;w.notes=sh.querySelector('#wn').value;draw();};
+    sh.querySelector('#wm').onclick=()=>{w.qty=Math.max(1,w.qty-1);w.notes=sh.querySelector('#wn').value;draw();};
+    sh.querySelector('#wpl').onclick=()=>{w.qty=Math.min(99,w.qty+1);w.notes=sh.querySelector('#wn').value;draw();};
+    sh.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{w.reason=b.dataset.r;w.notes=sh.querySelector('#wn').value;draw();});
+    sh.querySelector('#wph').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const img=new Image(); const rd=new FileReader(); rd.onload=()=>{ img.onload=()=>{ const c=document.createElement('canvas'); const sc=Math.min(1,480/img.width); c.width=img.width*sc; c.height=img.height*sc; c.getContext('2d').drawImage(img,0,0,c.width,c.height); w.photo=c.toDataURL('image/jpeg',.7); w.notes=sh.querySelector('#wn').value; draw(); }; img.src=rd.result; }; rd.readAsDataURL(f); };
+    sh.querySelector('#wGo').onclick=()=>{
+      if(!w.productId) return toast('Choose a product'); if(!w.reason) return toast('Choose a reason'); if(orgSet('requirePhoto') && !w.photo) return toast('A photo is required by your manager');
+      w.notes=sh.querySelector('#wn').value.trim();
+      up('wastage',{id:P.uid('w_'),productId:p.id,name:p.name,qty:w.qty,unit:'portion',reason:w.reason,notes:w.notes,photo:w.photo,cost:Math.round(unit*w.qty*100)/100,userId:user().id,siteId:S.currentSiteId,at:P.now(),labelId:w.labelId});
+      if(w.labelId){ const l=P.byId('labels',w.labelId); if(l) up('labels',{...l,status:'wasted'}); }
+      S=P.get(); closeSheet(); toast('Wastage logged'); render(); trySync();
+    };
+  };
+  draw();
+}
+
+// ---------- printing ----------
+function openPrint(p){
+  if(!p) return;
+  const c=P.byId('categories',p.categoryId); const sale=c&&c.type==='sale';
+  const o={useFirst:false,defrost:false,qty:1,batch:'',ruleId:p.ruleId||(sale?'r_display':ui.ruleId),manual:null,includeDate:!sale||true,size:'single',dateType:p.dateType||'use-by',price:p.price};
+  const rs=L('rules');
+  const draw=()=>{
+    const r=rule(o.ruleId); const exp=o.manual?new Date(o.manual):P.computeExpiry(r);
+    const body=`<div style="font-size:30px;font-weight:700;line-height:1.1">${esc(p.name)}</div>
+      ${!sale?`<button class="hint" id="pgBtn" style="color:#4a6cd0;text-decoration:underline;margin-top:4px;font-size:14px">${p.prepGuide?'View Prep Guide':'Create Prep Guide'}</button>
+        <div class="toggle2"><button class="tg ${o.useFirst?'on':''}" id="tUF" style="${o.useFirst?'border-color:#E53935;background:#E5393522':''}"><span class="dot" style="background:#E53935">${I.tick}</span>Use First</button><button class="tg ${o.defrost?'on':''}" id="tDF" style="${o.defrost?'border-color:#4a6cd0;background:#4a6cd022':''}"><span class="dot" style="background:#4a6cd0">${I.tick}</span>Defrost</button></div>`
+      :`<div class="seg sm" style="margin:12px 0" id="sz"><button data-s="single" class="${o.size==='single'?'on':''}">Single Height</button><button data-s="double" class="${o.size==='double'?'on':''}">Double Height</button></div>
+        <button class="check ${o.includeDate?'on':''}" id="incD" style="padding-top:4px"><span>Include Date</span><span class="switch ${o.includeDate?'on':''}"></span></button><div style="height:12px"></div>`}
+      ${o.includeDate?`<div class="fld"><div class="lbl">Expiry Calculation <span>${o.manual?'Manual override':P.ruleText(r)}</span></div><select class="inp" id="rsel">${rs.map(x=>`<option value="${x.id}" ${x.id===o.ruleId&&!o.manual?'selected':''}>${esc(x.name)}</option>`).join('')}<option value="__m" ${o.manual?'selected':''}>Manual override…</option></select></div>
+        <div class="fld"><div class="lbl">${sale&&o.dateType==='best-before'?'Best Before':'Expiry Date'}</div><label class="selbox" style="position:relative"><b>${P.fmtDay(exp)} ${P.fmtDate(exp, r.period==='hours'&&!o.manual)}</b><span style="color:#1E73BE;text-decoration:underline">Edit</span><input type="date" id="dpick" value="${exp.toISOString().slice(0,10)}" style="position:absolute;inset:0;opacity:0"></label></div>`:''}
+      ${sale?`<div class="row"><div class="fld" style="flex:1"><div class="lbl">Date type</div><select class="inp" id="dtp"><option value="use-by" ${o.dateType==='use-by'?'selected':''}>Use by</option><option value="best-before" ${o.dateType==='best-before'?'selected':''}>Best before</option></select></div><div class="fld" style="flex:1"><div class="lbl">Price (£)</div><input class="inp" id="prc" inputmode="decimal" value="${o.price!=null?o.price:''}"></div></div>`:''}
+      <div class="stepper" style="margin-bottom:16px"><span style="font-weight:500">Quantity</span><div class="sv"><button id="qm">−</button><b>${o.qty}</b><button id="qp">+</button></div></div>
+      <div class="fld"><div class="lbl">Batch Code</div><input class="inp" id="bat" maxlength="10" value="${esc(o.batch)}"></div>
+      <div class="lbl">Preview</div><div class="preview-wrap">${labelHTML(buildJob(p,o))}</div><div style="height:8px"></div>`;
+    const sh=openSheet('Print Label', body, `${canEditProducts()?`<button class="btn ghost sm" id="edP" style="min-height:54px">${I.edit}</button>`:''}<button class="btn" id="goP">${I.print} Print${o.qty>1?' '+o.qty:''}</button>`, '<span class="ver">v'+APP_VERSION+'</span>');
+    renderBarcodes(sh);
+    const keep=()=>{ const b=sh.querySelector('#bat'); if(b) o.batch=b.value; const pc=sh.querySelector('#prc'); if(pc){ const v=parseFloat(pc.value); o.price=isNaN(v)?null:v; } };
+    const redraw=()=>{ keep(); const y=sh.querySelector('.sb').scrollTop; draw(); $('#sheet .sb').scrollTop=y; };
+    const q=(s)=>sh.querySelector(s);
+    if(q('#tUF')) q('#tUF').onclick=()=>{o.useFirst=!o.useFirst;redraw();};
+    if(q('#tDF')) q('#tDF').onclick=()=>{o.defrost=!o.defrost; if(o.defrost && P.byId('rules','r_defrost') && !p.ruleId) o.ruleId='r_defrost'; else if(!o.defrost && o.ruleId==='r_defrost') o.ruleId=p.ruleId||ui.ruleId; redraw();};
+    if(q('#pgBtn')) q('#pgBtn').onclick=()=>prepGuide(p);
+    if(q('#sz')) q('#sz').querySelectorAll('button').forEach(b=>b.onclick=()=>{o.size=b.dataset.s;redraw();});
+    if(q('#incD')) q('#incD').onclick=()=>{o.includeDate=!o.includeDate;redraw();};
+    if(q('#rsel')) q('#rsel').onchange=e=>{ if(e.target.value==='__m'){ o.manual=o.manual||exp.toISOString(); } else { o.ruleId=e.target.value; o.manual=null; } redraw(); };
+    if(q('#dpick')) q('#dpick').onchange=e=>{ if(e.target.value){ const d=new Date(e.target.value+'T23:59:00'); o.manual=d.toISOString(); redraw(); } };
+    if(q('#dtp')) q('#dtp').onchange=e=>{o.dateType=e.target.value;redraw();};
+    q('#qm').onclick=()=>{o.qty=Math.max(1,o.qty-1);redraw();}; q('#qp').onclick=()=>{o.qty=Math.min(20,o.qty+1);redraw();};
+    if(q('#bat')) q('#bat').oninput=e=>{ o.batch=e.target.value; };
+    if(q('#prc')) q('#prc').onchange=()=>redraw();
+    if(q('#edP')) q('#edP').onclick=()=>productForm(p);
+    q('#goP').onclick=()=>{ keep(); enqueue(buildJob(p,o)); closeSheet(); };
+  };
+  draw();
+}
+function prepGuide(p){
+  const sh=openSheet('Prep Guide – '+p.name, canManage()?`<textarea class="inp" id="pgt" style="min-height:240px" placeholder="Method, temperatures, portion sizes, photos references…">${esc(p.prepGuide||'')}</textarea>`:`<div style="white-space:pre-wrap;font-size:16px;line-height:1.6">${esc(p.prepGuide||'No prep guide yet. Ask a manager to add one.')}</div>`, canManage()?'<button class="btn blue" id="pgS">Save guide</button>':'');
+  const s=sh.querySelector('#pgS'); if(s) s.onclick=()=>{ up('products',{...p,prepGuide:sh.querySelector('#pgt').value.trim()}); S=P.get(); toast('Prep guide saved'); openPrint(P.byId('products',p.id)); };
+}
+function openMisc(){
+  const sh=openSheet('Misc Label', `<div class="fld"><div class="lbl">Label text</div><input class="inp" id="mt" maxlength="30" placeholder="e.g. Staff meal, Sample"></div><div class="fld"><div class="lbl">Storage</div><select class="inp" id="mr">${L('rules').map(r=>`<option value="${r.id}" ${r.id===ui.ruleId?'selected':''}>${esc(r.name)} (${P.ruleText(r)})</option>`).join('')}</select></div><div class="fld"><div class="lbl">Allergens (optional)</div><input class="inp" id="ma" placeholder="e.g. Milk, Eggs"></div>`, `<button class="btn" id="mGo">${I.print} Print</button>`);
+  sh.querySelector('#mGo').onclick=()=>{ const t=sh.querySelector('#mt').value.trim(); if(!t) return toast('Enter label text');
+    const r=rule(sh.querySelector('#mr').value); const al=sh.querySelector('#ma').value.trim();
+    enqueue({id:P.uid('j'),productId:null,name:t,type:'prep',qty:1,expiry:P.computeExpiry(r).toISOString(),ruleName:r.name,rule:r,allergens:[],customAllergens:al,mayContain:'',batch:'',useFirst:false,defrost:false,code:P.labelCode()}); closeSheet(); };
+}
+function buildJob(p,o){
+  o=o||{}; const c=P.byId('categories',p.categoryId); const sale=c&&c.type==='sale';
+  const r=rule(o.ruleId || p.ruleId || (sale?'r_display':ui.ruleId));
+  const exp=o.manual?new Date(o.manual):P.computeExpiry(r);
+  return { id:P.uid('j'), productId:p.id, name:p.name, type:sale?'sale':'prep', qty:o.qty||1, expiry:exp.toISOString(), ruleName:o.manual?'Manual':r.name, rule:r,
+    allergens:P.productAllergens(p), mayContain:p.mayContain||'', customAllergens:p.customAllergens||'', ingredients:p.ingredients||'', price:o.price!==undefined?o.price:p.price,
+    batch:o.batch||'', useFirst:!!o.useFirst, defrost:!!o.defrost, includeDate:o.includeDate!==false, size:o.size||'single', dateType:o.dateType||p.dateType||'use-by', barcode:p.barcode||'', code:P.labelCode() };
+}
+function labelHTML(j){
+  const u=user(); const hrs=j.rule&&j.rule.period==='hours'&&j.ruleName!=='Manual';
+  const al=(j.allergens||[]).map(a=>(P.ALLERGEN_LABEL[a]||a)).join(', ') + (j.customAllergens?((j.allergens||[]).length?', ':'')+j.customAllergens:'');
+  if(j.type==='sale') return `<div class="lab ${j.size==='double'?'dbl':''}"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px"><div class="ln" style="text-align:left;flex:1">${esc(j.name)}</div>${j.price!=null?`<div class="price">${P.money(j.price)}</div>`:''}</div>
+      ${j.ingredients?`<div class="ing" style="${j.size==='double'?'':'display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden'}"><b style="text-decoration:none">INGREDIENTS:</b> ${j.ingredients}</div>`:''}
+      ${j.mayContain?`<div class="al">May contain: ${esc(j.mayContain)}</div>`:''}
+      ${j.includeDate?`<div class="ub" style="margin-top:4px"><span>${j.dateType==='best-before'?'BEST BEFORE:':'USE BY:'}</span><span>${P.fmtDay(j.expiry).toUpperCase()}</span><span>${P.fmtDate(j.expiry)}</span></div>`:''}
+      <div class="bt"><div class="meta">${j.batch?'Batch: '+esc(j.batch)+'<br>':''}${esc(site().name)}<br>${esc(site().address||'')}</div><div class="bc"><svg data-bc="${esc(j.barcode||j.code)}"></svg></div></div></div>`;
+  return `<div class="lab"><div class="ln">${esc(j.name)}</div>
+    <div class="ub"><span>USE BY:</span><span>${P.fmtDay(j.expiry).toUpperCase()}</span><span>${P.fmtDate(j.expiry,hrs)}</span></div>
+    <div class="r2"><span>PRINTED: ${P.fmtDate(new Date(),true)}</span><span>${j.ruleName==='Manual'?'MANUAL':esc((j.rule?P.ruleText(j.rule).replace('+',''):'')).toUpperCase()}</span></div>
+    ${al?`<div class="al">ALLERGENS: ${esc(al)}</div>`:''}${j.mayContain?`<div class="al">M/C: ${esc(j.mayContain)}</div>`:''}
+    <div class="bt"><div>${j.defrost||j.useFirst?`<span class="flag">${j.defrost?'DEFROSTED':''}${j.defrost&&j.useFirst?' | ':''}${j.useFirst?'USE FIRST':''}</span>`:''}<div style="font-size:10px;font-weight:700;margin-top:3px">${j.batch?esc(j.batch)+' | ':''}${esc(P.initials(u.name))} · ${esc(j.ruleName||'')}</div></div><div class="bc"><svg data-bc="${esc(j.code)}"></svg></div></div></div>`;
+}
+function renderBarcodes(root){ if(!window.JsBarcode) return; root.querySelectorAll('svg[data-bc]').forEach(s=>{ try{ JsBarcode(s, s.dataset.bc, {format:'CODE128',displayValue:true,fontSize:11,height:34,margin:0,width:1.3,textMargin:0}); }catch(e){} }); }
+
+function enqueue(job){
+  ui.queue.push(job); renderFooter();
+  if(!ui.printing) processQueue();
+}
+async function processQueue(){
+  if(!ui.queue.length){ ui.printing=false; $('#printout').innerHTML=''; renderFooter(); return; }
+  ui.printing=true; const j=ui.queue[0];
+  const n=ui.queue.reduce((a,x)=>a+x.qty,0);
+  $('#printout').innerHTML=`<div class="slot"></div><div class="paper">${labelHTML(j)}</div><div class="pq"><span class="spin"></span>${n} label${n!==1?'s':''} in queue · ${esc(j.name)}</div>`;
+  renderBarcodes($('#printout'));
+  try { await sendToPrinter(j); } catch(e){ toast('Printer: '+(e.message||e)); }
+  await new Promise(r=>setTimeout(r, 1500));
+  logPrinted(j);
+  if(j.qty>1){ j.qty--; j._logged=true; } else ui.queue.shift();
+  renderFooter(); processQueue();
+}
+function logPrinted(j){
+  if(j.test){ S.settings.labelsInStock=Math.max(0,S.settings.labelsInStock-1); P.save(); return; }
+  if(!j._logged){
+    up('labels',{id:P.uid('l_'),code:j.code,productId:j.productId,name:j.name,type:j.type,printedAt:P.now(),expiry:j.expiry,ruleName:j.ruleName,qty:j.qty,batch:j.batch,useFirst:j.useFirst,defrost:j.defrost,userId:user().id,siteId:S.currentSiteId,deviceId:S.deviceId,status:'active',allergens:j.allergens,reprintOf:j.reprintOf||null});
+    if(j.productId){ const p=P.byId('products',j.productId); if(p){ p.timesPrinted=(p.timesPrinted||0)+j.qty; p.updatedAt=P.now(); p._dirty=true; } }
+  }
+  S.settings.labelsInStock=Math.max(0,S.settings.labelsInStock-1);
+  const d=P.byId('devices',S.deviceId); if(d){ d.labelsLeft=S.settings.labelsInStock; d._dirty=true; d.updatedAt=P.now(); }
+  P.save(); S=P.get();
+  if(S.settings.labelsInStock===50) toast('Label roll running low – order more from Label Order');
+  if(!ui.queue.length || ui.queue.length===1 && ui.queue[0].qty<=1) trySync();
+}
+function reprintLabel(l, fromScan){
+  if(!l) return;
+  const p=l.productId?P.byId('products',l.productId):null;
+  if(fromScan && p){ const j=buildJob(p,{}); j.reprintOf=l.code; j.useFirst=l.useFirst; j.batch=l.batch; enqueue(j); toast('Reprinting '+l.name+' with today\'s date'); return; }
+  const r=L('rules').find(x=>x.name===l.ruleName)||rule(ui.ruleId);
+  enqueue({id:P.uid('j'),productId:l.productId,name:l.name,type:l.type,qty:1,expiry:l.expiry,ruleName:l.ruleName,rule:r,allergens:l.allergens||[],mayContain:p?p.mayContain:'',customAllergens:p?p.customAllergens:'',ingredients:p?p.ingredients:'',price:p?p.price:null,batch:l.batch,useFirst:l.useFirst,defrost:l.defrost,includeDate:true,code:l.code,barcode:p?p.barcode:'',reprintOf:l.code,dateType:p?p.dateType:'use-by'});
+  toast('Identical copy queued');
+}
+function showQueue(){
+  $('#modal').innerHTML=`<div class="modal"><div class="box"><h3>Print Queue</h3>${ui.queue.map((j,i)=>`<div class="kv"><span><b style="color:#000">${j.qty} ×</b> ${esc(j.name)}</span>${i===0?'<span class="spin"></span>':'<span class="hint">waiting</span>'}</div>`).join('')||'<p class="hint">Queue is empty.</p>'}<div class="row" style="margin-top:16px"><button class="btn ghost" id="qc">Close</button>${ui.queue.length>1?'<button class="btn red" id="qx">Cancel waiting</button>':''}</div></div></div>`;
+  $('#qc').onclick=()=>$('#modal').innerHTML='';
+  const x=$('#qx'); if(x) x.onclick=()=>{ ui.queue=ui.queue.slice(0,1); $('#modal').innerHTML=''; renderFooter(); };
+}
+
+// ESC/POS for real thermal printers (via native plugin in the Android app)
+function escpos(j){
+  const enc=new TextEncoder(); const out=[]; const push=(...b)=>b.forEach(x=>Array.isArray(x)?out.push(...x):out.push(x)); const txt=s=>push(...enc.encode(String(s).replace(/[£]/g,'GBP ').replace(/[^\x20-\x7E\n]/g,'')));
+  const al=(j.allergens||[]).join(', ')+(j.customAllergens?((j.allergens||[]).length?', ':'')+j.customAllergens:'');
+  push(0x1B,0x40); push(0x1B,0x61,1); push(0x1D,0x21,0x11,0x1B,0x45,1); txt(j.name.toUpperCase().slice(0,16)+'\n'); push(0x1D,0x21,0,0x1B,0x45,0);
+  if(j.type==='prep'||j.includeDate){ push(0x1D,0x42,1,0x1B,0x45,1); txt(' '+(j.dateType==='best-before'?'BEST BEFORE':'USE BY')+': '+P.fmtDay(j.expiry).toUpperCase()+' '+P.fmtDate(j.expiry, j.rule&&j.rule.period==='hours')+' \n'); push(0x1D,0x42,0,0x1B,0x45,0); }
+  push(0x1B,0x61,0);
+  if(j.type==='prep'){ txt('Printed: '+P.fmtDate(new Date(),true)+'  '+(j.ruleName||'')+'\n'); }
+  if(j.type==='sale'){ if(j.price!=null) txt('Price: GBP '+Number(j.price).toFixed(2)+'\n'); if(j.ingredients){ txt('Ingredients: '); const html=j.ingredients; html.split(/(<b>.*?<\/b>)/i).forEach(part=>{ if(/^<b>/i.test(part)){ push(0x1B,0x45,1,0x1B,0x2D,1); txt(P.stripHtml(part).toUpperCase()); push(0x1B,0x45,0,0x1B,0x2D,0);} else txt(P.stripHtml(part)); }); txt('\n'); } }
+  if(al){ push(0x1B,0x45,1); txt('ALLERGENS: '+al.toUpperCase()+'\n'); push(0x1B,0x45,0); }
+  if(j.mayContain) txt('M/C: '+j.mayContain+'\n');
+  if(j.defrost||j.useFirst){ push(0x1D,0x42,1); txt(' '+[j.defrost?'DEFROSTED':'',j.useFirst?'USE FIRST':''].filter(Boolean).join(' | ')+' \n'); push(0x1D,0x42,0); }
+  if(j.batch) txt('Batch: '+j.batch+'\n');
+  txt(P.initials(user().name)+' - '+site().name+'\n');
+  const code=String(j.barcode||j.code); push(0x1B,0x61,1,0x1D,0x68,50,0x1D,0x77,2,0x1D,0x48,2,0x1D,0x6B,73,code.length+2,0x7B,0x42); txt(code);
+  push(0x0A,0x0A,0x0A,0x1D,0x56,0x42,0x00);
+  return out;
+}
+async function sendToPrinter(j){
+  const pr=S.settings.printer; if(pr.mode==='preview') return;
+  const N=Native().LabelPrinter; if(!N) throw new Error('printing to hardware needs the Android app');
+  if(!pr.address) throw new Error('no printer set – see Settings');
+  const bytes=escpos({...j,qty:1}); let bin=''; bytes.forEach(b=>bin+=String.fromCharCode(b));
+  await N.print({mode:pr.mode,address:pr.address,port:pr.port||9100,data:btoa(bin)});
+}
+
+// ---------- sync & export ----------
+function touchDevice(){
+  if(!connected()) return;
+  const d=P.byId('devices',S.deviceId)||{id:S.deviceId,name:'Handheld '+String(S.deviceId).slice(-4).toUpperCase(),version:APP_VERSION};
+  P.upsert('devices',{...d,orgId:ORG(),siteId:S.currentSiteId,labelsLeft:S.settings.labelsInStock,battery:ui.battery!=null?ui.battery:d.battery,version:APP_VERSION,lastSync:P.now()});
+}
+async function doSync(){
+  if(!connected()){ toast(Cloud.enabled?'Not connected – Menu → Settings → Connect to Proview Label':'Demo data: live sync works in the Android app'); return; }
+  ui.syncing=true; renderStatus(); renderHeader();
+  try{ touchDevice(); const r=await Cloud.sync(P); S=P.get(); toast(`Synced · ${r.pushed} sent, ${r.pulled} received`); }
+  catch(e){ toast(Cloud.friendly(e)); if(/JWT|session|401/i.test(String(e.message||''))) toast('Please reconnect in Settings'); }
+  ui.syncing=false; render();
+}
+let syncT=null;
+function trySync(){ if(!connected()) return; clearTimeout(syncT); syncT=setTimeout(()=>{ Cloud.sync(P).then(()=>{ S=P.get(); renderStatus(); }).catch(()=>{}); },1500); }
+if(navigator.getBattery) navigator.getBattery().then(b=>{ ui.battery=Math.round(b.level*100); }).catch(()=>{});
+setInterval(()=>{ if(connected()&&navigator.onLine&&!ui.printing){ touchDevice(); Cloud.sync(P).then(()=>{ S=P.get(); if(!$('#sheet').classList.contains('on')&&!$('#modal').innerHTML) render(); else renderStatus(); }).catch(()=>{}); } },60000);
+
+function connectSheet(){
+  let step=1, who=null, uid=null, email='';
+  const draw=(msg)=>{
+    if(step===1){
+      const sh=openSheet('Connect to Proview Label',`<p class="hint" style="font-size:14px;margin-top:0">Sign in with a back-office login (owner, admin or manager). Staff then use their PINs on this handheld.</p>
+        ${msg?`<div class="tag bad" style="display:block;padding:10px 12px;margin-bottom:12px;text-transform:none;font-size:13px;letter-spacing:0">${esc(msg)}</div>`:''}
+        <div class="fld"><div class="lbl">Email</div><input class="inp" id="ce" type="email" autocomplete="username" value="${esc(email)}"></div>
+        <div class="fld"><div class="lbl">Password</div><input class="inp" id="cp" type="password" autocomplete="current-password"></div>
+        <p class="hint">Use the same email as your Proview account. No password yet? Open label.proviewcrm.co.uk and use “Forgot password?” to set one.</p>`,`<button class="btn blue" id="cgo">Sign in</button>`);
+      sh.querySelector('#cgo').onclick=async()=>{ email=sh.querySelector('#ce').value.trim().toLowerCase(); const pw=sh.querySelector('#cp').value; if(!email||!pw) return draw('Enter your email and password.');
+        sh.querySelector('#cgo').disabled=true; sh.querySelector('#cgo').textContent='Signing in…';
+        try{ const u=await Cloud.signIn(email,pw); uid=u.id; who=await Cloud.whoami(); if(!who.master&&!(who.orgs||[]).length) throw new Error('This login has no Proview Label business yet.');
+          S=P.useStore('cloud:'+uid,{blank:true}); S.orgs=(who.orgs||[]).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role})); P.save();
+          await Cloud.sync(P); S=P.get(); step=2; draw(); }
+        catch(e){ await Cloud.signOut().catch(()=>{}); draw(Cloud.friendly(e)); } };
+      return;
+    }
+    // step 2: pick the site this handheld lives at, and the person's own PIN
+    const sites=P.live('sites').filter(x=>{ const o=(who.orgs||[]).find(y=>y.id===x.orgId); if(who.master) return true; if(!o) return false; return o.role!=='manager'||(o.site_ids||[]).includes(x.id); });
+    const sh=openSheet('Set up this handheld',`${msg?`<div class="tag bad" style="display:block;padding:10px 12px;margin-bottom:12px;text-transform:none;font-size:13px;letter-spacing:0">${esc(msg)}</div>`:''}
+      ${sites.length?`<div class="fld"><div class="lbl">Site</div><select class="inp" id="cs">${sites.map(x=>`<option value="${x.id}">${esc(x.name)}${(S.orgs||[]).length>1?' · '+esc(((S.orgs||[]).find(o=>o.id===x.orgId)||{}).name||''):''}</option>`).join('')}</select></div>
+      <div class="fld"><div class="lbl">Handheld name</div><input class="inp" id="cn" value="Kitchen handheld"></div>
+      <div class="row"><div class="fld" style="flex:2"><div class="lbl">Your name</div><input class="inp" id="un" value="${esc(email.split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g,c=>c.toUpperCase()))}"></div><div class="fld" style="flex:1"><div class="lbl">Your PIN</div><input class="inp" id="up" inputmode="numeric" maxlength="4" type="password" placeholder="4 digits"></div></div>
+      <p class="hint">You'll be signed in on this handheld as a manager. Add other staff and their PINs in Manage Profiles or in the back-office.</p>`
+      :'<p>No sites yet for this business. Add a site in the back-office (Sites &amp; devices), then try again.</p>'}`,sites.length?`<button class="btn" id="cdone">Finish setup</button>`:`<button class="btn ghost" id="cx">Close</button>`);
+    const cx=sh.querySelector('#cx'); if(cx) cx.onclick=async()=>{ await Cloud.signOut().catch(()=>{}); S=P.useStore(null); closeSheet(); render(); };
+    const cd=sh.querySelector('#cdone'); if(cd) cd.onclick=async()=>{
+      const siteId=sh.querySelector('#cs').value, nm=sh.querySelector('#un').value.trim(), pin=sh.querySelector('#up').value.trim();
+      if(!nm) return draw('Enter your name.'); if(!/^\d{4}$/.test(pin)) return draw('Choose a 4-digit PIN.');
+      const s=P.byId('sites',siteId);
+      S.currentSiteId=siteId; S.deviceId=S.deviceId||('dev_'+P.uid('')); P.save();
+      P.ensureRules(s.orgId); const fr=P.live('rules').find(r=>r.orgId===s.orgId&&r.name==='Fridge'); if(fr){ ui.ruleId=fr.id; localStorageSet('pvl_rule',fr.id); }
+      let me=P.live('users').find(x=>x.orgId===s.orgId&&x.pin===pin&&(x.siteIds||[]).includes(siteId));
+      if(me&&me.name.toLowerCase()!==nm.toLowerCase()) return draw('Someone at this site already uses that PIN. Pick another.');
+      if(!me) me=P.upsert('users',{id:P.uid('u_'),orgId:s.orgId,name:nm,role:'manager',pin,siteIds:[siteId]});
+      S.currentUserId=me.id;
+      P.upsert('devices',{id:S.deviceId,orgId:s.orgId,siteId,name:sh.querySelector('#cn').value.trim()||'Kitchen handheld',version:APP_VERSION,labelsLeft:S.settings.labelsInStock,battery:ui.battery,lastSync:P.now()});
+      CONN={uid,email,orgId:s.orgId,siteId}; try{ localStorage.setItem(DEV_KEY,JSON.stringify(CONN)); }catch(e){}
+      cd.disabled=true; cd.textContent='Saving…';
+      try{ await Cloud.sync(P); S=P.get(); }catch(e){ toast(Cloud.friendly(e)); }
+      closeSheet(); root('home'); toast('Connected to '+s.name);
+    };
+  };
+  draw();
+}
+function disconnect(){
+  confirmBox('Disconnect this handheld?','It stops syncing and goes back to demo data. Labels already sent stay in the back-office.','Disconnect',async()=>{
+    try{ touchDevice(); await Cloud.sync(P); }catch(e){}
+    await Cloud.signOut().catch(()=>{}); try{ localStorage.removeItem(DEV_KEY); }catch(e){} CONN=null;
+    S=P.useStore(null); root('home'); toast('Disconnected');
+  },true);
+}
+
+async function exportData(){
+  const data=P.exportJSON(); const name='proview-label-'+P.fmtDate(new Date()).replace(/\//g,'-')+'.json';
+  const FS=Native().Filesystem, SH=Native().Share;
+  if(FS&&SH){ try{ const r=await FS.writeFile({path:name,data,directory:'CACHE',encoding:'utf8'}); await SH.share({title:name,url:r.uri}); return; }catch(e){ toast(e.message||'Export failed'); return; } }
+  $('#modal').innerHTML=`<div class="modal"><div class="box"><h3>Export data</h3><p class="hint">Copy this and paste it into the back-office (Devices → Import from device).</p><textarea class="inp" style="min-height:160px;font-size:11px" readonly>${esc(data)}</textarea><div class="row" style="margin-top:12px"><button class="btn ghost" id="ec">Close</button><button class="btn blue" id="ecp">Copy</button></div></div></div>`;
+  $('#ec').onclick=()=>$('#modal').innerHTML='';
+  $('#ecp').onclick=()=>{ const t=$('#modal textarea'); t.select(); (navigator.clipboard?navigator.clipboard.writeText(data):Promise.reject()).then(()=>toast('Copied')).catch(()=>{ try{document.execCommand('copy');toast('Copied');}catch(e){toast('Select and copy the text');} }); };
+}
+
+// ---------- render ----------
+function render(){
+  S=P.get();
+  $('#main').classList.remove('grey');
+  renderHeader(); renderStatus(); renderFooter();
+  (screens[ui.screen]||screens.home)();
+}
+window.addEventListener('online',renderStatus); window.addEventListener('offline',renderStatus);
+// Android hardware back button
+document.addEventListener('ionBackButton', ev=>{ ev.detail && ev.detail.register && ev.detail.register(10,()=>{ if($('#modal').innerHTML) $('#modal').innerHTML=''; else if($('#sheet').classList.contains('on')) closeSheet(); else if($('#drawer').classList.contains('on')) closeDrawer(); else if(ui.screen!=='home') back(); else if(Native().App) Native().App.exitApp(); }); });
+if(Native().App && Native().App.addListener) Native().App.addListener('backButton',()=>{ if($('#modal').innerHTML) $('#modal').innerHTML=''; else if($('#sheet').classList.contains('on')) closeSheet(); else if($('#drawer').classList.contains('on')) closeDrawer(); else if(ui.screen!=='home') back(); else Native().App.exitApp(); });
+render();
+setInterval(renderStatus, 60000);
+if(connected()) trySync();
+window.__pvl={ui,render,go,root,escpos,buildJob};
+})();
+</script>
+</body>
+</html>

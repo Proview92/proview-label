@@ -1,0 +1,6 @@
+{
+  "appId": "uk.co.proviewtech.label",
+  "appName": "Proview Label",
+  "webDir": "www",
+  "android": { "backgroundColor": "#1E88E5", "allowMixedContent": false }
+}

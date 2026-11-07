@@ -1,0 +1,29 @@
+diff --git a/README.md b/README.md
+index 48a0b90..4d95590 100644
+--- a/README.md
++++ b/README.md
+@@ -1,9 +1,9 @@
+ # Proview dashboard
+ 
+-https://dashboard.proviewcrm.co.uk: one sign-in (a "Proview account") for Proview Bookings, Employee, Signage and WiFi.
++https://dashboard.proviewcrm.co.uk: one sign-in (a "Proview account") for Proview Bookings, Employee, Signage, Label and WiFi.
+ 
+ - Accounts live in the licence hub Supabase project (`bpssjfrinjlrnkzhytfr`, own storage key `pv-account`).
+ - Opening an app calls the hub's `sso-assert` function, which returns a 2-minute, single-use, Ed25519-signed hand-off for that app. The app checks it with the public key (`sso-login` function, or `/customer/sso` in WiFi) and signs the person in, if they are an owner/manager there.
+-- Apps send people here with `?app=<bookings|employee|signage|wifi>&return=<url>`.
++- Apps send people here with `?app=<bookings|employee|signage|label|wifi>&return=<url>`.
+ 
+ Single static page; pushing to `main` redeploys through GitHub Pages.
+diff --git a/index.html b/index.html
+index 61f28c4..eda6a01 100644
+--- a/index.html
++++ b/index.html
+@@ -70,7 +70,7 @@ const HUB_KEY = "sb_publishable_t-flikzLh-wDUz7ZR5iPBA_ZmPNnkB6";
+ // Own storage key: the licence admin page on this site uses the default one.
+ const sb = createClient(HUB_URL, HUB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: "pv-account" } });
+ 
+-const NAMES = { bookings: "Proview Bookings", employee: "Proview Employee", signage: "Proview Signage", wifi: "Proview WiFi" };
++const NAMES = { bookings: "Proview Bookings", employee: "Proview Employee", signage: "Proview Signage", label: "Proview Label", wifi: "Proview WiFi" };
+ const qs = new URLSearchParams(location.search);
+ const APP = NAMES[qs.get("app")] ? qs.get("app") : null;  // set when an app sent the person here to sign in
+ const RET = qs.get("return") || "";

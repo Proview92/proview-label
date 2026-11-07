@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Proview Label</string>
+    <string name="title_activity_main">Proview Label</string>
+    <string name="package_name">uk.co.proviewtech.label</string>
+    <string name="custom_url_scheme">uk.co.proviewtech.label</string>
+</resources>

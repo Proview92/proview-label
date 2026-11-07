@@ -1,0 +1,16 @@
+{
+  "name": "proview-label-android",
+  "version": "1.1.0",
+  "private": true,
+  "scripts": {
+    "web": "cd ../web && npm install && npm run build && cd ../android-app && node prepare-web.js",
+    "sync": "npm run web && npx cap sync android",
+    "apk": "npm run sync && cd android && ./gradlew assembleDebug",
+    "open": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.0", "@capacitor/app": "^7.0.0", "@capacitor/core": "^7.4.0",
+    "@capacitor/filesystem": "^7.1.0", "@capacitor/share": "^7.0.0", "@fontsource/inter": "^5.2.0"
+  },
+  "devDependencies": { "@capacitor/cli": "^7.4.0" }
+}
