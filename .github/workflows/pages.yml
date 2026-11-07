@@ -5,11 +5,11 @@ on:
 permissions: { contents: read, pages: write, id-token: write }
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: { name: github-pages }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22 }
       - run: npm install && npm run build
         working-directory: web
