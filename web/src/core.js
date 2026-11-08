@@ -440,10 +440,36 @@
       if (rows.length < 1000) break;
       offset += 1000;
     }
+    // full: also drop clean cached records the server no longer returns (hard-deleted, or no longer visible
+    // to this person). Unsent local edits (_dirty) are kept for the next push.
+    let dropped = 0;
+    if (o.full) {
+      const seen = new Set(); let off = 0;
+      for (;;) {
+        const r3 = await fetch(base + '?select=id&order=id.asc&limit=1000&offset=' + off, { headers });
+        if (!r3.ok) throw new Error('Couldn’t load from the server (' + r3.status + ').');
+        const ids = await r3.json(); ids.forEach((x) => seen.add(x.id));
+        if (ids.length < 1000) break;
+        off += 1000;
+      }
+      COLLECTIONS.forEach((k) => { const n = s[k].length; s[k] = s[k].filter((r) => r._dirty || !r.orgId || seen.has(r.id)); dropped += n - s[k].length; });
+    }
     s.settings.sync.lastSync = started;
     save();
-    return { ok: true, pushed, pulled, skipped };
+    return { ok: true, pushed, pulled, skipped, dropped };
   }
+  // Forget everything cached for businesses outside orgIds (the person's current server access): it is
+  // never shown and never uploaded again, even unsent edits (the server would refuse them anyway).
+  function prune(orgIds) {
+    const s = get(); const ok = new Set(orgIds || []); let n = 0;
+    COLLECTIONS.forEach((k) => { const b = s[k].length; s[k] = s[k].filter((r) => !r.orgId || ok.has(r.orgId)); n += b - s[k].length; });
+    const ob = (s.orgs || []).length; s.orgs = (s.orgs || []).filter((o) => ok.has(o.id)); n += ob - s.orgs.length;
+    if (s.currentSiteId && !s.sites.some((x) => x.id === s.currentSiteId)) s.currentSiteId = null;
+    save();
+    return n;
+  }
+  // list the localStorage keys of every per-user cloud cache on this device
+  function cloudStores() { const out = []; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf(STORAGE_KEY + ':cloud:') === 0) out.push(k.slice(STORAGE_KEY.length + 1)); } } catch (e) {} return out; }
 
   // Offline sync via file: export/import whole dataset (used when no cloud configured)
   function exportJSON() { const s = get(); return JSON.stringify({ exportedAt: now(), ...s }, null, 0); }
@@ -465,6 +491,6 @@
     uid, now, fmtDate, fmtDay, fmtTime, esc, money, initials, stripHtml,
     detectAllergens, boldAllergens, productAllergens, computeExpiry, expiryStatus, ruleText, labelCode,
     seed, blank, useStore, forget, load, save, reset, get, on, upsert, remove, live, byId, audit,
-    toCSV, parseCSV, analyseMenu, sync, exportJSON, importJSON, ensureRules, DEFAULT_RULES
+    toCSV, parseCSV, analyseMenu, sync, prune, cloudStores, exportJSON, importJSON, ensureRules, DEFAULT_RULES
   };
 })(typeof window !== 'undefined' ? window : globalThis);

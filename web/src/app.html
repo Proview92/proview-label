@@ -1018,7 +1018,7 @@ function touchDevice(){
 async function doSync(){
   if(!connected()){ toast(Cloud.enabled?'Not connected – Menu → Settings → Connect to Proview Label':'Demo data: live sync works in the Android app'); return; }
   ui.syncing=true; renderStatus(); renderHeader();
-  try{ touchDevice(); const r=await Cloud.sync(P); S=P.get(); toast(`Synced · ${r.pushed} sent, ${r.pulled} received`); }
+  try{ touchDevice(); if(Cloud.prune) await Cloud.prune(P); const r=await Cloud.sync(P,{full:true}); S=P.get(); toast(`Synced · ${r.pushed} sent, ${r.pulled} received`); }
   catch(e){ toast(Cloud.friendly(e)); if(/JWT|session|401/i.test(String(e.message||''))) toast('Please reconnect in Settings'); }
   ui.syncing=false; render();
 }

@@ -54,7 +54,10 @@
     },
     // { email, master, orgs: [{ id, name, role, site_ids, settings, suspended }] }
     async whoami() { const { data, error } = await sb.rpc('pl_whoami'); if (error) throw error; return data; },
-    async sync(P) { return P.sync({ url: C.SUPABASE_URL, key: C.SUPABASE_KEY, token: await Cloud.token() }); },
+    async sync(P, opts) { return P.sync({ url: C.SUPABASE_URL, key: C.SUPABASE_KEY, token: await Cloud.token(), full: !!(opts && opts.full) }); },
+    // Re-read this person's access and purge cached data for businesses they no longer belong to.
+    // Returns the whoami result (or null if it couldn't be checked; then nothing is purged).
+    async prune(P) { let w; try { w = await Cloud.whoami(); } catch (e) { return null; } if (!w) return null; P.prune((w.orgs || []).map((o) => o.id)); return w; },
     // ----- businesses & back-office logins -----
     async createOrg(name, ownerEmail, ownerName) { const { data, error } = await sb.rpc('pl_create_org', { p_name: name, p_owner_email: ownerEmail || null, p_owner_name: ownerName || '' }); if (error) throw error; return data; },
     async renameOrg(id, name) { const { error } = await sb.from('pl_orgs').update({ name }).eq('id', id); if (error) throw error; },

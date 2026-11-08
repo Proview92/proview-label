@@ -683,10 +683,36 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
       if (rows.length < 1000) break;
       offset += 1000;
     }
+    // full: also drop clean cached records the server no longer returns (hard-deleted, or no longer visible
+    // to this person). Unsent local edits (_dirty) are kept for the next push.
+    let dropped = 0;
+    if (o.full) {
+      const seen = new Set(); let off = 0;
+      for (;;) {
+        const r3 = await fetch(base + '?select=id&order=id.asc&limit=1000&offset=' + off, { headers });
+        if (!r3.ok) throw new Error('Couldn’t load from the server (' + r3.status + ').');
+        const ids = await r3.json(); ids.forEach((x) => seen.add(x.id));
+        if (ids.length < 1000) break;
+        off += 1000;
+      }
+      COLLECTIONS.forEach((k) => { const n = s[k].length; s[k] = s[k].filter((r) => r._dirty || !r.orgId || seen.has(r.id)); dropped += n - s[k].length; });
+    }
     s.settings.sync.lastSync = started;
     save();
-    return { ok: true, pushed, pulled, skipped };
+    return { ok: true, pushed, pulled, skipped, dropped };
   }
+  // Forget everything cached for businesses outside orgIds (the person's current server access): it is
+  // never shown and never uploaded again, even unsent edits (the server would refuse them anyway).
+  function prune(orgIds) {
+    const s = get(); const ok = new Set(orgIds || []); let n = 0;
+    COLLECTIONS.forEach((k) => { const b = s[k].length; s[k] = s[k].filter((r) => !r.orgId || ok.has(r.orgId)); n += b - s[k].length; });
+    const ob = (s.orgs || []).length; s.orgs = (s.orgs || []).filter((o) => ok.has(o.id)); n += ob - s.orgs.length;
+    if (s.currentSiteId && !s.sites.some((x) => x.id === s.currentSiteId)) s.currentSiteId = null;
+    save();
+    return n;
+  }
+  // list the localStorage keys of every per-user cloud cache on this device
+  function cloudStores() { const out = []; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf(STORAGE_KEY + ':cloud:') === 0) out.push(k.slice(STORAGE_KEY.length + 1)); } } catch (e) {} return out; }
 
   // Offline sync via file: export/import whole dataset (used when no cloud configured)
   function exportJSON() { const s = get(); return JSON.stringify({ exportedAt: now(), ...s }, null, 0); }
@@ -708,7 +734,7 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     uid, now, fmtDate, fmtDay, fmtTime, esc, money, initials, stripHtml,
     detectAllergens, boldAllergens, productAllergens, computeExpiry, expiryStatus, ruleText, labelCode,
     seed, blank, useStore, forget, load, save, reset, get, on, upsert, remove, live, byId, audit,
-    toCSV, parseCSV, analyseMenu, sync, exportJSON, importJSON, ensureRules, DEFAULT_RULES
+    toCSV, parseCSV, analyseMenu, sync, prune, cloudStores, exportJSON, importJSON, ensureRules, DEFAULT_RULES
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -770,7 +796,10 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     },
     // { email, master, orgs: [{ id, name, role, site_ids, settings, suspended }] }
     async whoami() { const { data, error } = await sb.rpc('pl_whoami'); if (error) throw error; return data; },
-    async sync(P) { return P.sync({ url: C.SUPABASE_URL, key: C.SUPABASE_KEY, token: await Cloud.token() }); },
+    async sync(P, opts) { return P.sync({ url: C.SUPABASE_URL, key: C.SUPABASE_KEY, token: await Cloud.token(), full: !!(opts && opts.full) }); },
+    // Re-read this person's access and purge cached data for businesses they no longer belong to.
+    // Returns the whoami result (or null if it couldn't be checked; then nothing is purged).
+    async prune(P) { let w; try { w = await Cloud.whoami(); } catch (e) { return null; } if (!w) return null; P.prune((w.orgs || []).map((o) => o.id)); return w; },
     // ----- businesses & back-office logins -----
     async createOrg(name, ownerEmail, ownerName) { const { data, error } = await sb.rpc('pl_create_org', { p_name: name, p_owner_email: ownerEmail || null, p_owner_name: ownerName || '' }); if (error) throw error; return data; },
     async renameOrg(id, name) { const { error } = await sb.from('pl_orgs').update({ name }).eq('id', id); if (error) throw error; },
@@ -799,6 +828,7 @@ const day=864e5;
 // row-level security enforces the same rules shown here.
 const Cloud=window.PVLCloud||{enabled:false};
 const CLOUD=!!Cloud.enabled;
+if(CLOUD){ P.useStore('signed-out',{blank:true}); S=P.get(); }
 const SKEY='pvl-session';
 const lsGet=(k)=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const lsSet=(k,v)=>{ try{ v==null?localStorage.removeItem(k):localStorage.setItem(k,v); }catch(e){} };
@@ -808,7 +838,7 @@ let LOGIN={msg:'',kind:'bad',mode:'signin'};
 const ROLE_RANK={master:4,owner:3,admin:2,manager:1};
 // role in a business: 'master' | 'owner' | 'admin' | 'manager' | null
 function orgRole(orgId){
-  if(CLOUD){ if(!WHO) return null; if(WHO.master) return 'master'; const o=(WHO.orgs||[]).find(x=>x.id===orgId); return o?o.role:null; }
+  if(CLOUD){ if(!WHO) return null; if(WHO.master) return (WHO.orgs||[]).some(x=>x.id===orgId)?'master':null; const o=(WHO.orgs||[]).find(x=>x.id===orgId); return o?o.role:null; }
   const u=P.byId('users',sessionId); if(!u) return null; if(u.role==='master') return 'master';
   return u.orgId===orgId?(u.role==='admin'?'admin':u.role==='manager'?'manager':null):null;
 }
@@ -836,6 +866,7 @@ function fixSite(){
   else if(siteFilter==='all'&&orgs.length===1&&a.length>1&&!isMaster()) siteFilter='org:'+orgs[0].id;
 }
 function setSite(id){ siteFilter=id; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),id); render(); }
+function pickSite(id){ if(id==='all'&&isMaster()&&location.hash!=='#sites'){ siteFilter='all'; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),'all'); location.hash='sites'; return; } setSite(id); }
 // A business must be chosen before creating catalogue items, sites or staff
 function withOrg(cb){
   const o=curOrg(); if(o) return cb(o);
@@ -848,6 +879,7 @@ function orgSettings(orgId){ const o=(S.orgs||[]).find(x=>x.id===orgId); return 
 async function setOrgSetting(orgId,k,v){ const o=(S.orgs||[]).find(x=>x.id===orgId); if(!o) return; o.settings={...(o.settings||{}),[k]:v}; P.save();
   if(CLOUD){ try{ await Cloud.saveOrgSettings(orgId,o.settings); }catch(e){ toast(Cloud.friendly(e)); } } }
 const NAV=[
+  ['Proview',[['sites','All sites','pin']]],
   ['Service',[['overview','Dashboard','home'],['expiry','Expiry log','clock'],['printlog','Print log','print'],['wastage','Wastage','bin']]],
   ['Menu & labels',[['products','Products','tag'],['categories','Categories','grid'],['matrix','Allergen matrix','shield'],['analyser','Menu analyser','spark'],['rules','Expiry rules','snow']]],
   ['Manage',[['orders','Label orders','box'],['devices','Sites & devices','device'],['users','Users & permissions','users'],['history','Amendment history','hist'],['settings','Settings','gear']]]
@@ -880,7 +912,7 @@ const VIEW_FEATURE={expiry:'expiry',printlog:'printlog',wastage:'wastage',produc
 function hasFeature(f){ const u=me(); if(!u) return false; if(u.role!=='manager') return true;
   if(CLOUD){ return (WHO.orgs||[]).filter(o=>o.role==='manager').some(o=>((o.features||{})[f])!==false); }
   return ((u.features||{})[f])!==false; }
-function canView(k){ const u=me(); if(!u) return false; if(u.role==='manager'){ if(k==='settings') return false; const f=VIEW_FEATURE[k]; return !f||hasFeature(f); } return true; }
+function canView(k){ const u=me(); if(!u) return false; if(k==='sites') return u.role==='master'; if(u.role==='manager'){ if(k==='settings') return false; const f=VIEW_FEATURE[k]; return !f||hasFeature(f); } return true; }
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2400);}
 // records tied to a site (labels, wastage, orders, devices) follow the picker; others follow the business
 const bySite=(arr)=>{ const a=allowedSiteIds(), orgs=scopeOrgIds();
@@ -891,7 +923,9 @@ const multiOrg=()=>scopeOrgIds().length>1;
 const siteName=(id)=>(P.byId('sites',id)||{}).name||'—';
 const userName=(id)=>(P.byId('users',id)||{}).name||'—';
 const catOf=(p)=>P.byId('categories',p.categoryId)||{};
-function route(){ const h=(location.hash||'#overview').slice(1); return VIEWS[h]&&canView(h)?h:'overview'; }
+function route(){ const h=(location.hash||(isMaster()?'#sites':'#overview')).slice(1); const r=VIEWS[h]&&canView(h)?h:'overview';
+  if(r==='overview'&&isMaster()&&(!visibleOrgs().length||(siteFilter==='all'&&!allowedSiteIds().length))) return 'sites';
+  return r; }
 
 function siteStats(id){
   const ls=P.live('labels').filter(l=>l.siteId===id); const today=new Date().toDateString();
@@ -933,7 +967,7 @@ function render(){
   const cur=siteFilter==='all'||siteFilter.startsWith('org:')?null:P.byId('sites',siteFilter);
   $('#app').innerHTML=`<div class="app">
     <aside class="side">
-      <a class="brand" href="#overview"><div class="logo"></div><div class="wordmark">PROVIEW<span>LABEL</span></div></a>
+      <a class="brand" href="#${isMaster()?'sites':'overview'}"><div class="logo"></div><div class="wordmark">PROVIEW<span>LABEL</span></div></a>
       <div class="client-pick" id="orgPick">${pickerHtml()}</div>
       <nav class="nav">${NAV.map(([g,items])=>{ const vis=items.filter(([k])=>canView(k)); return vis.length?`<div class="nav-sec">${g}</div>`+vis.map(([k,l,i])=>`<a href="#${k}" class="${r===k?'on':''}" title="${l}">${ic(i)}<span class="lbl">${l}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`).join(''):''; }).join('')}</nav>
       ${cur||single?`<div class="venue"><span class="dot" style="background:${siteStats((cur||P.byId('sites',allowedSiteIds()[0])).id).online?'#12a150':'#8b8b95'}"></span>${siteStats((cur||P.byId('sites',allowedSiteIds()[0])).id).online?'Devices online':'Devices offline'}<b>${esc((cur||P.byId('sites',allowedSiteIds()[0])).name)}</b><span style="color:#8b8b95">${esc((cur||P.byId('sites',allowedSiteIds()[0])).address||'')}</span></div>`:''}
@@ -953,46 +987,66 @@ function render(){
       <div class="content" id="main"></div>
     </div></div>`;
   VIEWS[r]($('#main'));
-  const sp=$('#sitePick'); if(sp) sp.onchange=e=>setSite(e.target.value);
-  const sp2=$('#sitePick2'); if(sp2) sp2.onchange=e=>setSite(e.target.value);
+  const sp=$('#sitePick'); if(sp) sp.onchange=e=>pickSite(e.target.value);
+  const sp2=$('#sitePick2'); if(sp2) sp2.onchange=e=>pickSite(e.target.value);
   $('#tbBell').onclick=()=>location.hash='expiry';
-  $('#tbSync').onclick=$('#sbSync').onclick=doSync;
+  $('#tbSync').onclick=$('#sbSync').onclick=()=>doSync(false);
   $('#tbOut').onclick=$('#sbOut').onclick=signOut;
-  $('#tbMe').onclick=()=>modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open every business and site from the picker under the logo.':'You can see '+allowedSiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn" id="mo">Sign out</button>`).querySelector('#mo').onclick=()=>{closeModal();signOut();};
+  $('#tbMe').onclick=()=>modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open every business and site from All sites or the picker under the logo.':'You can see '+allowedSiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn" id="mo">Sign out</button>`).querySelector('#mo').onclick=()=>{closeModal();signOut();};
 }
 let syncing=false, syncTimer=null;
 async function doSync(quiet){
   if(!CLOUD){ if(!quiet) toast('This is the demo. In the hosted back-office changes sync to every device automatically.'); return; }
   if(syncing) return; syncing=true;
-  try{ const r=await Cloud.sync(P); S=P.get(); if(!quiet) toast(`Synced · ${r.pushed} sent, ${r.pulled} received`); if(r.pulled||!quiet) render(); }
+  try{ let changed=false; if(!quiet){ if(!(await checkAccess())) return; changed=true; }
+    const r=await Cloud.sync(P,{full:!quiet}); S=P.get(); if(!quiet) toast(`Synced · ${r.pushed} sent, ${r.pulled} received`); if(r.pulled||r.dropped||changed) render(); }
   catch(e){ toast(Cloud.friendly(e)); }
   finally{ syncing=false; }
 }
 // push changes shortly after any edit; pull every minute
 P.on(()=>{ if(!CLOUD||!WHO) return; const dirty=P.COLLECTIONS.some(k=>P.get()[k].some(r=>r._dirty)); if(!dirty) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>doSync(true),1200); });
-if(CLOUD) setInterval(()=>{ if(WHO&&document.visibilityState==='visible') doSync(true); },60000);
-async function signOut(){
-  if(CLOUD){ await Cloud.signOut(); WHO=null; P.useStore(null); LOGIN={msg:'You’ve been signed out.',kind:'ok',mode:'signin'}; }
+if(CLOUD) setInterval(async()=>{ if(WHO&&document.visibilityState==='visible'&&!syncing){ const before=JSON.stringify(S.orgs); if(!(await checkAccess())) return; if(JSON.stringify(S.orgs)!==before) render(); doSync(true); } },60000);
+const NO_ACCESS='Your login isn’t linked to a business yet. Ask your owner or Proview.';
+// the handheld app on this origin keeps its own cache for its connected login: never wipe that one
+const deviceStore=()=>{ try{ const c=JSON.parse(lsGet('pvl-device')||'null'); return c&&c.uid?'cloud:'+c.uid:null; }catch(e){ return null; } };
+// forget every cached business on this device except `keep` (the signed-in person's own cache)
+function forgetCaches(keep){ const dev=deviceStore(); (P.cloudStores?P.cloudStores():[]).forEach(k=>{ if(k!==keep&&k!==dev) P.forget(k); }); P.forget('signed-out'); }
+async function signOut(msg){
+  if(CLOUD){ await Cloud.signOut().catch(()=>{}); WHO=null; P.useStore('signed-out',{blank:true}); S=P.get();
+    forgetCaches(null); LOGIN=typeof msg==='string'?{msg,kind:'bad',mode:'signin'}:{msg:'You’ve been signed out.',kind:'ok',mode:'signin'}; }
   else { lsSet(SKEY,null); sessionId=null; }
   render();
 }
-function signIn(u){ sessionId=u.id; lsSet(SKEY,u.id); siteFilter=lsGet('pvl-site:'+u.id)||'all'; if(!location.hash) location.hash='overview'; render(); toast('Signed in as '+u.name); }
+// re-read this person's access from the server; purge businesses they've lost; sign them out if none are left
+async function checkAccess(){
+  if(!CLOUD||!WHO) return true;
+  let w; try{ w=await Cloud.whoami(); }catch(e){ return true; } // offline: keep working on what's cached
+  if(!w) return true;
+  if(!w.master&&!(w.orgs||[]).length){ await signOut(NO_ACCESS); return false; }
+  applyWho(w); return true;
+}
+function applyWho(w){ WHO=w; S=P.get(); S.orgs=(w.orgs||[]).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role,suspended:o.suspended})); P.prune(S.orgs.map(o=>o.id)); S=P.get(); }
+function signIn(u){ sessionId=u.id; lsSet(SKEY,u.id); siteFilter=lsGet('pvl-site:'+u.id)||'all'; if(u.role==='master'){ siteFilter='all'; location.hash='sites'; } else if(!location.hash) location.hash='overview'; render(); toast('Signed in as '+u.name); }
 // cloud: after Supabase sign-in, find out what this person can see and load it
-async function boot(){
+async function boot(fresh){
   const u=await Cloud.user(); if(!u){ WHO=null; return render(); }
   $('#app').innerHTML=`<div class="auth2"><div class="auth2-art"><div class="auth2-brand"><div class="logo"></div><div class="wordmark">PROVIEW<span>LABEL</span></div></div></div><div class="auth2-form"><div style="text-align:center;color:#55555f">Loading your sites…</div></div></div>`;
   try{
     const w=await Cloud.whoami();
-    if(!w||(!w.master&&!(w.orgs||[]).length)){ LOGIN={msg:`There's no Proview Label access for ${u.email} yet. Ask your business owner or Proview to add you, then sign in again.`,kind:'bad',mode:'signin'}; await Cloud.signOut(); WHO=null; return render(); }
-    WHO=w; P.useStore('cloud:'+u.id,{blank:true}); S=P.get();
-    S.orgs=(w.orgs||[]).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role,suspended:o.suspended})); P.save();
-    siteFilter=lsGet('pvl-site:'+w.email)||'all';
-    await Cloud.sync(P); S=P.get();
-    if(!location.hash) location.hash='overview';
+    if(!w||(!w.master&&!(w.orgs||[]).length)){ WHO=null; return signOut(NO_ACCESS); }
+    // a different person on this device: drop everyone else's cached businesses first
+    forgetCaches('cloud:'+u.id);
+    P.useStore('cloud:'+u.id,{blank:true}); applyWho(w);
+    siteFilter=(fresh&&w.master)?'all':(lsGet('pvl-site:'+w.email)||'all');
+    await Cloud.sync(P,{full:true}); S=P.get();
+    // a manager with no sites they can open has nothing to work on: back to sign-in
+    if(!w.master&&!allowedSiteIds().length&&!(w.orgs||[]).some(o=>o.role==='owner'||o.role==='admin')){ P.forget('cloud:'+u.id); return signOut(NO_ACCESS); }
+    if(w.master&&(fresh||!location.hash||location.hash==='#overview')&&siteFilter==='all') location.hash='sites';
+    else if(!location.hash) location.hash='overview';
     render();
   }catch(e){ WHO=null; LOGIN={msg:Cloud.friendly(e),kind:'bad',mode:'signin'}; render(); }
 }
-async function refreshWho(){ const w=await Cloud.whoami(); WHO=w; S.orgs=(w.orgs||[]).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role,suspended:o.suspended})); P.save(); }
+async function refreshWho(){ const w=await Cloud.whoami(); applyWho(w); }
 function loginArt(){ return `<div class="auth2-art"><div class="art-glow"></div>
       <div class="auth2-brand"><div class="logo"></div><div class="wordmark">PROVIEW<span>LABEL</span></div></div>
       <div><h2>Every label, every use-by — in one place.</h2>
@@ -1033,18 +1087,18 @@ function renderLogin(){
     if(!CLOUD){ const u=accts.find(x=>x.email.toLowerCase()===em); if(!u||u.password!==pw) return err('That email and password don’t match an account.'); return signIn(u); }
     const go=$('#lgo'); go.disabled=true;
     try{
-      if(newpw){ if(pw.length<8) throw new Error('Use at least 8 characters.'); if(pw!==$('#lp2').value) throw new Error('The two passwords don’t match.'); await Cloud.setPassword(pw); LOGIN={msg:'',kind:'ok',mode:'signin'}; return boot(); }
+      if(newpw){ if(pw.length<8) throw new Error('Use at least 8 characters.'); if(pw!==$('#lp2').value) throw new Error('The two passwords don’t match.'); await Cloud.setPassword(pw); LOGIN={msg:'',kind:'ok',mode:'signin'}; return boot(true); }
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) throw new Error('Enter your email address.');
       if(reset){ await Cloud.resetPassword(em,HERE); LOGIN={msg:'If there’s a login for that email, a reset link is on its way.',kind:'ok',mode:'signin'}; return renderLogin(); }
       if(up){ if(pw.length<8) throw new Error('Use at least 8 characters for your password.'); if(pw!==$('#lp2').value) throw new Error('The two passwords don’t match.');
-        const d=await Cloud.signUp(em,pw,HERE); if(!d.session){ LOGIN={msg:`Check your inbox: we’ve sent a confirmation link to ${em}.`,kind:'ok',mode:'signin'}; return renderLogin(); } return boot(); }
+        const d=await Cloud.signUp(em,pw,HERE); if(!d.session){ LOGIN={msg:`Check your inbox: we’ve sent a confirmation link to ${em}.`,kind:'ok',mode:'signin'}; return renderLogin(); } return boot(true); }
       if(!pw) throw new Error('Enter your password.');
-      await Cloud.signIn(em,pw); LOGIN={msg:'',kind:'bad',mode:'signin'}; await boot();
+      await Cloud.signIn(em,pw); LOGIN={msg:'',kind:'bad',mode:'signin'}; await boot(true);
     }catch(ex){ go.disabled=false; err(Cloud.friendly?Cloud.friendly(ex):ex.message); }
   };
   $('#app').querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>{ const u=P.byId('users',b.dataset.u); signIn(u); });
 }
-async function ssoArrive(){ try{ if(await Cloud.consumeSsoHash()){ LOGIN={msg:'',kind:'bad',mode:'signin'}; return boot(); } }catch(e){ WHO=null; LOGIN={msg:e.message,kind:'bad',mode:'signin'}; render(); } }
+async function ssoArrive(){ try{ if(await Cloud.consumeSsoHash()){ LOGIN={msg:'',kind:'bad',mode:'signin'}; return boot(true); } }catch(e){ WHO=null; LOGIN={msg:e.message,kind:'bad',mode:'signin'}; render(); } }
 window.addEventListener('hashchange',()=>{ if(/pv_sso=/.test(location.hash)){ if(CLOUD) ssoArrive(); return; } render(); const m=$('#main'); if(m) m.scrollTop=0; });
 
 // ---------- modal helpers ----------
@@ -1321,6 +1375,37 @@ VIEWS.orders=(el)=>{
     m.querySelector('#sv').onclick=()=>{ P.upsert('orders',{id:P.uid('o_'),siteId:m.querySelector('#s').value,orgId:(P.byId('sites',m.querySelector('#s').value)||{}).orgId,mode:'on-demand',labelType:m.querySelector('#t').value,rolls:+m.querySelector('#r').value||1,delivery:m.querySelector('#d').value,status:'pending',at:P.now(),userId:me().id}); closeModal(); render(); }; };
 };
 
+// ---------- All sites (master landing): every business and its sites across the platform ----------
+let asq='';
+VIEWS.sites=(el)=>{
+  const orgs=visibleOrgs().slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  const rows=[]; orgs.forEach(o=>{ const os=P.live('sites').filter(x=>x.orgId===o.id).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+    if(!os.length) rows.push({o,s:null}); else os.forEach(x=>rows.push({o,s:x})); });
+  const nSites=rows.filter(r=>r.s).length;
+  const status=(o)=>o.suspended?'<span class="tag bad">Suspended</span>':'<span class="tag ok">Active</span>';
+  const tr=(r)=>{ const st=r.s?siteStats(r.s.id):null; const q=(r.o.name+' '+(r.s?r.s.name+' '+(r.s.address||'')+' '+(r.s.region||''):'')).toLowerCase();
+    return `<tr data-q="${esc(q)}"><td><b>${esc(r.o.name)}</b></td><td>${r.s?`<b>${esc(r.s.name)}</b><div class="hint">${esc(r.s.address||r.s.region||'')}</div>`:'<span class="hint">No sites yet</span>'}</td><td>${status(r.o)}</td>
+      <td>${st?st.devices:'—'}</td><td class="hint">${st?(st.lastSync?P.fmtDate(st.lastSync,true):'Never'):'—'}</td>
+      <td style="text-align:right;white-space:nowrap">${r.s?`<button class="btn sm" data-open="${esc(r.s.id)}">Open</button>`:`<button class="btn ghost sm" data-openorg="${esc(r.o.id)}">Open</button>`}</td></tr>`; };
+  const empty=`<tr><td colspan="6"><div class="empty" style="padding:38px 20px"><h3 style="font-size:17px;color:var(--ink)">No businesses yet</h3><p class="hint" style="max-width:460px;margin:8px auto 16px">Add a customer business and invite its owner. They can then add their kitchens, menu and staff, or you can set it up for them.</p><div class="btns" style="justify-content:center"><button class="btn" data-addb>+ Add business</button><button class="btn ghost" data-refresh>Refresh</button></div></div></td></tr>`;
+  el.innerHTML=`<div class="ph keep"><div><h1>All sites</h1><p>${orgs.length} business${orgs.length!==1?'es':''} · ${nSites} site${nSites!==1?'s':''} across Proview Label</p></div><div class="btns"><button class="btn ghost" data-refresh>Refresh</button><button class="btn" data-addb>+ Add business</button></div></div>
+  ${rows.length>6?`<div class="filters"><input id="asq" placeholder="Search business or site" value="${esc(asq)}" style="min-width:260px"><span class="count" id="asc"></span></div>`:''}
+  <div class="tbl"><table><thead><tr><th>Business</th><th>Site</th><th>Status</th><th>Devices</th><th>Last sync</th><th></th></tr></thead><tbody>${rows.length?rows.map(tr).join(''):empty}<tr id="asnone" style="display:none"><td colspan="6" class="empty">No business or site matches “<span></span>”.</td></tr></tbody></table></div>`;
+  const filt=()=>{ const q=asq.trim().toLowerCase(); let n=0; el.querySelectorAll('tr[data-q]').forEach(t=>{ const on=!q||t.dataset.q.includes(q); t.style.display=on?'':'none'; if(on) n++; });
+    const c=el.querySelector('#asc'); if(c) c.textContent=q?n+' of '+rows.length:''; const no=el.querySelector('#asnone'); if(no){ no.style.display=q&&!n?'':'none'; no.querySelector('span').textContent=asq; } };
+  const qi=el.querySelector('#asq'); if(qi){ qi.oninput=()=>{ asq=qi.value; filt(); }; filt(); }
+  el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ setSite(b.dataset.open); location.hash='overview'; });
+  el.querySelectorAll('[data-openorg]').forEach(b=>b.onclick=()=>{ setSite('org:'+b.dataset.openorg); location.hash='devices'; });
+  el.querySelectorAll('[data-addb]').forEach(b=>b.onclick=()=>addBusiness(()=>render()));
+  el.querySelectorAll('[data-refresh]').forEach(b=>b.onclick=async()=>{ if(!CLOUD){ render(); return toast('Up to date'); }
+    b.disabled=true; try{ if(!(await checkAccess())) return; await Cloud.sync(P,{full:true}); S=P.get(); render(); toast('Up to date'); }catch(e){ b.disabled=false; toast(Cloud.friendly(e)); } });
+};
+
+// Master: create a customer business (and optionally invite its owner). Used by All sites and Sites & devices.
+function addBusiness(after){ const m=modal('Add business',`<div class="fld"><label>Business name</label><input class="inp" id="bn" placeholder="e.g. Pepe's Piri Piri"></div><div class="g2"><div class="fld"><label>Owner's name</label><input class="inp" id="on"></div><div class="fld"><label>Owner's email</label><input class="inp" id="oe" type="email" placeholder="They sign in with this"></div></div><p class="hint">The owner signs in with “Sign in with Proview account” or “Create a login” using that email. They can then add their sites, staff and menu.</p>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Add business</button>`);
+    m.querySelector('#sv').onclick=async()=>{ const n=m.querySelector('#bn').value.trim(), oe=m.querySelector('#oe').value.trim().toLowerCase(), on=m.querySelector('#on').value.trim(); if(!n) return toast('Enter the business name'); if(oe&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(oe)) return toast('Check the owner’s email');
+      try{ let id; if(CLOUD){ id=await Cloud.createOrg(n,oe,on); await refreshWho(); } else { id='org_'+P.uid(''); S.orgs.push({id,name:n,settings:{}}); if(oe) P.upsert('users',{id:P.uid('u_'),orgId:id,name:on||oe,email:oe,password:'demo',role:'admin',pin:'0000',siteIds:[]}); P.save(); }
+        P.ensureRules(id); closeModal(); toast(n+' added'); if(after) after(id); else setSite('org:'+id); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } }; }
 VIEWS.devices=(el)=>{
   const ss=P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(siteFilter==='all'||x.id===siteFilter||siteFilter==='org:'+x.orgId)), ds=bySite(P.live('devices'));
   const canAddSite=visibleOrgs().some(o=>['master','owner','admin'].includes(orgRole(o.id)));
@@ -1337,10 +1422,7 @@ VIEWS.devices=(el)=>{
   el.querySelectorAll('[data-openorg]').forEach(b=>b.onclick=()=>{ setSite('org:'+b.dataset.openorg); location.hash='overview'; });
   el.querySelectorAll('[data-eo]').forEach(b=>b.onclick=()=>{ const o=S.orgs.find(x=>x.id===b.dataset.eo); const m=modal('Rename business',`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(o.name)}"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
     m.querySelector('#sv').onclick=async()=>{ const n=m.querySelector('#n').value.trim(); if(!n) return; try{ if(CLOUD) await Cloud.renameOrg(o.id,n); o.name=n; P.save(); closeModal(); render(); }catch(e){ toast(Cloud.friendly(e)); } }; });
-  const ab=el.querySelector('#addB'); if(ab) ab.onclick=()=>{ const m=modal('Add business',`<div class="fld"><label>Business name</label><input class="inp" id="bn" placeholder="e.g. Pepe's Piri Piri"></div><div class="g2"><div class="fld"><label>Owner's name</label><input class="inp" id="on"></div><div class="fld"><label>Owner's email</label><input class="inp" id="oe" type="email" placeholder="They sign in with this"></div></div><p class="hint">The owner signs in with “Sign in with Proview account” or “Create a login” using that email. They can then add their sites, staff and menu.</p>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Add business</button>`);
-    m.querySelector('#sv').onclick=async()=>{ const n=m.querySelector('#bn').value.trim(), oe=m.querySelector('#oe').value.trim().toLowerCase(), on=m.querySelector('#on').value.trim(); if(!n) return toast('Enter the business name'); if(oe&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(oe)) return toast('Check the owner’s email');
-      try{ let id; if(CLOUD){ id=await Cloud.createOrg(n,oe,on); await refreshWho(); } else { id='org_'+P.uid(''); S.orgs.push({id,name:n,settings:{}}); if(oe) P.upsert('users',{id:P.uid('u_'),orgId:id,name:on||oe,email:oe,password:'demo',role:'admin',pin:'0000',siteIds:[]}); P.save(); }
-        P.ensureRules(id); closeModal(); toast(n+' added'); setSite('org:'+id); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } }; };
+  const ab=el.querySelector('#addB'); if(ab) ab.onclick=()=>addBusiness();
   const cfg=el.querySelector('#cfg'); if(cfg) cfg.onclick=()=>{ const data=P.exportJSON(); const m=modal('Device config file',`<p class="hint">Copy this to the device, or save it as a .json file and use Settings → Import data in the app.</p><textarea class="inp" style="min-height:200px;font-family:monospace;font-size:11px" readonly>${esc(data)}</textarea>`,`<button class="btn ghost" id="dl">Download .json</button><button class="btn" id="cp">Copy</button>`);
     m.querySelector('#cp').onclick=()=>{ m.querySelector('textarea').select(); (navigator.clipboard?navigator.clipboard.writeText(data):Promise.reject()).then(()=>toast('Copied')).catch(()=>{try{document.execCommand('copy');toast('Copied');}catch(e){}}); };
     m.querySelector('#dl').onclick=()=>{ try{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([data],{type:'application/json'})); a.download='proview-label-config.json'; document.body.appendChild(a); a.click(); a.remove(); }catch(e){} toast('If nothing downloaded, use Copy'); }; };
