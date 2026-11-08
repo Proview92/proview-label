@@ -433,22 +433,23 @@ function siteStats(id){
     online: devs.some(d=>d.lastSync&&Date.now()-new Date(d.lastSync)<6*3600e3) };
 }
 // Site dropdown in the header, straight after the page title: the one Proview standard (PICKER_STANDARD.md).
-// Master: "All sites (N)", then per business (A–Z) an optgroup with "Business ▸ All sites" and each "Business ▸ Site".
+// Master: "All sites (N)", then every site name A–Z (" · Business" only when two share a name).
 // Owner/admin/manager with several sites: "All my sites (N)" and each site. Exactly one site: a disabled box with its name.
 function pickerHtml(){
   const byName=(x,y)=>String(x.name).localeCompare(String(y.name));
   const a=allowedSiteIds(); const sites=P.live('sites').filter(s=>a.includes(s.id)).sort(byName);
   const sel=(v)=>siteFilter===v?' selected':'';
+  // a business-wide view (opened from the All sites page) isn't in the list, so show it only while it's the current view
+  const curOrg=siteFilter.startsWith('org:')?`<option value="${esc(siteFilter)}" selected>All ${esc(orgName(siteFilter.slice(4)))} sites</option>`:'';
   if(isMaster()){
-    const orgs=visibleOrgs().slice().sort(byName);
-    const groups=orgs.map(o=>`<optgroup label="${esc(o.name)}"><option value="org:${esc(o.id)}"${sel('org:'+o.id)}>${esc(o.name)} ▸ All sites</option>${sites.filter(s=>s.orgId===o.id).map(s=>`<option value="${esc(s.id)}"${sel(s.id)}>${esc(o.name)} ▸ ${esc(s.name)}</option>`).join('')}</optgroup>`).join('');
-    return `<select id="sitePick" aria-label="Choose site"><option value="all"${sel('all')}>All sites (${sites.length})</option>${groups}</select>`;
+    const dup=(x)=>sites.some(y=>y!==x&&y.name===x.name);
+    return `<select id="sitePick" aria-label="Choose site"><option value="all"${sel('all')}>All sites (${sites.length})</option>${curOrg}${sites.map(x=>`<option value="${esc(x.id)}"${sel(x.id)}>${esc(x.name)}${dup(x)?' · '+esc(orgName(x.orgId)):''}</option>`).join('')}</select>`;
   }
   if(!sites.length) return '';
   if(sites.length===1) return `<select id="sitePick" aria-label="Choose site" disabled><option>${esc(sites[0].name)}</option></select>`;
   const orgs=[...new Set(sites.map(s=>s.orgId))];
   const allVal=orgs.length===1?'org:'+orgs[0]:'all';
-  const orgOpt=siteFilter.startsWith('org:')&&siteFilter!==allVal?`<option value="${esc(siteFilter)}" selected>${esc(orgName(siteFilter.slice(4)))} ▸ All sites</option>`:'';
+  const orgOpt=siteFilter!==allVal?curOrg:'';
   return `<select id="sitePick" aria-label="Choose site"><option value="${allVal}"${sel(allVal)}>All my sites (${sites.length})</option>${orgOpt}${sites.map(s=>`<option value="${esc(s.id)}"${sel(s.id)}>${esc(s.name)}</option>`).join('')}</select>`;
 }
 function scopeLabel(){ if(siteFilter==='all') return visibleOrgs().length>1?'all businesses':'all sites'; if(siteFilter.startsWith('org:')) return orgName(siteFilter.slice(4)); return siteName(siteFilter); }
@@ -1008,7 +1009,7 @@ VIEWS.sites=(el)=>{
   const status=(o)=>stateTag(o);
   const trialOk=!CLOUD||(WHO&&Cloud.trialReady&&Cloud.trialReady(WHO));
   const tr=(r)=>{ const st=r.s?siteStats(r.s.id):null; const q=(r.o.name+' '+(r.s?r.s.name+' '+(r.s.address||'')+' '+(r.s.region||''):'')).toLowerCase();
-    return `<tr data-q="${esc(q)}"><td><b>${esc(r.o.name)}</b></td><td>${r.s?`<b>${esc(r.s.name)}</b><div class="hint">${esc(r.s.address||r.s.region||'')}</div>`:'<span class="hint">No sites yet</span>'}</td><td>${status(r.o)}</td>
+    return `<tr data-q="${esc(q)}"><td><b>${esc(r.o.name)}</b>${r.s&&r.first?`<div><a href="#overview" class="hint" data-openbiz="${esc(r.o.id)}" title="See this business across all its sites, as its owner does">Open business</a></div>`:''}</td><td>${r.s?`<b>${esc(r.s.name)}</b><div class="hint">${esc(r.s.address||r.s.region||'')}</div>`:'<span class="hint">No sites yet</span>'}</td><td>${status(r.o)}</td>
       <td>${st?st.devices:'—'}</td><td class="hint">${st?(st.lastSync?P.fmtDate(st.lastSync,true):'Never'):'—'}</td>
       <td style="text-align:right;white-space:nowrap">${trialOk&&r.first?`<button class="btn ghost sm" data-trial="${esc(r.o.id)}" title="Extend, end or clear this business's free trial">Trial…</button> `:''}${r.s?`<button class="btn sm" data-open="${esc(r.s.id)}">Open</button>`:`<button class="btn ghost sm" data-openorg="${esc(r.o.id)}">Open</button>`}</td></tr>`; };
   const empty=`<tr><td colspan="6"><div class="empty" style="padding:38px 20px"><h3 style="font-size:17px;color:var(--ink)">No businesses yet</h3><p class="hint" style="max-width:460px;margin:8px auto 16px">Add a customer business and invite its owner. They can then add their kitchens, menu and staff, or you can set it up for them.</p><div class="btns" style="justify-content:center"><button class="btn" data-addb>+ Add business</button><button class="btn ghost" data-refresh>Refresh</button></div></div></td></tr>`;
@@ -1020,6 +1021,7 @@ VIEWS.sites=(el)=>{
   const qi=el.querySelector('#asq'); if(qi){ qi.oninput=()=>{ asq=qi.value; filt(); }; filt(); }
   el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ setSite(b.dataset.open); location.hash='overview'; });
   el.querySelectorAll('[data-openorg]').forEach(b=>b.onclick=()=>{ setSite('org:'+b.dataset.openorg); location.hash='devices'; });
+  el.querySelectorAll('[data-openbiz]').forEach(b=>b.onclick=(e)=>{ e.preventDefault(); setSite('org:'+b.dataset.openbiz); });
   el.querySelectorAll('[data-addb]').forEach(b=>b.onclick=()=>addBusiness(()=>render()));
   el.querySelectorAll('[data-trial]').forEach(b=>b.onclick=()=>trialForm(b.dataset.trial));
   el.querySelectorAll('[data-refresh]').forEach(b=>b.onclick=async()=>{ if(!CLOUD){ render(); return toast('Up to date'); }
