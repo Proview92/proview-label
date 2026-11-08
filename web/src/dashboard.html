@@ -210,6 +210,8 @@ textarea.inp{min-height:76px;resize:vertical}
 .hint{color:var(--mut);font-size:12.5px;line-height:1.5}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(16px);background:#141418;color:#fff;padding:11px 18px;border-radius:10px;opacity:0;transition:all .2s;z-index:200;pointer-events:none;font-weight:500}
 .toast.on{opacity:1;transform:translateX(-50%)}
+/* phones: messages stay at the bottom, clear of the header and its site dropdown */
+@media (max-width:700px){.toast{top:auto;bottom:calc(16px + env(safe-area-inset-bottom));max-width:calc(100vw - 32px);width:max-content;text-align:center}}
 .matrix td,.matrix th{text-align:center;padding:7px 5px}
 .matrix td:first-child,.matrix th:first-child{text-align:left;padding-left:14px}
 .matrix th.v{writing-mode:vertical-rl;transform:rotate(180deg);height:118px;vertical-align:bottom}
@@ -439,8 +441,8 @@ function pickerHtml(){
   const byName=(x,y)=>String(x.name).localeCompare(String(y.name));
   const a=allowedSiteIds(); const sites=P.live('sites').filter(s=>a.includes(s.id)).sort(byName);
   const sel=(v)=>siteFilter===v?' selected':'';
-  // a business-wide view (opened from the All sites page) isn't in the list, so show it only while it's the current view
-  const curOrg=siteFilter.startsWith('org:')?`<option value="${esc(siteFilter)}" selected>All ${esc(orgName(siteFilter.slice(4)))} sites</option>`:'';
+  // a whole business open (All sites → Open business): the closed box reads "<Business> (all sites)", a hidden option not in the list
+  const curOrg=siteFilter.startsWith('org:')?`<option value="${esc(siteFilter)}" selected hidden>${esc(orgName(siteFilter.slice(4)))} (all sites)</option>`:'';
   if(isMaster()){
     const dup=(x)=>sites.some(y=>y!==x&&y.name===x.name);
     return `<select id="sitePick" aria-label="Choose site"><option value="all"${sel('all')}>All sites (${sites.length})</option>${curOrg}${sites.map(x=>`<option value="${esc(x.id)}"${sel(x.id)}>${esc(x.name)}${dup(x)?' · '+esc(orgName(x.orgId)):''}</option>`).join('')}</select>`;
