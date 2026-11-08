@@ -16,6 +16,12 @@
   --font:Inter,"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;--r:12px;--sh:0 1px 2px rgba(20,20,30,.06),0 4px 16px rgba(20,20,30,.05)}
 *{box-sizing:border-box}
 html,body{height:100%}
+/* loading splash: only the app icon, centred on the page background, until the sign-in state is known
+   (same as the other Proview apps: 72px icon, page background, 1.2s pulse as Proview Bookings) */
+.pv-splash{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:300}
+.pv-splash .logo{width:72px;height:72px;opacity:.9;animation:pvsplash 1.2s ease-in-out infinite}
+@keyframes pvsplash{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.pv-splash .logo{animation:none}}
 body{margin:0;font-family:Inter,"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.4}
 button,input,select,textarea{font:inherit;color:inherit}
 h1,h2,h3,h4{margin:0;font-weight:650;letter-spacing:-.01em}
@@ -291,7 +297,7 @@ html .wordmark span,html .wordmark span.x.x,html .wordmark2 span,html .wordmark2
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="app"><div class="pv-splash" role="status" aria-label="Loading Proview Label"><div class="logo"></div></div></div>
 <div id="modal"></div>
 <div class="toast" id="toast"></div>
 
@@ -662,9 +668,14 @@ function renderTrialSetup(){
 function signIn(u){ sessionId=u.id; lsSet(SKEY,u.id); siteFilter=lsGet('pvl-site:'+u.id)||'all'; if(u.role==='master'){ siteFilter='all'; location.hash='sites'; } else if(!location.hash) location.hash='overview'; render(); toast('Signed in as '+u.name); }
 // cloud: after Supabase sign-in, find out what this person can see and load it
 const TRIAL_USED_MSG='The free trial for this email has already been used. Buy a licence at license.proviewcrm.co.uk or contact Proview on 020 8935 5495.';
+// Loading splash: just the app icon while the sign-in state is checked; never the sign-in form.
+// Failsafe: if the check hasn't finished after 8 seconds (offline, say), show the normal page (sign-in if signed out).
+const SPLASH='<div class="pv-splash" role="status" aria-label="Loading Proview Label"><div class="logo"></div></div>';
+let splashTimer=null;
+function splash(){ if(!$('#app .pv-splash')) $('#app').innerHTML=SPLASH; clearTimeout(splashTimer); splashTimer=setTimeout(()=>{ if($('#app .pv-splash')) render(); },8000); }
 async function boot(fresh,newOrg){
+  splash();
   const u=await Cloud.user(); if(!u){ WHO=null; TRIAL_SETUP=false; return render(); }
-  $('#app').innerHTML=`<div class="auth2"><div class="auth2-art"><div class="auth2-brand"><div class="logo"></div><div class="wordmark">PROVIEW<span>LABEL</span></div></div></div><div class="auth2-form"><div style="text-align:center;color:#55555f">Loading your sites…</div></div></div>`;
   try{
     const w=await Cloud.whoami();
     if(!w||(!w.master&&!(w.orgs||[]).length)){ WHO=null;
@@ -738,7 +749,7 @@ function renderLogin(){
   };
   $('#app').querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>{ const u=P.byId('users',b.dataset.u); signIn(u); });
 }
-async function ssoArrive(){ try{ if(await Cloud.consumeSsoHash()){ LOGIN={msg:'',kind:'bad',mode:'signin'}; return boot(true); } }catch(e){ WHO=null; LOGIN={msg:e.message,kind:'bad',mode:'signin'}; render(); } }
+async function ssoArrive(){ splash(); try{ if(await Cloud.consumeSsoHash()){ LOGIN={msg:'',kind:'bad',mode:'signin'}; return boot(true); } }catch(e){ WHO=null; LOGIN={msg:e.message,kind:'bad',mode:'signin'}; render(); } }
 window.addEventListener('hashchange',()=>{ if(/pv_sso=/.test(location.hash)){ if(CLOUD) ssoArrive(); return; } render(); const m=$('#main'); if(m) m.scrollTop=0; });
 
 // ---------- modal helpers ----------
@@ -1171,6 +1182,7 @@ VIEWS.settings=(el)=>{
 
 if(CLOUD){
   Cloud.onRecovery(()=>{ LOGIN={msg:'',kind:'bad',mode:'newpw'}; WHO=null; renderLogin(); });
+  splash();
   (async()=>{
     try{ await Cloud.consumeSsoHash(); }catch(e){ LOGIN={msg:e.message,kind:'bad',mode:'signin'}; }
     const hp=new URLSearchParams(location.hash.slice(1));
