@@ -6,8 +6,7 @@
 <title>Proview Label</title>
 <link rel="icon" type="image/png" href="icon-32.png?v=2">
 <link rel="apple-touch-icon" href="icon-180.png?v=2">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- no web font: the system font stack, the same as Proview Signage and the other Proview apps -->
 <style>
 /* Proview CRM family theme (same tokens as Proview Bookings / Employee / Signage) */
 :root{--pri:#4a6cd0;--pri-d:#3a59b8;--pri-l:#edf2fd;--grad:linear-gradient(135deg,#2f84d4 0%,#5a5fbb 100%);--grad-light:linear-gradient(90deg,#62b0ec 0%,#8b88dc 100%);
@@ -302,6 +301,32 @@ html .logo.logo.logo.logo,html .brand-mark.brand-mark.brand-mark.brand-mark,html
 html .side .brand .logo.logo.logo.logo,html .side .brand .brand-mark.brand-mark.brand-mark.brand-mark,html .side .brand .auth2-logo.auth2-logo.auth2-logo.auth2-logo,html .brand .logo.logo.logo.logo,html .brand .brand-mark.brand-mark.brand-mark.brand-mark,html .brand .auth2-logo.auth2-logo.auth2-logo.auth2-logo,html .app.collapsed .side .brand .logo.logo.logo.logo,html .app.collapsed .side .brand .brand-mark.brand-mark.brand-mark.brand-mark,html .app.collapsed .side .brand .auth2-logo.auth2-logo.auth2-logo.auth2-logo,html body .app .side .brand .logo.logo.logo.logo,html body .app .side .brand .brand-mark.brand-mark.brand-mark.brand-mark,html body .app .side .brand .auth2-logo.auth2-logo.auth2-logo.auth2-logo{width:30px!important;height:30px!important}
 html .auth2-logo.auth2-logo.auth2-logo.auth2-logo,html .auth2-brand .logo.logo.logo.logo{width:60px!important;height:60px!important}
 html .wordmark span,html .wordmark span.x.x,html .wordmark2 span,html .wordmark2 span.x.x,html .wm span,html .fcols .brand .wm span{background:linear-gradient(90deg,#EC4899 0%,#BE185D 100%)!important;-webkit-background-clip:text!important;background-clip:text!important;color:transparent!important}
+/* ===== Proview shell v4: exact Proview Signage values (SHELL_MATCH_SPEC.md, measured in headless Chrome) ===== */
+body{font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+.side{gap:0}
+.side .nav{gap:0}
+.side .nav>*{flex-shrink:0}
+@media (hover:none) and (pointer:coarse){.top .hdr-pick select{font-size:16px!important}}
+/* Locations page (master): page head and table exactly as Proview Signage's Locations page */
+.content:has(>.ph.keep){max-width:1280px}   /* Signage's page area stops at 1280px */
+.content .ph.keep{margin-bottom:22px}
+.content .ph.keep h1{font-size:21px;font-weight:650;letter-spacing:-.01em;line-height:1.45}
+.content .ph.keep p{font-size:15px;line-height:1.45;color:#55555f}
+.content .ph.keep .btn{height:38px;padding:0 14px;font-size:14px;line-height:normal;box-sizing:border-box}
+.content .ph.keep~.tbl th{font-size:12px;font-weight:600;line-height:1.45;letter-spacing:.04em;color:#8b8b95;padding:12px 16px;background:none}
+.content .ph.keep~.tbl td{font-size:14px;line-height:1.45;padding:12px 16px}
+/* header title: one line with an ellipsis, as Proview Signage (keeps its width from 701px up; the picker shrinks) */
+html :is(#top,.top):is(#top,.top)>h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:auto}
+@media (min-width:701px){html :is(#top,.top):is(#top,.top)>h2{flex-shrink:0}}
+/* collapsed menu (desktop): same geometry as Proview Signage's collapsed menu */
+@media (min-width:901px){
+html .app.collapsed :is(.side,#pv-x){padding:18px 10px!important}
+html .app.collapsed .side :is(.brand,#pv-x){justify-content:center!important;padding:4px 0 18px!important;gap:10px!important;margin:0!important}
+html .app.collapsed .side :is(.nav,#pv-x){padding:6px 10px!important}
+html .app.collapsed .side :is(.nav,#pv-x)>a,html .app.collapsed .side :is(.nav,#pv-x)>button:not(.nav-group):not(.nav-more){width:32px!important;min-width:0!important;margin:0 auto!important;padding:0 12px!important;gap:10px!important;justify-content:center!important}
+html .app.collapsed .side :is(.side-foot,#pv-x){flex-direction:column!important;align-items:center!important;justify-content:normal!important;gap:4px!important;padding:0 10px 14px!important}
+html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26px!important;padding:6px 8px!important;margin:0!important;justify-content:center!important;box-sizing:border-box!important}
+}
 </style>
 </head>
 <body>
@@ -1386,7 +1411,7 @@ function orgSettings(orgId){ const o=(S.orgs||[]).find(x=>x.id===orgId); return 
 async function setOrgSetting(orgId,k,v){ const o=(S.orgs||[]).find(x=>x.id===orgId); if(!o) return; o.settings={...(o.settings||{}),[k]:v}; P.save();
   if(CLOUD){ try{ await Cloud.saveOrgSettings(orgId,o.settings); }catch(e){ toast(Cloud.friendly(e)); } } }
 const NAV=[
-  ['Proview',[['sites','Locations','pin']]],
+  ['',[['sites','Locations','pvloc']]],   // no section label above Locations (as Proview Signage)
   ['Service',[['overview','Dashboard','home'],['expiry','Expiry log','clock'],['printlog','Print log','print'],['wastage','Wastage','bin']]],
   ['Menu & labels',[['products','Products','tag'],['categories','Categories','grid'],['matrix','Allergen matrix','shield'],['analyser','Menu analyser','spark'],['rules','Expiry rules','snow']]],
   ['Manage',[['orders','Label orders','box'],['devices','Locations & devices','device'],['users','Users & permissions','users'],['history','Amendment history','hist'],['settings','Settings','gear']]]
@@ -1410,6 +1435,7 @@ const ICON={
   bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
   out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
   pin:'<path d="M12 21s-7-6.1-7-11a7 7 0 1 1 14 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  pvloc:'<path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M9 13h1M9 17h1M14 9h1M14 13h1M14 17h1"/>',
   left:'<path d="M15 18l-6-6 6-6"/>',
   check:'<path d="M20 6 9 17l-5-5"/>'
 };
@@ -1498,7 +1524,7 @@ function render(){
   $('#app').innerHTML=`<div class="app${col?' collapsed':''}">
     <aside class="side">
       <a class="brand" href="#${isMaster()?'sites':'overview'}" title="Proview Label"><div class="brand-mark"></div><div class="wordmark">PROVIEW<span>LABEL</span></div></a>
-      <nav class="nav">${NAV.map(([g,items])=>{ const vis=items.filter(([k])=>canView(k)); return vis.length?`<div class="nav-sep">${g}</div>`+vis.map(link).join(''):''; }).join('')}</nav>
+      <nav class="nav">${NAV.map(([g,items])=>{ const vis=items.filter(([k])=>canView(k)); return vis.length?(g?`<div class="nav-sep">${g}</div>`:'')+vis.map(link).join(''):''; }).join('')}</nav>
       <div class="side-foot"><button class="sf-link" id="sfCollapse" title="${col?'Expand menu':'Collapse menu'}" aria-label="${col?'Expand menu':'Collapse menu'}">${ic('left',14)}<span class="lbl">COLLAPSE</span></button></div>
     </aside>
     <div class="main">
