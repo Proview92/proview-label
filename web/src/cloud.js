@@ -20,12 +20,30 @@
     if (/email not confirmed/i.test(t)) return 'Confirm your email first: open the link we emailed you.';
     if (/already registered/i.test(t)) return 'There’s already an account for this email. Sign in instead.';
     if (/rate limit|too many/i.test(t)) return 'Too many attempts. Please wait a minute and try again.';
+    if (/^TRIAL_USED: |^ALREADY_MEMBER: /.test(t)) return t.replace(/^[A-Z_]+: /, '');
     if (/failed to fetch|network/i.test(t)) return 'Can’t reach the server. Check your internet connection and try again.';
     return t || 'Something went wrong. Please try again.';
   };
 
+  const LICENCE_URL = 'https://license.proviewcrm.co.uk';
+  const SUPPORT = { phone: '020 8935 5495', email: 'info@proviewtechgroup.co.uk' };
+  // Licence / trial state of a business from whoami: 'expired' (trial ended), 'suspended', 'trial' or 'active'
+  const orgState = (o) => {
+    if (!o) return 'active';
+    if (o.suspended) return 'suspended';
+    if (o.trial_ends_at && (o.trial_expired || new Date(o.trial_ends_at) < new Date())) return 'expired';
+    if (o.trial_ends_at) return 'trial';
+    return 'active';
+  };
+  const lockMsg = (o) => {
+    const st = orgState(o), n = (o && o.name) || 'This business';
+    if (st === 'expired') return { title: 'Trial ended', text: n + '’s free 3-day trial has ended. Your data is safe, but nothing can be changed or synced until you buy a licence.' };
+    if (st === 'suspended') return { title: 'Account suspended', text: n + ' is suspended. Your data is safe, but nothing can be changed or synced until the licence is renewed.' };
+    return null;
+  };
+
   const Cloud = {
-    enabled, friendly, url: C.SUPABASE_URL, key: C.SUPABASE_KEY,
+    enabled, friendly, url: C.SUPABASE_URL, key: C.SUPABASE_KEY, LICENCE_URL, SUPPORT, orgState, lockMsg,
     client: () => sb,
     async session() { if (!sb) return null; const { data } = await sb.auth.getSession(); return data.session; },
     async user() { const s = await Cloud.session(); return s ? s.user : null; },
@@ -60,6 +78,12 @@
     async prune(P) { let w; try { w = await Cloud.whoami(); } catch (e) { return null; } if (!w) return null; P.prune((w.orgs || []).map((o) => o.id)); return w; },
     // ----- businesses & back-office logins -----
     async createOrg(name, ownerEmail, ownerName) { const { data, error } = await sb.rpc('pl_create_org', { p_name: name, p_owner_email: ownerEmail || null, p_owner_name: ownerName || '' }); if (error) throw error; return data; },
+    // Self sign-up: 3-day free trial (migration 003). Returns { org_id, site_id, trial_ends_at }.
+    // trialReady(who): the server has the trial feature (whoami then reports trial_used).
+    trialReady(who) { return !!who && Object.prototype.hasOwnProperty.call(who, 'trial_used'); },
+    async startTrial(business, site) { const { data, error } = await sb.rpc('pl_start_trial', { p_business: business, p_site: site || null }); if (error) throw error; return data; },
+    // master: extend (ISO date) or clear (null) a business's trial
+    async setTrial(orgId, endsAt) { const { error } = await sb.rpc('pl_set_trial', { p_org: orgId, p_ends: endsAt || null }); if (error) throw error; },
     async renameOrg(id, name) { const { error } = await sb.from('pl_orgs').update({ name }).eq('id', id); if (error) throw error; },
     async saveOrgSettings(id, settings) { const { error } = await sb.from('pl_orgs').update({ settings }).eq('id', id); if (error) throw error; },
     async members(orgIds) { let q = sb.from('pl_members').select('*').order('name'); if (orgIds) q = q.in('org_id', orgIds); const { data, error } = await q; if (error) throw error; return data || []; },

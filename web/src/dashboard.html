@@ -247,6 +247,7 @@ const lsSet=(k,v)=>{ try{ v==null?localStorage.removeItem(k):localStorage.setIte
 let sessionId=CLOUD?null:lsGet(SKEY);
 let WHO=null;           // cloud: result of pl_whoami
 let LOGIN={msg:'',kind:'bad',mode:'signin'};
+let TRIAL_SETUP=false, TRIAL_EMAIL='';   // cloud: signed in with no business and no invite -> "Set up your business"
 const ROLE_RANK={master:4,owner:3,admin:2,manager:1};
 // role in a business: 'master' | 'owner' | 'admin' | 'manager' | null
 function orgRole(orgId){
@@ -368,6 +369,7 @@ function scopeLabel(){ if(siteFilter==='all') return visibleOrgs().length>1?'all
 
 function render(){
   S=P.get();
+  if(CLOUD&&TRIAL_SETUP&&!WHO) return renderTrialSetup();
   if(!me()){ return renderLogin(); }
   fixSite();
   const r=route(); const u=me();
@@ -399,6 +401,7 @@ function render(){
       <div class="content" id="main"></div>
     </div></div>`;
   VIEWS[r]($('#main'));
+  const tbn=trialBanner(); if(tbn&&r!=='sites') $('#main').insertAdjacentHTML('afterbegin',tbn);
   const sp=$('#sitePick'); if(sp) sp.onchange=e=>pickSite(e.target.value);
   const sp2=$('#sitePick2'); if(sp2) sp2.onchange=e=>pickSite(e.target.value);
   $('#tbBell').onclick=()=>location.hash='expiry';
@@ -406,13 +409,13 @@ function render(){
   $('#tbOut').onclick=$('#sbOut').onclick=signOut;
   $('#tbMe').onclick=()=>modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open every business and site from All sites or the picker under the logo.':'You can see '+allowedSiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn" id="mo">Sign out</button>`).querySelector('#mo').onclick=()=>{closeModal();signOut();};
 }
-let syncing=false, syncTimer=null;
+let syncing=false, syncTimer=null, lockToastShown=false;
 async function doSync(quiet){
   if(!CLOUD){ if(!quiet) toast('This is the demo. In the hosted back-office changes sync to every device automatically.'); return; }
   if(syncing) return; syncing=true;
   try{ let changed=false; if(!quiet){ if(!(await checkAccess())) return; changed=true; }
     const r=await Cloud.sync(P,{full:!quiet}); S=P.get(); if(!quiet) toast(`Synced · ${r.pushed} sent, ${r.pulled} received`); if(r.pulled||r.dropped||changed) render(); }
-  catch(e){ toast(Cloud.friendly(e)); }
+  catch(e){ const lo=(S.orgs||[]).find(o=>lockMsgOf(o)); if(lo&&!isMaster()){ if(!quiet||!lockToastShown){ lockToastShown=true; toast(lockMsgOf(lo).title+': changes can’t be saved. Buy a licence at license.proviewcrm.co.uk.'); } } else toast(Cloud.friendly(e)); }
   finally{ syncing=false; }
 }
 // push changes shortly after any edit; pull every minute
@@ -424,6 +427,7 @@ const deviceStore=()=>{ try{ const c=JSON.parse(lsGet('pvl-device')||'null'); re
 // forget every cached business on this device except `keep` (the signed-in person's own cache)
 function forgetCaches(keep){ const dev=deviceStore(); (P.cloudStores?P.cloudStores():[]).forEach(k=>{ if(k!==keep&&k!==dev) P.forget(k); }); P.forget('signed-out'); }
 async function signOut(msg){
+  TRIAL_SETUP=false;
   if(CLOUD){ await Cloud.signOut().catch(()=>{}); WHO=null; P.useStore('signed-out',{blank:true}); S=P.get();
     forgetCaches(null); LOGIN=typeof msg==='string'?{msg,kind:'bad',mode:'signin'}:{msg:'You’ve been signed out.',kind:'ok',mode:'signin'}; }
   else { lsSet(SKEY,null); sessionId=null; }
@@ -437,20 +441,81 @@ async function checkAccess(){
   if(!w.master&&!(w.orgs||[]).length){ await signOut(NO_ACCESS); return false; }
   applyWho(w); return true;
 }
-function applyWho(w){ WHO=w; S=P.get(); S.orgs=(w.orgs||[]).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role,suspended:o.suspended})); P.prune(S.orgs.map(o=>o.id)); S=P.get(); }
+function applyWho(w){ WHO=w; S=P.get(); S.orgs=(w.orgs||[]).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role,suspended:o.suspended,trial_ends_at:o.trial_ends_at||null,trial_expired:!!o.trial_expired})); P.prune(S.orgs.map(o=>o.id)); S=P.get(); }
+// ---------- licence / free trial ----------
+const orgState=(o)=>Cloud.orgState?Cloud.orgState(o):(o&&o.suspended?'suspended':'active');
+const lockMsgOf=(o)=>Cloud.lockMsg?Cloud.lockMsg(o):null;
+const LIC_URL=Cloud.LICENCE_URL||'https://license.proviewcrm.co.uk', SUP=Cloud.SUPPORT||{phone:'020 8935 5495',email:'info@proviewtechgroup.co.uk'};
+const contactHtml=()=>`Buy a licence at <a href="${LIC_URL}" target="_blank" rel="noopener">license.proviewcrm.co.uk</a> or contact Proview on <a href="tel:${SUP.phone.replace(/\s/g,'')}">${esc(SUP.phone)}</a> · <a href="mailto:${esc(SUP.email)}">${esc(SUP.email)}</a>.`;
+function stateTag(o){ const st=orgState(o);
+  if(st==='suspended') return '<span class="tag bad">Suspended</span>';
+  if(st==='expired') return `<span class="tag bad" title="Trial ended ${esc(P.fmtDate(o.trial_ends_at,true))}">Trial expired</span>`;
+  if(st==='trial') return `<span class="tag warn">Trial – ends ${esc(P.fmtDate(o.trial_ends_at))}</span>`;
+  return '<span class="tag ok">Active</span>'; }
+// banner above the page for the business in view: trial ended / suspended (writes blocked), or trial running
+function trialBanner(){
+  const ids=scopeOrgIds(); const orgs=(S.orgs||[]).filter(o=>ids.includes(o.id));
+  const locked=orgs.filter(o=>lockMsgOf(o)), trial=orgs.filter(o=>orgState(o)==='trial');
+  if(locked.length){ const m=lockMsgOf(locked[0]);
+    return `<div class="card" role="alert" style="border-color:var(--bad);background:var(--badl);margin-bottom:16px"><h3 style="color:var(--bad)">${esc(m.title)}${locked.length>1?' · '+locked.length+' businesses':''}</h3><p style="margin:6px 0 0">${esc(m.text)} ${isMaster()?'As master you can extend or clear the trial from All sites.':contactHtml()}</p></div>`; }
+  if(trial.length&&!isMaster()){ const o=trial[0];
+    return `<div class="card" style="border-color:var(--warn);background:var(--warnl);margin-bottom:16px;padding:12px 16px"><b>Free trial</b> · ${esc(o.name)} · ends ${esc(P.fmtDate(o.trial_ends_at,true))}. ${contactHtml()}</div>`; }
+  return '';
+}
+const anyLocked=()=>(S.orgs||[]).filter(o=>scopeOrgIds().includes(o.id)).some(o=>lockMsgOf(o));
+// Signed in, no business, no invite: "Set up your business" (start a free 3-day trial)
+let TRIAL={msg:''};
+function renderTrialSetup(){
+  const em=TRIAL_EMAIL||'';
+  $('#app').innerHTML=`<div class="auth2">${loginArt()}
+    <div class="auth2-form"><div>
+      <form id="tf" novalidate>
+        <div class="auth2-fbrand"><div class="auth2-logo"></div><div class="wordmark2">PROVIEW<span>LABEL</span></div></div>
+        <h1>Set up your business</h1><p class="auth2-mut">Start your free 3-day trial${em?' as '+esc(em):''}.</p>
+        <div id="terr">${TRIAL.msg?`<div class="lg-err" role="alert">${esc(TRIAL.msg)}</div>`:''}</div>
+        <label for="tb">Business name</label><input class="inp" id="tb" placeholder="e.g. Pepe's Piri Piri" maxlength="120" autocomplete="organization">
+        <label for="ts">First site or kitchen</label><input class="inp" id="ts" placeholder="Same as the business name" maxlength="120">
+        <button class="go" type="submit" id="tgo">Start free trial</button>
+        <button class="ghost2" type="button" id="tout">Sign out</button>
+        <p class="hint" style="margin:0;font-size:12.5px">After 3 days the business becomes read-only until you buy a licence at <a href="${LIC_URL}" target="_blank" rel="noopener">license.proviewcrm.co.uk</a>. Joining an existing business? Ask its owner to add your email, then sign in again.</p>
+      </form></div></div></div>`;
+  const tb=$('#tb'), ts=$('#ts'); let edited=false;
+  tb.oninput=()=>{ if(!edited) ts.value=tb.value; }; ts.oninput=()=>{ edited=ts.value.trim()!==''&&ts.value!==tb.value; };
+  $('#tout').onclick=()=>{ TRIAL={msg:''}; signOut(); };
+  $('#tf').onsubmit=async(e)=>{ e.preventDefault(); const b=tb.value.trim(), s=ts.value.trim()||b;
+    const err=(m)=>{ $('#terr').innerHTML=`<div class="lg-err" role="alert">${esc(m)}</div>`; };
+    if(!b) return err('Enter your business name.');
+    const go=$('#tgo'); go.disabled=true; go.textContent='Setting up…';
+    try{ const r=await Cloud.startTrial(b,s); TRIAL={msg:''};
+      if(r&&r.site_id) lsSet('pvl-site:'+em,r.site_id);
+      await boot(false,r&&r.org_id); toast('Your free trial has started');
+    }catch(ex){ const t=String((ex&&ex.message)||ex);
+      if(/ALREADY_MEMBER/.test(t)) return boot(false);
+      if(/could not find the function|PGRST202|does not exist/i.test(t)||(ex&&ex.code==='PGRST202')){ WHO=null; return signOut(NO_ACCESS); }
+      go.disabled=false; go.textContent='Start free trial'; err(Cloud.friendly(ex)); }
+  };
+  tb.focus();
+}
 function signIn(u){ sessionId=u.id; lsSet(SKEY,u.id); siteFilter=lsGet('pvl-site:'+u.id)||'all'; if(u.role==='master'){ siteFilter='all'; location.hash='sites'; } else if(!location.hash) location.hash='overview'; render(); toast('Signed in as '+u.name); }
 // cloud: after Supabase sign-in, find out what this person can see and load it
-async function boot(fresh){
-  const u=await Cloud.user(); if(!u){ WHO=null; return render(); }
+const TRIAL_USED_MSG='The free trial for this email has already been used. Buy a licence at license.proviewcrm.co.uk or contact Proview on 020 8935 5495.';
+async function boot(fresh,newOrg){
+  const u=await Cloud.user(); if(!u){ WHO=null; TRIAL_SETUP=false; return render(); }
   $('#app').innerHTML=`<div class="auth2"><div class="auth2-art"><div class="auth2-brand"><div class="logo"></div><div class="wordmark">PROVIEW<span>LABEL</span></div></div></div><div class="auth2-form"><div style="text-align:center;color:#55555f">Loading your sites…</div></div></div>`;
   try{
     const w=await Cloud.whoami();
-    if(!w||(!w.master&&!(w.orgs||[]).length)){ WHO=null; return signOut(NO_ACCESS); }
+    if(!w||(!w.master&&!(w.orgs||[]).length)){ WHO=null;
+      // no business and no invite: offer a free 3-day trial (only once the server supports it, and once per email)
+      if(w&&w.email&&Cloud.trialReady&&Cloud.trialReady(w)){ if(w.trial_used) return signOut(TRIAL_USED_MSG);
+        forgetCaches(null); TRIAL_SETUP=true; P.useStore('signed-out',{blank:true}); S=P.get(); WHO=null; TRIAL_EMAIL=w.email; return render(); }
+      return signOut(NO_ACCESS); }
+    TRIAL_SETUP=false;
     // a different person on this device: drop everyone else's cached businesses first
     forgetCaches('cloud:'+u.id);
     P.useStore('cloud:'+u.id,{blank:true}); applyWho(w);
     siteFilter=(fresh&&w.master)?'all':(lsGet('pvl-site:'+w.email)||'all');
     await Cloud.sync(P,{full:true}); S=P.get();
+    if(newOrg){ P.ensureRules(newOrg); siteFilter=lsGet('pvl-site:'+w.email)||siteFilter; }
     // a manager with no sites they can open has nothing to work on: back to sign-in
     if(!w.master&&!allowedSiteIds().length&&!(w.orgs||[]).some(o=>o.role==='owner'||o.role==='admin')){ P.forget('cloud:'+u.id); return signOut(NO_ACCESS); }
     if(w.master&&(fresh||!location.hash||location.hash==='#overview')&&siteFilter==='all') location.hash='sites';
@@ -474,7 +539,7 @@ function renderLogin(){
   const mode=LOGIN.mode, up=mode==='signup', reset=mode==='reset', newpw=mode==='newpw';
   const accts=CLOUD?[]:P.live('users').filter(u=>u.email&&u.password);
   const title=newpw?'Choose a new password':reset?'Reset your password':up?'Create your login':'Sign in';
-  const sub=newpw?'At least 8 characters.':reset?'We’ll email you a link to choose a new password.':up?'Use the email your business owner or Proview added for you.':'Manage products, allergens, expiry and wastage across your sites.';
+  const sub=newpw?'At least 8 characters.':reset?'We’ll email you a link to choose a new password.':up?'Use the email your business owner or Proview added for you. New to Proview Label? Create a login to start a free 3-day trial.':'Manage products, allergens, expiry and wastage across your sites.';
   $('#app').innerHTML=`<div class="auth2">${loginArt()}
     <div class="auth2-form"><div>
       <form id="lf" autocomplete="on" novalidate>
@@ -792,13 +857,14 @@ let asq='';
 VIEWS.sites=(el)=>{
   const orgs=visibleOrgs().slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)));
   const rows=[]; orgs.forEach(o=>{ const os=P.live('sites').filter(x=>x.orgId===o.id).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
-    if(!os.length) rows.push({o,s:null}); else os.forEach(x=>rows.push({o,s:x})); });
+    if(!os.length) rows.push({o,s:null,first:true}); else os.forEach((x,i)=>rows.push({o,s:x,first:i===0})); });
   const nSites=rows.filter(r=>r.s).length;
-  const status=(o)=>o.suspended?'<span class="tag bad">Suspended</span>':'<span class="tag ok">Active</span>';
+  const status=(o)=>stateTag(o);
+  const trialOk=!CLOUD||(WHO&&Cloud.trialReady&&Cloud.trialReady(WHO));
   const tr=(r)=>{ const st=r.s?siteStats(r.s.id):null; const q=(r.o.name+' '+(r.s?r.s.name+' '+(r.s.address||'')+' '+(r.s.region||''):'')).toLowerCase();
     return `<tr data-q="${esc(q)}"><td><b>${esc(r.o.name)}</b></td><td>${r.s?`<b>${esc(r.s.name)}</b><div class="hint">${esc(r.s.address||r.s.region||'')}</div>`:'<span class="hint">No sites yet</span>'}</td><td>${status(r.o)}</td>
       <td>${st?st.devices:'—'}</td><td class="hint">${st?(st.lastSync?P.fmtDate(st.lastSync,true):'Never'):'—'}</td>
-      <td style="text-align:right;white-space:nowrap">${r.s?`<button class="btn sm" data-open="${esc(r.s.id)}">Open</button>`:`<button class="btn ghost sm" data-openorg="${esc(r.o.id)}">Open</button>`}</td></tr>`; };
+      <td style="text-align:right;white-space:nowrap">${trialOk&&r.first?`<button class="btn ghost sm" data-trial="${esc(r.o.id)}" title="Extend, end or clear this business's free trial">Trial…</button> `:''}${r.s?`<button class="btn sm" data-open="${esc(r.s.id)}">Open</button>`:`<button class="btn ghost sm" data-openorg="${esc(r.o.id)}">Open</button>`}</td></tr>`; };
   const empty=`<tr><td colspan="6"><div class="empty" style="padding:38px 20px"><h3 style="font-size:17px;color:var(--ink)">No businesses yet</h3><p class="hint" style="max-width:460px;margin:8px auto 16px">Add a customer business and invite its owner. They can then add their kitchens, menu and staff, or you can set it up for them.</p><div class="btns" style="justify-content:center"><button class="btn" data-addb>+ Add business</button><button class="btn ghost" data-refresh>Refresh</button></div></div></td></tr>`;
   el.innerHTML=`<div class="ph keep"><div><h1>All sites</h1><p>${orgs.length} business${orgs.length!==1?'es':''} · ${nSites} site${nSites!==1?'s':''} across Proview Label</p></div><div class="btns"><button class="btn ghost" data-refresh>Refresh</button><button class="btn" data-addb>+ Add business</button></div></div>
   ${rows.length>6?`<div class="filters"><input id="asq" placeholder="Search business or site" value="${esc(asq)}" style="min-width:260px"><span class="count" id="asc"></span></div>`:''}
@@ -809,10 +875,26 @@ VIEWS.sites=(el)=>{
   el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ setSite(b.dataset.open); location.hash='overview'; });
   el.querySelectorAll('[data-openorg]').forEach(b=>b.onclick=()=>{ setSite('org:'+b.dataset.openorg); location.hash='devices'; });
   el.querySelectorAll('[data-addb]').forEach(b=>b.onclick=()=>addBusiness(()=>render()));
+  el.querySelectorAll('[data-trial]').forEach(b=>b.onclick=()=>trialForm(b.dataset.trial));
   el.querySelectorAll('[data-refresh]').forEach(b=>b.onclick=async()=>{ if(!CLOUD){ render(); return toast('Up to date'); }
     b.disabled=true; try{ if(!(await checkAccess())) return; await Cloud.sync(P,{full:true}); S=P.get(); render(); toast('Up to date'); }catch(e){ b.disabled=false; toast(Cloud.friendly(e)); } });
 };
 
+// Master: extend, end now or clear (= licensed, no longer a trial) a business's free trial
+function trialForm(orgId){ const o=(S.orgs||[]).find(x=>x.id===orgId); if(!o) return;
+  const ymd=(d)=>{ const x=new Date(d); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); };
+  const base=Math.max(Date.now(),o.trial_ends_at?new Date(o.trial_ends_at).getTime():0);
+  const m=modal('Trial · '+o.name,`<p style="margin-top:0">Status: ${stateTag(o)}${o.trial_ends_at?` <span class="hint">ends ${esc(P.fmtDate(o.trial_ends_at,true))}</span>`:' <span class="hint">not a trial (licensed)</span>'}</p>
+    <div class="fld"><label>Trial ends on</label><input class="inp" type="date" id="te" value="${ymd(base+3*day)}"></div>
+    <div class="btns" style="margin-bottom:6px"><button class="btn ghost sm" data-add="3">+3 days</button><button class="btn ghost sm" data-add="7">+7 days</button><button class="btn ghost sm" data-add="30">+30 days</button></div>
+    <p class="hint">The trial ends at the end of that day. After it ends the business is read-only and its people see “Trial ended” with the licence portal and Proview contact details. Clear the trial once they have a licence.</p>`,
+    `<button class="btn ghost" data-x>Cancel</button>${o.trial_ends_at?'<button class="btn ghost" id="tclr">Clear trial (licensed)</button>':''}<button class="btn" id="tsv">Save end date</button>`);
+  m.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{ m.querySelector('#te').value=ymd(base+(+b.dataset.add)*day); });
+  const save=async(ends)=>{ try{ if(CLOUD){ await Cloud.setTrial(orgId,ends); await refreshWho(); } else { o.trial_ends_at=ends; o.trial_expired=!!ends&&new Date(ends)<new Date(); P.save(); }
+      closeModal(); toast(ends?'Trial now ends '+P.fmtDate(ends,true):'Trial cleared: '+o.name+' is licensed'); render(); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } };
+  m.querySelector('#tsv').onclick=()=>{ const v=m.querySelector('#te').value; if(!v) return toast('Pick a date'); const d=new Date(v+'T23:59:59'); if(isNaN(d)) return toast('Pick a date'); save(d.toISOString()); };
+  const c=m.querySelector('#tclr'); if(c) c.onclick=()=>save(null);
+}
 // Master: create a customer business (and optionally invite its owner). Used by All sites and Sites & devices.
 function addBusiness(after){ const m=modal('Add business',`<div class="fld"><label>Business name</label><input class="inp" id="bn" placeholder="e.g. Pepe's Piri Piri"></div><div class="g2"><div class="fld"><label>Owner's name</label><input class="inp" id="on"></div><div class="fld"><label>Owner's email</label><input class="inp" id="oe" type="email" placeholder="They sign in with this"></div></div><p class="hint">The owner signs in with “Sign in with Proview account” or “Create a login” using that email. They can then add their sites, staff and menu.</p>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Add business</button>`);
     m.querySelector('#sv').onclick=async()=>{ const n=m.querySelector('#bn').value.trim(), oe=m.querySelector('#oe').value.trim().toLowerCase(), on=m.querySelector('#on').value.trim(); if(!n) return toast('Enter the business name'); if(oe&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(oe)) return toast('Check the owner’s email');
@@ -823,7 +905,7 @@ VIEWS.devices=(el)=>{
   const canAddSite=visibleOrgs().some(o=>['master','owner','admin'].includes(orgRole(o.id)));
   const orgs=visibleOrgs();
   el.innerHTML=`<div class="ph"><div><h1>Sites & devices</h1><p>${isMaster()?'Every business, its kitchens and the handhelds running Proview Label.':'Your kitchens and the handhelds running Proview Label.'}</p></div><div class="btns">${!CLOUD?'<button class="btn ghost" id="imp">Import from device</button><button class="btn ghost" id="cfg">Device config file</button>':''}${isMaster()?'<button class="btn ghost" id="addB">+ Add business</button>':''}${canAddSite?'<button class="btn" id="addS">+ Add site</button>':''}</div></div>
-  ${isMaster()?`<div class="card"><h3>Businesses</h3><div class="sub">Customers using Proview Label. Open one to work in it, or add a new customer.</div><table><thead><tr><th>Business</th><th>Sites</th><th>Devices</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${orgs.map(o=>{ const os=P.live('sites').filter(x=>x.orgId===o.id); return `<tr><td><b>${esc(o.name)}</b>${o.suspended?' <span class="tag bad">Suspended</span>':''}</td><td>${os.length}</td><td>${P.live('devices').filter(d=>os.some(x=>x.id===d.siteId)).length}</td><td>${P.live('labels').filter(l=>os.some(x=>x.id===l.siteId)&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-openorg="${o.id}">Open</button> <button class="icbtn" data-eo="${o.id}" title="Rename">✎</button></td></tr>`; }).join('')||'<tr><td colspan="5" class="empty">No businesses yet. Add your first customer.</td></tr>'}</tbody></table></div>`:''}
+  ${isMaster()?`<div class="card"><h3>Businesses</h3><div class="sub">Customers using Proview Label. Open one to work in it, or add a new customer.</div><table><thead><tr><th>Business</th><th>Sites</th><th>Devices</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${orgs.map(o=>{ const os=P.live('sites').filter(x=>x.orgId===o.id); return `<tr><td><b>${esc(o.name)}</b>${orgState(o)!=='active'?' '+stateTag(o):''}</td><td>${os.length}</td><td>${P.live('devices').filter(d=>os.some(x=>x.id===d.siteId)).length}</td><td>${P.live('labels').filter(l=>os.some(x=>x.id===l.siteId)&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-openorg="${o.id}">Open</button> <button class="icbtn" data-eo="${o.id}" title="Rename">✎</button></td></tr>`; }).join('')||'<tr><td colspan="5" class="empty">No businesses yet. Add your first customer.</td></tr>'}</tbody></table></div>`:''}
   <div class="card"><h3>Sites</h3><table><thead><tr><th>Site</th>${multiOrg()?'<th>Business</th>':''}<th>Address (printed on sale labels)</th><th>Device staff</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${ss.map(s=>`<tr><td><b>${esc(s.name)}</b><div class="hint">${esc(s.region||'')}</div></td>${multiOrg()?`<td class="hint">${esc(orgName(s.orgId))}</td>`:''}<td>${esc(s.address||'')}</td><td>${P.live('users').filter(u=>(u.siteIds||[]).includes(s.id)).length}</td><td>${P.live('labels').filter(l=>l.siteId===s.id&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap">${siteFilter!==s.id&&allowedSiteIds().length>1?`<button class="btn ghost sm" data-open="${s.id}">Open</button> `:''}${['master','owner','admin'].includes(orgRole(s.orgId))?`<button class="icbtn" data-es="${s.id}">✎</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No sites yet.</td></tr>'}</tbody></table></div>
   <div class="card"><h3>Devices</h3><div class="sub">${CLOUD?'Handhelds appear here once they sign in (Android app → Settings → Connect to Proview Label).':'Sample devices.'}</div><table><thead><tr><th>Device</th><th>Site</th><th>Battery</th><th>Labels left</th><th>App</th><th>Last sync</th></tr></thead><tbody>${ds.map(d=>`<tr><td><b>${esc(d.name)}</b><div class="hint">${esc(d.id)}</div></td><td>${esc(siteName(d.siteId))}</td><td>${d.battery!=null?d.battery+'%':'—'}</td><td>${d.labelsLeft<60?`<span class="tag bad">${d.labelsLeft} – low</span>`:d.labelsLeft}</td><td>v${esc(d.version||'')}</td><td>${d.lastSync?P.fmtDate(d.lastSync,true):'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No devices connected yet.</td></tr>'}</tbody></table></div>`;
   const siteForm=(s,orgId)=>{ const isNew=!s; s=s||{id:'site_'+P.uid(''),orgId,name:'',address:'',region:''}; const m=modal((isNew?'Add site':'Edit site')+' · '+orgName(s.orgId),`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(s.name)}"></div><div class="fld"><label>Address</label><input class="inp" id="a" value="${esc(s.address||'')}"></div><div class="fld"><label>Area</label><input class="inp" id="g" value="${esc(s.region||'')}" placeholder="e.g. North London"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
