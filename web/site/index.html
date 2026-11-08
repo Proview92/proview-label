@@ -45,8 +45,8 @@ a{color:var(--pri)}
 .side .nav a.active svg{color:var(--pri)}
 .side .nav a.off{opacity:.45;cursor:not-allowed}
 .side .nav a.off:hover{background:none;color:#c9c9d1}
-.hdr-pick.pulse select{animation:pvpulse 1s ease-out}
-@keyframes pvpulse{0%{box-shadow:0 0 0 0 rgba(90,141,238,.7)}30%{box-shadow:0 0 0 4px rgba(90,141,238,.55)}100%{box-shadow:0 0 0 0 rgba(90,141,238,0)}}
+.top .hdr-pick.pulse select{animation:hdr-pick-pulse 1s ease-out}
+@keyframes hdr-pick-pulse{0%,60%{box-shadow:0 0 0 3px rgba(90,141,238,.55);border-color:#5a8dee}100%{box-shadow:0 0 0 0 rgba(90,141,238,0)}}
 .side .nav .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .side .nav .slbl{display:none}
 .side .nav .cnt{margin-left:auto;font-size:11px;line-height:16px;font-weight:600;background:rgba(255,255,255,.12);padding:0 7px;border-radius:10px}
@@ -78,6 +78,8 @@ a{color:var(--pri)}
 .top .hdr-pick select:focus { outline: none; border-color: var(--line); }
 .top .hdr-pick select:focus-visible { outline: 2px solid #5a8dee; outline-offset: 2px; }
 .top .hdr-pick select:disabled { opacity: 1; cursor: default; color: var(--ink); appearance: none; -webkit-appearance: none; padding-right: 12px; }
+/* iPad / narrow desktop: the title keeps its width and the picker shrinks (to its 170px minimum) to fit (as Signage) */
+@media (min-width: 701px) { .top h2 { flex-shrink: 0; } .top .hdr-pick select { max-width: min(320px, 100%); } }
 /* phones: the tray leaves no room on the title row, so the picker gets the header's second row, full width */
 @media (max-width: 700px) {
   .top { flex-wrap: wrap; row-gap: 6px; }
@@ -88,12 +90,18 @@ a{color:var(--pri)}
 .top .hdr-pick{display:flex}
 .hdr-pick+.tag{flex:none}
 .hdr-dot[role=button]{cursor:pointer}
+/* bell count: the same blue badge as Proview Signage (.bell-dot) */
+.top .bell{color:var(--ink);margin-left:0}
+.bell .bell-dot{position:absolute;top:1px;right:-2px}
+.bell-dot{min-width:18px;height:18px;border-radius:9px;background:var(--grad);color:#fff;font:700 11px/18px var(--font);padding:0 5px;text-align:center}
+.bell-dot.hidden{display:none}
 .icon-btn{position:relative;background:none;border:1px solid transparent;border-radius:10px;width:38px;height:38px;padding:0;display:grid;place-items:center;cursor:pointer;color:var(--ink)}
 .icon-btn:hover{background:var(--bg);border-color:var(--line)}
 .top .top-me{display:flex;align-items:center;gap:4px;margin-left:8px;flex:none}
 .top-av{width:34px;height:34px;border-radius:50%;border:0;padding:0;flex:none;display:grid;place-items:center;background:var(--grad);color:#fff;font-family:inherit;font-weight:700;font-size:12.5px;line-height:1;cursor:pointer}
 .top-av:hover{filter:brightness(1.08)}
 .top-me .top-out svg{width:18px;height:18px}
+.top-av:focus-visible,.top-me .top-out:focus-visible{outline:2px solid #5a8dee;outline-offset:2px}
 .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px}
 .av{width:34px;height:34px;border-radius:50%;background:var(--pri);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12.5px;flex:none;border:0}
 .av.master{background:var(--grad)}
@@ -125,7 +133,7 @@ a{color:var(--pri)}
  .app .side .nav a{width:50px;height:52px;margin:0 auto;padding:0 1px;flex-direction:column;justify-content:center;align-items:center;gap:4px;font-size:15px}
  .app .side .nav a svg{width:18px;height:18px}
  .app .side .nav .slbl{display:block;font-size:10px;line-height:12px;font-weight:500;letter-spacing:-.1px;text-align:center;white-space:nowrap;max-width:58px}
- .top{padding:8px 10px;gap:2px}
+ .top{padding:8px 10px;gap:2px;row-gap:6px}
  .top h2{flex:1;max-width:none}
  .top .sp,.top .tag{display:none}
  .top .top-me{margin-left:4px;gap:2px}
@@ -981,7 +989,7 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
 </script>
 <script>
 /* Proview hub: the shared header tray (status, search, chat, inbox, bell),
-   search palette, team chat panel and inbox panel. The same file is used by
+   search palette, team chat panel, inbox panel and the avatar's account menu. The same file is used by
    Proview Employee and Proview Signage; each app passes in its own data
    through PVHub.init(adapter). */
 (function () {
@@ -998,6 +1006,8 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     page: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
+    help: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>',
+    logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
     grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
   };
   const svg = (k, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${SVG[k] || k}</svg>`;
@@ -1022,6 +1032,15 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
 .pv-dash svg{width:17px!important;height:17px!important}
 @media (max-width:700px){.pv-dash{width:34px;height:34px;padding:0;justify-content:center}.pv-dash span{display:none}}
 @media (max-width:700px){.hdr-cap{padding:2px;gap:0}.hdr-cap>button,.hdr-cap>a{width:30px;min-width:30px;height:30px}.hdr-dot{margin:0 6px}}
+.hdr-cap>button:focus-visible,.hdr-cap>a:focus-visible,.pv-dash:focus-visible{outline:2px solid #5a8dee;outline-offset:2px}
+.pv-acct{position:fixed;z-index:310;width:264px;max-width:calc(100vw - 16px);background:#fff;border:1px solid #e4e2dc;border-radius:12px;box-shadow:0 12px 32px rgba(20,20,30,.16);padding:6px;font-size:14px;color:#17171c;box-sizing:border-box}
+.pv-acct-h{display:flex;align-items:center;gap:10px;padding:8px 8px 12px;margin-bottom:6px;border-bottom:1px solid #eceae4;min-width:0}
+.pv-acct-h .ct{flex:1;min-width:0}.pv-acct-h b{display:block;font-size:14px;font-weight:700;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-acct-h small{display:block;font-size:12.5px;line-height:17px;color:#8b8b95;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-acct-i{display:flex;align-items:center;gap:10px;width:100%;height:36px;padding:0 10px;border-radius:8px;border:0;background:none;font:inherit;font-size:14px;font-weight:550;color:#17171c!important;text-decoration:none!important;cursor:pointer;text-align:left;box-sizing:border-box}
+.pv-acct-i:hover,.pv-acct-i:focus-visible{background:#f3f2ee;outline:0}
+.pv-acct-i svg{width:17px!important;height:17px!important;color:#4a4a55;flex:none}
+.pv-acct-sep{height:1px;background:#eceae4;margin:6px 4px}
 .hub-bg{position:fixed;inset:0;background:rgba(20,20,26,.38);z-index:300;display:flex}
 .hub-pal{margin:12vh auto auto;width:min(580px,92vw);background:#fff;border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.25);overflow:hidden;font-size:15px;color:#17171c}
 .hub-pal .hp-in{display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid #eceae4;color:#8b8b95}
@@ -1116,7 +1135,7 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
   /** Build the tray: [status dot, search, chat, inbox, bell]. bellEl is the app's own bell button. */
   function tray({ dot, bell }) {
     const cap = document.createElement('div'); cap.className = 'hdr-cap';
-    if (!dot) { dot = document.createElement('span'); dot.className = 'hdr-dot'; dot.title = 'Online'; }
+    if (!dot) { dot = document.createElement('span'); dot.className = 'hdr-dot'; dot.title = 'Online'; dot.setAttribute('role', 'img'); dot.setAttribute('aria-label', 'Online'); }
     dot.classList.add('hdr-dot');
     cap.appendChild(dot);
     cap.appendChild(btn('search', 'Search (Ctrl+K)', openSearch));
@@ -1246,10 +1265,45 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     draw();
   }
 
+  /* ---------------- account menu (the avatar in the header) ---------------- */
+  // PVHub.accountMenu(avatarButton, { name, email, sub, items: [{ label, icon, href | run, sep }] })
+  // Opens under the avatar, right-aligned to it. Click the avatar again, click outside, press Esc,
+  // pick an item or change page to close. Up/Down move between items.
+  let acct = null;
+  function closeAccount() { if (!acct) return; acct.el.remove(); acct.btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('mousedown', acct.out, true); document.removeEventListener('keydown', acct.key, true); removeEventListener('hashchange', closeAccount); acct = null; }
+  function accountMenu(btn, o) {
+    if (acct) { const was = acct.btn; closeAccount(); if (was === btn) return; }
+    const m = document.createElement('div'); m.className = 'pv-acct'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', 'My account');
+    m.innerHTML = `<div class="pv-acct-h"><span class="hub-av">${esc(o.initials || initials(o.name || o.email))}</span><span class="ct"><b>${esc(o.name || '')}</b>${o.email ? `<small>${esc(o.email)}</small>` : ''}${o.sub ? `<small>${esc(o.sub)}</small>` : ''}</span></div>`;
+    (o.items || []).forEach((it) => {
+      if (it.sep) { const d = document.createElement('div'); d.className = 'pv-acct-sep'; m.appendChild(d); }
+      const el = document.createElement(it.href ? 'a' : 'button'); el.className = 'pv-acct-i'; el.setAttribute('role', 'menuitem');
+      if (it.href) { el.href = it.href; if (/^https?:/.test(it.href)) { el.target = '_self'; } } else el.type = 'button';
+      el.innerHTML = svg(it.icon || 'page', 17) + `<span>${esc(it.label)}</span>`;
+      el.addEventListener('click', (e) => { closeAccount(); if (it.run) { e.preventDefault(); it.run(); } });
+      m.appendChild(el);
+    });
+    document.body.appendChild(m);
+    const r = btn.getBoundingClientRect();
+    m.style.top = Math.round(r.bottom + 8) + 'px';
+    m.style.right = Math.max(8, Math.round(innerWidth - r.right)) + 'px';
+    const items = () => [...m.querySelectorAll('.pv-acct-i')];
+    acct = { el: m, btn,
+      out: (e) => { if (!m.contains(e.target) && !btn.contains(e.target)) closeAccount(); },
+      key: (e) => {
+        if (e.key === 'Escape') { e.stopPropagation(); closeAccount(); btn.focus(); return; }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const l = items(), i = l.indexOf(document.activeElement); l[(i + (e.key === 'ArrowDown' ? 1 : -1) + l.length) % l.length]?.focus(); }
+      } };
+    btn.setAttribute('aria-expanded', 'true');
+    document.addEventListener('mousedown', acct.out, true); document.addEventListener('keydown', acct.key, true);
+    addEventListener('hashchange', closeAccount);
+    if (o.focusFirst) items()[0]?.focus();
+  }
+
   window.PVHub = {
     init(adapter) { A = adapter; paint(); },
     adapter: () => A,
-    tray, dashLink, paint, chatChanged, openSearch, openChat, openInbox, close, svg, initials,
+    tray, dashLink, accountMenu, closeAccount, paint, chatChanged, openSearch, openChat, openInbox, close, svg, initials,
   };
 })();
 
@@ -1315,7 +1369,7 @@ const onSitesPage=()=>isMaster()&&(location.hash||'#sites')==='#sites';
 function setSite(id){ siteFilter=id; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),id); if(id!=='all'&&onSitesPage()){ location.hash='overview'; return; } render(); }
 // Master on All sites (nothing picked): the usual pages are greyed out until a site is chosen in the header dropdown
 const masterAll=()=>isMaster()&&siteFilter==='all';
-function chooseSiteFirst(){ toast('Choose a site in the dropdown first'); const s=$('#sitePick'), w=$('.hdr-pick'); if(s) s.focus();
+function chooseSiteFirst(){ toast('Choose a location in the dropdown first'); const s=$('#sitePick'), w=$('.hdr-pick'); if(s) s.focus();
   if(w){ w.classList.remove('pulse'); void w.offsetWidth; w.classList.add('pulse'); clearTimeout(w._p); w._p=setTimeout(()=>w.classList.remove('pulse'),1000); } }
 function goPage(k){ if(masterAll()&&k!=='sites') return chooseSiteFirst(); location.hash=k; }
 function pickSite(id){ if(id==='all'&&isMaster()&&!onSitesPage()){ siteFilter='all'; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),'all'); location.hash='sites'; return; }
@@ -1325,17 +1379,17 @@ function withOrg(cb){
   const o=curOrg(); if(o) return cb(o);
   const orgs=visibleOrgs().filter(x=>orgRole(x.id)!=='manager'||true);
   if(!orgs.length) return toast('No business to add this to yet.');
-  const m=modal('Which business?',`<div class="fld"><label>Business</label><select class="inp" id="wo">${orgs.map(o=>`<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select></div><p class="hint">Tip: pick a business or site in the dropdown at the top and you won't be asked again.</p>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="wok">Continue</button>`);
+  const m=modal('Which business?',`<div class="fld"><label>Business</label><select class="inp" id="wo">${orgs.map(o=>`<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select></div><p class="hint">Tip: pick a business or location in the dropdown at the top and you won't be asked again.</p>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="wok">Continue</button>`);
   m.querySelector('#wok').onclick=()=>{ const v=m.querySelector('#wo').value; closeModal(); cb(v); };
 }
 function orgSettings(orgId){ const o=(S.orgs||[]).find(x=>x.id===orgId); return (o&&o.settings)||{}; }
 async function setOrgSetting(orgId,k,v){ const o=(S.orgs||[]).find(x=>x.id===orgId); if(!o) return; o.settings={...(o.settings||{}),[k]:v}; P.save();
   if(CLOUD){ try{ await Cloud.saveOrgSettings(orgId,o.settings); }catch(e){ toast(Cloud.friendly(e)); } } }
 const NAV=[
-  ['Proview',[['sites','All sites','pin']]],
+  ['Proview',[['sites','Locations','pin']]],
   ['Service',[['overview','Dashboard','home'],['expiry','Expiry log','clock'],['printlog','Print log','print'],['wastage','Wastage','bin']]],
   ['Menu & labels',[['products','Products','tag'],['categories','Categories','grid'],['matrix','Allergen matrix','shield'],['analyser','Menu analyser','spark'],['rules','Expiry rules','snow']]],
-  ['Manage',[['orders','Label orders','box'],['devices','Sites & devices','device'],['users','Users & permissions','users'],['history','Amendment history','hist'],['settings','Settings','gear']]]
+  ['Manage',[['orders','Label orders','box'],['devices','Locations & devices','device'],['users','Users & permissions','users'],['history','Amendment history','hist'],['settings','Settings','gear']]]
 ];
 const ICON={
   home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
@@ -1361,7 +1415,7 @@ const ICON={
 };
 const ic=(k,s)=>`<svg width="${s||17}" height="${s||17}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[k]||''}</svg>`;
 // Feature switches for managers (owners/admins always have everything). Keep keys in step with supabase/migrations/002.
-const FEATURES=[['expiry','Expiry log'],['printlog','Print log'],['wastage','Wastage'],['products','Products, categories, allergens & menu analyser'],['rules','Expiry rules'],['orders','Label orders'],['devices','Sites & devices'],['users','Device staff (add, edit, remove)'],['history','Amendment history']];
+const FEATURES=[['expiry','Expiry log'],['printlog','Print log'],['wastage','Wastage'],['products','Products, categories, allergens & menu analyser'],['rules','Expiry rules'],['orders','Label orders'],['devices','Locations & devices'],['users','Device staff (add, edit, remove)'],['history','Amendment history']];
 const VIEW_FEATURE={expiry:'expiry',printlog:'printlog',wastage:'wastage',products:'products',categories:'products',matrix:'products',analyser:'products',rules:'rules',orders:'orders',devices:'devices',users:'users',history:'history'};
 // true if the signed-in manager has this feature in at least one business they can see (missing key = on)
 function hasFeature(f){ const u=me(); if(!u) return false; if(u.role!=='manager') return true;
@@ -1403,25 +1457,25 @@ function pickerHtml(){
   const a=mySiteIds(); const sites=P.live('sites').filter(s=>a.includes(s.id)).sort(byName);
   const sel=(v)=>siteFilter===v?' selected':'';
   // a whole business open (All sites → Open business): the closed box reads "<Business> (all sites)", a hidden option not in the list
-  const curOrg=siteFilter.startsWith('org:')?`<option value="${esc(siteFilter)}" selected hidden>${esc(orgName(siteFilter.slice(4)))} (all sites)</option>`:'';
+  const curOrg=siteFilter.startsWith('org:')?`<option value="${esc(siteFilter)}" selected hidden>${esc(orgName(siteFilter.slice(4)))} (all locations)</option>`:'';
   if(isMaster()){
     const dup=(x)=>sites.some(y=>y!==x&&y.name===x.name);
-    return `<select id="sitePick" aria-label="Choose site"><option value="all"${sel('all')}>All sites (${sites.length})</option>${curOrg}${sites.map(x=>`<option value="${esc(x.id)}"${sel(x.id)}>${esc(x.name)}${dup(x)?' · '+esc(orgName(x.orgId)):''}</option>`).join('')}</select>`;
+    return `<select id="sitePick" aria-label="Choose location"><option value="all"${sel('all')}>All locations (${sites.length})</option>${curOrg}${sites.map(x=>`<option value="${esc(x.id)}"${sel(x.id)}>${esc(x.name)}${dup(x)?' · '+esc(orgName(x.orgId)):''}</option>`).join('')}</select>`;
   }
   if(!sites.length) return '';
-  if(sites.length===1) return `<select id="sitePick" aria-label="Choose site" disabled><option>${esc(sites[0].name)}</option></select>`;
+  if(sites.length===1) return `<select id="sitePick" aria-label="Choose location" disabled><option>${esc(sites[0].name)}</option></select>`;
   const orgs=[...new Set(sites.map(s=>s.orgId))];
   if(orgs.length>1){ // a login in several businesses: one business at a time, never all of them together
     const bz=orgs.map(o=>({o,n:orgName(o)})).sort(byName);
-    return `<select id="sitePick" aria-label="Choose site">${bz.map(b=>`<option value="org:${esc(b.o)}"${sel('org:'+b.o)}>${esc(b.n)} (all sites)</option>`).join('')}${sites.map(s=>`<option value="${esc(s.id)}"${sel(s.id)}>${esc(s.name)} · ${esc(orgName(s.orgId))}</option>`).join('')}</select>`;
+    return `<select id="sitePick" aria-label="Choose location">${bz.map(b=>`<option value="org:${esc(b.o)}"${sel('org:'+b.o)}>${esc(b.n)} (all locations)</option>`).join('')}${sites.map(s=>`<option value="${esc(s.id)}"${sel(s.id)}>${esc(s.name)} · ${esc(orgName(s.orgId))}</option>`).join('')}</select>`;
   }
   const allVal='org:'+orgs[0];
-  return `<select id="sitePick" aria-label="Choose site"><option value="${allVal}"${sel(allVal)}>All my sites (${sites.length})</option>${sites.map(s=>`<option value="${esc(s.id)}"${sel(s.id)}>${esc(s.name)}</option>`).join('')}</select>`;
+  return `<select id="sitePick" aria-label="Choose location"><option value="${allVal}"${sel(allVal)}>All my locations (${sites.length})</option>${sites.map(s=>`<option value="${esc(s.id)}"${sel(s.id)}>${esc(s.name)}</option>`).join('')}</select>`;
 }
-function scopeLabel(){ if(siteFilter==='all') return visibleOrgs().length>1?'all businesses':'all sites'; if(siteFilter.startsWith('org:')) return orgName(siteFilter.slice(4)); return siteName(siteFilter); }
+function scopeLabel(){ if(siteFilter==='all') return visibleOrgs().length>1?'all businesses':'all locations'; if(siteFilter.startsWith('org:')) return orgName(siteFilter.slice(4)); return siteName(siteFilter); }
 
 // short names under each icon on the iPad and phone rail (same idea as Proview Bookings)
-const SHORT={sites:'All sites',overview:'Dashboard',expiry:'Expiry',printlog:'Print log',wastage:'Wastage',products:'Products',categories:'Categories',matrix:'Allergens',analyser:'Analyser',rules:'Rules',orders:'Orders',devices:'Devices',users:'Users',history:'History',settings:'Settings'};
+const SHORT={sites:'Locations',overview:'Dashboard',expiry:'Expiry',printlog:'Print log',wastage:'Wastage',products:'Products',categories:'Categories',matrix:'Allergens',analyser:'Analyser',rules:'Rules',orders:'Orders',devices:'Devices',users:'Users',history:'History',settings:'Settings'};
 // desktop menu: COLLAPSE to an icon rail (remembered on this device, as in Proview Signage)
 const sideCollapsed=()=>lsGet('pvl.sideCollapsed')==='1';
 function toggleSide(){ const on=!sideCollapsed(); lsSet('pvl.sideCollapsed',on?'1':'0'); const a=$('.app'); if(a) a.classList.toggle('collapsed',on); const b=$('#sfCollapse'); if(b){ b.title=on?'Expand menu':'Collapse menu'; b.setAttribute('aria-label',b.title); } }
@@ -1438,7 +1492,7 @@ function render(){
   const r=route(); const u=me(); const off=masterAll();
   const badge={expiry:expiredCount(),orders:bySite(P.live('orders')).filter(o=>o.status==='pending').length,products:byOrg(P.live('products')).filter(p=>p.approved===false).length};
   const title=(NAV.flatMap(([,i])=>i).find(x=>x[0]===r)||[])[1]||'Dashboard';
-  const link=([k,l,i])=>off&&k!=='sites'?`<a class="off" role="link" tabindex="0" aria-disabled="true" data-off="${k}" title="${esc(l)} – choose a site first" aria-label="${esc(l)} – choose a site first">${ic(i)}<span class="lbl">${esc(l)}</span><span class="slbl">${esc(SHORT[k]||l)}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`
+  const link=([k,l,i])=>off&&k!=='sites'?`<a class="off" role="link" tabindex="0" aria-disabled="true" data-off="${k}" title="${esc(l)} – choose a location first" aria-label="${esc(l)} – choose a location first">${ic(i)}<span class="lbl">${esc(l)}</span><span class="slbl">${esc(SHORT[k]||l)}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`
     :`<a href="#${k}" class="${r===k?'active':''}" title="${esc(l)}" aria-label="${esc(l)}">${ic(i)}<span class="lbl">${esc(l)}</span><span class="slbl">${esc(SHORT[k]||l)}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`;
   const col=sideCollapsed();
   $('#app').innerHTML=`<div class="app${col?' collapsed':''}">
@@ -1451,20 +1505,29 @@ function render(){
       <header class="top" id="top"><h2>${esc(title)}</h2>${(()=>{ const pk=pickerHtml(); return pk?`<div class="hdr-pick">${pk}</div>`:''; })()}${!CLOUD?'<span class="tag warn" title="Sample data in this browser only">Demo</span>':''}<div class="sp"></div></header>
       <div class="content" id="main"></div>
     </div></div>`;
-  // header: tray (status, search, inbox, notifications), Proview dashboard, avatar and sign out
+  // header (same as Proview Signage): tray (status, search, chat, inbox, notifications), Proview dashboard, avatar and sign out
   const top=$('#top');
-  if(window.PVHub){ const cap=PVHub.tray({dot:syncDot(),bell:bellBtn()}); const chat=cap.querySelector('.hub-chat'); if(chat) chat.remove(); top.appendChild(cap); const d=PVHub.dashLink(true); if(d) top.appendChild(d); PVHub.paint(); }
-  top.insertAdjacentHTML('beforeend',`<div class="top-me"><button class="top-av" id="tbMe" title="${esc(u.name)} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}" aria-label="My account">${esc(P.initials(u.name))}</button><button class="icon-btn top-out" id="tbOut" title="Sign out" aria-label="Sign out">${ic('out',18)}</button></div>`);
+  if(window.PVHub){ const cap=PVHub.tray({dot:syncDot(),bell:bellBtn()}); top.appendChild(cap); const d=PVHub.dashLink(u.role!=='manager'); if(d) top.appendChild(d); PVHub.paint(); }
+  top.insertAdjacentHTML('beforeend',`<div class="top-me"><button class="top-av" id="tbMe" title="${esc(u.name)} · ${esc(acctSub(u))}" aria-label="My account" aria-haspopup="menu" aria-expanded="false">${esc(P.initials(u.name))}</button><button class="icon-btn top-out" id="tbOut" title="Sign out" aria-label="Sign out">${ic('out',18)}</button></div>`);
   VIEWS[r]($('#main'));
   const tbn=trialBanner(); if(tbn&&r!=='sites') $('#main').insertAdjacentHTML('afterbegin',tbn);
   const sp=$('#sitePick'); if(sp&&!sp.disabled) sp.onchange=e=>pickSite(e.target.value);
   $('#sfCollapse').onclick=toggleSide;
   document.querySelectorAll('.side .nav a.off').forEach(a=>{ a.onclick=(e)=>{ e.preventDefault(); chooseSiteFirst(); }; a.onkeydown=(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); chooseSiteFirst(); } }; });
   $('#tbOut').onclick=()=>signOut();
-  $('#tbMe').onclick=()=>{ const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open any business or site from All sites or the site dropdown, one business at a time.':'You can see '+mySiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
-    m.querySelector('#mo').onclick=()=>{closeModal();signOut();}; m.querySelector('#msync').onclick=()=>{closeModal();doSync(false);}; };
+  // avatar: the account menu under it (same as Proview Signage): who's signed in, Users & permissions, Sync now, Sign out
+  $('#tbMe').onclick=(e)=>{ const b=e.currentTarget; if(!window.PVHub||!PVHub.accountMenu) return accountModal(u);
+    PVHub.accountMenu(b,{ initials:P.initials(u.name), name:u.name, email:u.email||'', sub:acctSub(u), focusFirst:e.detail===0,
+      items:[ !masterAll()&&canView('users')?{label:'Users & permissions',icon:'users',href:'#users'}:null,
+        {label:'Your account',icon:'user',run:()=>accountModal(u)},
+        {label:'Sync now',icon:ICON.sync,run:()=>doSync(false)},
+        {label:'Sign out',icon:'logout',run:()=>signOut(),sep:true} ].filter(Boolean) }); };
 }
-// ---------- header tray: status dot (sync), search, inbox and notifications ----------
+const acctSub=(u)=>[u.role==='master'?'Proview master':u.rawRole==='owner'?'Owner':P.ROLES[u.role], u.role!=='master'||curOrg()?(curOrg()?orgName(curOrg()):visibleOrgs().length===1?visibleOrgs()[0].name:''):''].filter(Boolean).join(' · ');
+function accountModal(u){
+  const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open any business or location from Locations or the location dropdown, one business at a time.':'You can see '+mySiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
+    m.querySelector('#mo').onclick=()=>{closeModal();signOut();}; m.querySelector('#msync').onclick=()=>{closeModal();doSync(false);}; }
+// ---------- header tray: status dot (sync), search, chat, inbox and notifications ----------
 let SYNC_STATE='ok';
 function syncDot(){ const d=document.createElement('span'); d.id='syncDot'; d.setAttribute('role','button'); d.tabIndex=0; paintDot(d);
   d.onclick=()=>doSync(false); d.onkeydown=(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); doSync(false); } }; return d; }
@@ -1490,8 +1553,8 @@ function attention(){
     else if(orgState(o)==='trial') out.push({lvl:'warn',icon:'shield',title:`${o.name}: free trial`,sub:'Ends '+P.fmtDate(o.trial_ends_at,true),go:isMaster()?'sites':null}); });
   return out;
 }
-function bellBtn(){ const n=attention().filter(x=>x.lvl==='bad').length; const b=document.createElement('button'); b.type='button'; b.id='tbBell'; b.className='hub-bell'; b.title='Notifications'; b.setAttribute('aria-label','Notifications');
-  b.innerHTML=ic('bell',18)+`<span class="hub-badge${n?'':' hidden'}">${n>9?'9+':n||''}</span>`; b.onclick=(e)=>{ e.preventDefault(); openNotifications(); }; return b; }
+function bellBtn(){ const n=attention().filter(x=>x.lvl==='bad').length; const b=document.createElement('button'); b.type='button'; b.id='tbBell'; b.className='bell'; b.title='Notifications'; b.setAttribute('aria-label','Notifications');
+  b.innerHTML=ic('bell',18)+`<span class="bell-dot${n?'':' hidden'}">${n>9?'9+':n||''}</span>`; b.onclick=(e)=>{ e.preventDefault(); openNotifications(); }; return b; }
 function openNotifications(){ if(window.PVHub) PVHub.close(); const items=attention(); const sv=(k)=>window.PVHub?PVHub.svg(k==='clock'?'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>':ICON[k]||k,17):'';
   const m=modal('Notifications',`<div class="nt-list">${items.length?items.slice(0,60).map((x,i)=>`<div class="hub-item" data-i="${i}" ${x.go?'':'style="cursor:default"'}><span class="ii ${x.lvl}">${sv(x.icon)}</span><div class="it"><b>${esc(x.title)}</b>${x.sub?`<div class="is">${esc(x.sub)}</div>`:''}</div></div>`).join(''):'<div class="hub-note">Nothing needs your attention. Expired items, low label rolls, devices that stop syncing and trial reminders show up here.</div>'}</div>`,
     `${canView('expiry')?'<a class="btn ghost" href="#expiry" data-x>Open expiry log</a>':''}<button class="btn" data-x>Close</button>`);
@@ -1510,13 +1573,16 @@ function inboxItems(){ if(!me()) return []; const out=[];
 function searchItems(q){ if(!me()) return []; const out=[]; const has=(x)=>String(x||'').toLowerCase().includes(q);
   NAV.flatMap(([,i])=>i).filter(([k,l])=>canView(k)&&(!q||has(l)||has(SHORT[k]))).forEach(([k,l])=>out.push({group:'Pages',icon:'page',label:l,run:()=>goPage(k)}));
   if(!q) return out;
-  P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(has(x.name)||has(x.address))).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,8).forEach(x=>out.push({group:'Sites',icon:ICON.pin,label:x.name,hint:[orgName(x.orgId),x.address].filter(Boolean).join(' · '),run:()=>{ setSite(x.id); if(location.hash==='#sites'||!canView((location.hash||'').slice(1))) location.hash='overview'; }}));
+  P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(has(x.name)||has(x.address))).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,8).forEach(x=>out.push({group:'Locations',icon:ICON.pin,label:x.name,hint:[orgName(x.orgId),x.address].filter(Boolean).join(' · '),run:()=>{ setSite(x.id); if(location.hash==='#sites'||!canView((location.hash||'').slice(1))) location.hash='overview'; }}));
   if(canView('products')){ byOrg(P.live('products')).filter(p=>has(p.name)||has(p.barcode)).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,8).forEach(p=>out.push({group:'Products',icon:ICON.tag,label:p.name,hint:(catOf(p).name||'')+(p.approved===false?' · awaiting approval':''),run:()=>{ location.hash='products'; }}));
     byOrg(P.live('categories')).filter(c=>has(c.name)).slice(0,6).forEach(c=>out.push({group:'Categories',icon:ICON.grid,label:c.name,hint:c.type||'',run:()=>{ location.hash='categories'; }})); }
   if(canView('users')){ const oi=scopeOrgIds(), a=allowedSiteIds(); P.live('users').filter(x=>!x.email&&x.role!=='master'&&oi.includes(x.orgId)&&(x.siteIds||[]).some(id=>a.includes(id))&&has(x.name)).slice(0,6).forEach(x=>out.push({group:'People',av:true,label:x.name,hint:'Device staff · '+(x.siteIds||[]).filter(id=>a.includes(id)).map(siteName).join(', '),run:()=>{ location.hash='users'; }})); }
   return out; }
 if(window.PVHub){
   PVHub.init({ key:()=>((me()||{}).email||'x')+'.'+siteFilter, searchItems,
+    // Team chat: Label has no messages yet, so the panel says so (no dead button); approvals stay in the Inbox
+    chat:{ me:()=>({id:(me()||{}).email||'x'}), people:()=>[], cached:()=>[],
+      unavailable:()=>'No messages yet. Team chat isn’t switched on in Proview Label yet. Product approvals and label orders are in your Inbox.' },
     inbox:{ empty:'Nothing waiting for you. New products awaiting approval and label orders to approve show up here.',
       items:async()=>inboxItems(), count:()=>{ const seen=+(lsGet(inboxSeenKey())||0); return inboxItems().filter(i=>i.unread||(i.at&&new Date(i.at).getTime()>seen)).length; },
       seen:()=>lsSet(inboxSeenKey(),String(Date.now())) } });
@@ -1574,7 +1640,7 @@ function trialBanner(){
   const ids=scopeOrgIds(); const orgs=(S.orgs||[]).filter(o=>ids.includes(o.id));
   const locked=orgs.filter(o=>lockMsgOf(o)), trial=orgs.filter(o=>orgState(o)==='trial');
   if(locked.length){ const m=lockMsgOf(locked[0]);
-    return `<div class="card" role="alert" style="border-color:var(--bad);background:var(--badl);margin-bottom:16px"><h3 style="color:var(--bad)">${esc(m.title)}${locked.length>1?' · '+locked.length+' businesses':''}</h3><p style="margin:6px 0 0">${esc(m.text)} ${isMaster()?'As master you can extend or clear the trial from All sites.':contactHtml()}</p></div>`; }
+    return `<div class="card" role="alert" style="border-color:var(--bad);background:var(--badl);margin-bottom:16px"><h3 style="color:var(--bad)">${esc(m.title)}${locked.length>1?' · '+locked.length+' businesses':''}</h3><p style="margin:6px 0 0">${esc(m.text)} ${isMaster()?'As master you can extend or clear the trial from Locations.':contactHtml()}</p></div>`; }
   if(trial.length&&!isMaster()){ const o=trial[0];
     return `<div class="card" style="border-color:var(--warn);background:var(--warnl);margin-bottom:16px;padding:12px 16px"><b>Free trial</b> · ${esc(o.name)} · ends ${esc(P.fmtDate(o.trial_ends_at,true))}. ${contactHtml()}</div>`; }
   return '';
@@ -1591,7 +1657,7 @@ function renderTrialSetup(){
         <h1>Set up your business</h1><p class="auth2-mut">Start your free 3-day trial${em?' as '+esc(em):''}.</p>
         <div id="terr">${TRIAL.msg?`<div class="lg-err" role="alert">${esc(TRIAL.msg)}</div>`:''}</div>
         <label for="tb">Business name</label><input class="inp" id="tb" placeholder="e.g. Pepe's Piri Piri" maxlength="120" autocomplete="organization">
-        <label for="ts">First site or kitchen</label><input class="inp" id="ts" placeholder="Same as the business name" maxlength="120">
+        <label for="ts">First location or kitchen</label><input class="inp" id="ts" placeholder="Same as the business name" maxlength="120">
         <button class="go" type="submit" id="tgo">Start free trial</button>
         <button class="ghost2" type="button" id="tout">Sign out</button>
         <p class="hint" style="margin:0;font-size:12.5px">After 3 days the business becomes read-only until you buy a licence at <a href="${LIC_URL}" target="_blank" rel="noopener">license.proviewcrm.co.uk</a>. Joining an existing business? Ask its owner to add your email, then sign in again.</p>
@@ -1661,7 +1727,7 @@ function renderLogin(){
   const mode=LOGIN.mode, up=mode==='signup', reset=mode==='reset', newpw=mode==='newpw';
   const accts=CLOUD?[]:P.live('users').filter(u=>u.email&&u.password);
   const title=newpw?'Choose a new password':reset?'Reset your password':up?'Create your login':'Sign in';
-  const sub=newpw?'At least 8 characters.':reset?'We’ll email you a link to choose a new password.':up?'Use the email your business owner or Proview added for you. New to Proview Label? Create a login to start a free 3-day trial.':'Manage products, allergens, expiry and wastage across your sites.';
+  const sub=newpw?'At least 8 characters.':reset?'We’ll email you a link to choose a new password.':up?'Use the email your business owner or Proview added for you. New to Proview Label? Create a login to start a free 3-day trial.':'Manage products, allergens, expiry and wastage across your locations.';
   $('#app').innerHTML=`<div class="auth2">${loginArt()}
     <div class="auth2-form"><div>
       <form id="lf" autocomplete="on" novalidate>
@@ -1676,7 +1742,7 @@ function renderLogin(){
         ${CLOUD?`<div class="row" style="justify-content:space-between;font-size:13.5px">${mode==='signin'?`<a href="#" data-m="signup">Create a login</a><a href="#" data-m="reset">Forgot password?</a>`:newpw?'':`<a href="#" data-m="signin">Back to sign in</a>`}</div>`:''}
       </form>
       ${accts.length?`<div class="demo"><div class="t">Demo accounts (password shown)</div>
-        ${accts.map(u=>`<button data-u="${u.id}"><span class="av ${u.role==='master'?'master':''}">${esc(P.initials(u.name))}</span><span style="flex:1"><b>${esc(u.name)} <span class="tag ${u.role==='master'?'pur':u.role==='admin'?'blue':'mute'}">${P.ROLES[u.role]}</span></b><small>${esc(u.email)} · ${esc(u.password)} · ${u.role==='master'?'every business':(u.role==='admin'?orgName(u.orgId)+' (all sites)':(u.siteIds||[]).map(siteName).map(esc).join(', '))}</small></span></button>`).join('')}</div>`:''}
+        ${accts.map(u=>`<button data-u="${u.id}"><span class="av ${u.role==='master'?'master':''}">${esc(P.initials(u.name))}</span><span style="flex:1"><b>${esc(u.name)} <span class="tag ${u.role==='master'?'pur':u.role==='admin'?'blue':'mute'}">${P.ROLES[u.role]}</span></b><small>${esc(u.email)} · ${esc(u.password)} · ${u.role==='master'?'every business':(u.role==='admin'?orgName(u.orgId)+' (all locations)':(u.siteIds||[]).map(siteName).map(esc).join(', '))}</small></span></button>`).join('')}</div>`:''}
     </div></div></div>`;
   if(LOGIN.msg) err(LOGIN.msg,LOGIN.kind);
   $('#app').querySelectorAll('[data-m]').forEach(a=>a.onclick=(e)=>{ e.preventDefault(); LOGIN={msg:'',kind:'bad',mode:a.dataset.m}; renderLogin(); });
@@ -1748,11 +1814,11 @@ VIEWS.overview=(el)=>{
   const top={}; labels.filter(l=>Date.now()-new Date(l.printedAt)<14*day).forEach(l=>top[l.name]=(top[l.name]||0)+(+l.qty||1));
   const reasons={}; waste.forEach(w=>reasons[w.reason]=(reasons[w.reason]||0)+(+w.cost||0));
   const multi=(siteFilter==='all'||siteFilter.startsWith('org:'))&&bySite(P.live('sites').map(x=>({...x,siteId:x.id}))).length>1;
-  const sitesHtml=multi?`<div class="card" style="padding:16px 16px 4px"><div class="row" style="justify-content:space-between;margin-bottom:10px"><div><h3>${isMaster()?'All sites':'Your sites'}</h3><div class="sub" style="margin:0">Click a site to open it. You can also switch from the site picker.</div></div></div>
-    <div class="sitegrid">${P.live('sites').filter(x=>allowedSiteIds().includes(x.id)).sort((a,b)=>siteStats(b.id).expired-siteStats(a.id).expired||a.name.localeCompare(b.name)).map(x=>{const st=siteStats(x.id);return `<button class="sc" data-site="${x.id}"><div class="t"><b>${esc(x.name)}</b>${st.expired?`<span class="tag bad">${st.expired} expired</span>`:st.soon?`<span class="tag warn">${st.soon} due</span>`:'<span class="tag ok">All good</span>'}</div><div class="meta"><span class="dot" style="background:${st.online?'#12a150':'#8b8b95'}"></span>${st.devices} device${st.devices!==1?'s':''} · ${st.lastSync?'synced '+P.fmtDate(st.lastSync,true):'never synced'}${st.low?' · <span style="color:#d92d20">'+st.low+' low on labels</span>':''}</div><div class="nums"><div><span>${st.today}</span>labels today</div><div><span>${st.soon}</span>due 24 hrs</div><div><span>${P.money(st.waste7)}</span>waste 7d</div></div><div class="go">Open site →</div></button>`;}).join('')}</div></div>`:'';
-  el.innerHTML=`<div class="ph keep"><div><h1>${multi?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):visibleOrgs().length>1?'All businesses':isMaster()?'All sites':'Your sites'):siteFilter==='all'||siteFilter.startsWith('org:')?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):isMaster()?'All businesses':'Your sites'):esc(siteName(siteFilter))}</h1><p>${P.fmtDay(new Date())} ${P.fmtDate(new Date())}${multi?' · '+allowedSiteIds().length+' sites combined':''}${(()=>{ const v=!multi&&siteInView(); if(!v) return ''; const on=siteStats(v.id).online; return ` · <span class="dot" style="background:${on?'#12a150':'#8b8b95'}"></span>${on?'Devices online':'Devices offline'}${v.address?' · '+esc(v.address):''}`; })()}</p></div><div class="btns"><a class="btn ghost" href="#analyser">Menu analyser</a><a class="btn" href="#products">+ Add product</a></div></div>
+  const sitesHtml=multi?`<div class="card" style="padding:16px 16px 4px"><div class="row" style="justify-content:space-between;margin-bottom:10px"><div><h3>${isMaster()?'Locations':'Your locations'}</h3><div class="sub" style="margin:0">Click a location to open it. You can also switch from the location dropdown.</div></div></div>
+    <div class="sitegrid">${P.live('sites').filter(x=>allowedSiteIds().includes(x.id)).sort((a,b)=>siteStats(b.id).expired-siteStats(a.id).expired||a.name.localeCompare(b.name)).map(x=>{const st=siteStats(x.id);return `<button class="sc" data-site="${x.id}"><div class="t"><b>${esc(x.name)}</b>${st.expired?`<span class="tag bad">${st.expired} expired</span>`:st.soon?`<span class="tag warn">${st.soon} due</span>`:'<span class="tag ok">All good</span>'}</div><div class="meta"><span class="dot" style="background:${st.online?'#12a150':'#8b8b95'}"></span>${st.devices} device${st.devices!==1?'s':''} · ${st.lastSync?'synced '+P.fmtDate(st.lastSync,true):'never synced'}${st.low?' · <span style="color:#d92d20">'+st.low+' low on labels</span>':''}</div><div class="nums"><div><span>${st.today}</span>labels today</div><div><span>${st.soon}</span>due 24 hrs</div><div><span>${P.money(st.waste7)}</span>waste 7d</div></div><div class="go">Open location →</div></button>`;}).join('')}</div></div>`:'';
+  el.innerHTML=`<div class="ph keep"><div><h1>${multi?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):visibleOrgs().length>1?'All businesses':isMaster()?'Locations':'Your locations'):siteFilter==='all'||siteFilter.startsWith('org:')?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):isMaster()?'All businesses':'Your locations'):esc(siteName(siteFilter))}</h1><p>${P.fmtDay(new Date())} ${P.fmtDate(new Date())}${multi?' · '+allowedSiteIds().length+' locations combined':''}${(()=>{ const v=!multi&&siteInView(); if(!v) return ''; const on=siteStats(v.id).online; return ` · <span class="dot" style="background:${on?'#12a150':'#8b8b95'}"></span>${on?'Devices online':'Devices offline'}${v.address?' · '+esc(v.address):''}`; })()}</p></div><div class="btns"><a class="btn ghost" href="#analyser">Menu analyser</a><a class="btn" href="#products">+ Add product</a></div></div>
   ${expired?`<div class="banner">${ic('clock',20)}<div><b>${expired} expired item${expired!==1?'s':''} still marked active</b><span class="hint">Mark each as used or wasted so the expiry log stays accurate.</span></div><div class="sp"></div><a class="btn ghost sm" href="#expiry">Review</a></div>`:''}
-  ${!allowedSiteIds().length?`<div class="card" style="text-align:center;padding:34px 20px"><h3 style="font-size:18px">${isMaster()&&!visibleOrgs().length?'Add your first business':'Add your first site'}</h3><p class="hint" style="max-width:520px;margin:8px auto 16px">${isMaster()&&!visibleOrgs().length?'Create a customer business and invite its owner. They can then add their kitchens, menu and staff, or you can set it up for them.':'Add a kitchen, then connect a handheld to it (Menu → Settings → Connect to Proview Label on the device).'}</p><a class="btn" href="#devices">${isMaster()&&!visibleOrgs().length?'+ Add business':'+ Add site'}</a></div>`:''}
+  ${!allowedSiteIds().length?`<div class="card" style="text-align:center;padding:34px 20px"><h3 style="font-size:18px">${isMaster()&&!visibleOrgs().length?'Add your first business':'Add your first location'}</h3><p class="hint" style="max-width:520px;margin:8px auto 16px">${isMaster()&&!visibleOrgs().length?'Create a customer business and invite its owner. They can then add their kitchens, menu and staff, or you can set it up for them.':'Add a kitchen, then connect a handheld to it (Menu → Settings → Connect to Proview Label on the device).'}</p><a class="btn" href="#devices">${isMaster()&&!visibleOrgs().length?'+ Add business':'+ Add location'}</a></div>`:''}
   ${sitesHtml}
   <div class="kpis">
     <div class="kpi"><div class="l">Labels printed today</div><div class="v">${lToday}</div><div class="s">${l7} in the last 7 days</div></div>
@@ -1919,10 +1985,10 @@ VIEWS.printlog=(el)=>{
   if(lf.q) ls=ls.filter(l=>l.name.toLowerCase().includes(lf.q.toLowerCase())||l.code.toLowerCase().includes(lf.q.toLowerCase())||(l.batch||'').toLowerCase().includes(lf.q.toLowerCase()));
   el.innerHTML=`<div class="ph"><div><h1>Print <span>log</span></h1><p>Every label printed, when and by whom.</p></div><button class="btn ghost" id="ex">Export CSV</button></div>
   ${logFilters()}<div class="filters"><span class="count">${ls.reduce((a,l)=>a+(+l.qty||1),0)} labels · ${ls.length} print jobs</span></div>
-  <div class="tbl"><table><thead><tr><th>Printed</th><th>Product</th><th>Type</th><th>Qty</th><th>Use by</th><th>Storage</th><th>Batch</th><th>Flags</th><th>By</th><th>Site</th><th>Code</th></tr></thead><tbody>
+  <div class="tbl"><table><thead><tr><th>Printed</th><th>Product</th><th>Type</th><th>Qty</th><th>Use by</th><th>Storage</th><th>Batch</th><th>Flags</th><th>By</th><th>Location</th><th>Code</th></tr></thead><tbody>
   ${ls.slice(0,400).map(l=>`<tr><td style="white-space:nowrap">${P.fmtDate(l.printedAt,true)}</td><td><b>${esc(l.name)}</b>${l.reprintOf?' <span class="tag mute">Reprint</span>':''}</td><td><span class="tag ${l.type==='sale'?'blue':'mute'}">${l.type}</span></td><td>${l.qty||1}</td><td style="white-space:nowrap">${P.fmtDate(l.expiry,l.ruleName==='Hot Holding')}</td><td>${esc(l.ruleName||'')}</td><td>${esc(l.batch||'')}</td><td>${l.useFirst?'<span class="tag bad">Use first</span> ':''}${l.defrost?'<span class="tag blue">Defrosted</span>':''}</td><td>${esc(userName(l.userId))}</td><td class="hint">${esc(siteName(l.siteId))}</td><td class="hint">${esc(l.code)}</td></tr>`).join('')||'<tr><td colspan="11" class="empty">No labels in this period.</td></tr>'}</tbody></table></div>`;
   bindLogFilters(el);
-  el.querySelector('#ex').onclick=()=>exportCSV('Print log',ls,[{label:'printed_at',get:l=>P.fmtDate(l.printedAt,true)},{key:'name',label:'product'},{key:'type'},{key:'qty'},{label:'use_by',get:l=>P.fmtDate(l.expiry,true)},{key:'ruleName',label:'storage'},{key:'batch'},{key:'useFirst',label:'use_first'},{key:'defrost'},{label:'user',get:l=>userName(l.userId)},{label:'site',get:l=>siteName(l.siteId)},{key:'code'}]);
+  el.querySelector('#ex').onclick=()=>exportCSV('Print log',ls,[{label:'printed_at',get:l=>P.fmtDate(l.printedAt,true)},{key:'name',label:'product'},{key:'type'},{key:'qty'},{label:'use_by',get:l=>P.fmtDate(l.expiry,true)},{key:'ruleName',label:'storage'},{key:'batch'},{key:'useFirst',label:'use_first'},{key:'defrost'},{label:'user',get:l=>userName(l.userId)},{label:'location',get:l=>siteName(l.siteId)},{key:'code'}]);
 };
 function logFilters(){ return `<div class="filters"><input id="lq" placeholder="Search product, code, batch" value="${esc(lf.q)}"><select id="lr">${[['1','Today'],['7','Last 7 days'],['30','Last 30 days'],['all','All time']].map(([v,l])=>`<option value="${v}" ${lf.range===v?'selected':''}>${l}</option>`).join('')}</select><select id="lu"><option value="all">All staff</option>${byOrg(P.live('users')).map(u=>`<option value="${u.id}" ${lf.user===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select><select id="lt"><option value="all">Prep & sale</option><option value="prep" ${lf.type==='prep'?'selected':''}>Prep</option><option value="sale" ${lf.type==='sale'?'selected':''}>Sale</option></select></div>`; }
 function bindLogFilters(el){ const q=el.querySelector('#lq'); q.oninput=()=>{lf.q=q.value;clearTimeout(q._t);q._t=setTimeout(()=>{render();const n=$('#lq');n.focus();n.setSelectionRange(n.value.length,n.value.length);},250);}; el.querySelector('#lr').onchange=e=>{lf.range=e.target.value;render();}; el.querySelector('#lu').onchange=e=>{lf.user=e.target.value;render();}; el.querySelector('#lt').onchange=e=>{lf.type=e.target.value;render();}; }
@@ -1934,11 +2000,11 @@ VIEWS.expiry=(el)=>{
   const closed=ls.filter(l=>l.status==='used'||l.status==='wasted');
   el.innerHTML=`<div class="ph"><div><h1>Expiry <span>log</span></h1><p>Prep items currently in the kitchen and what happened to them.</p></div><button class="btn ghost" id="ex">Export CSV</button></div>
   <div class="kpis"><div class="kpi ${act.filter(l=>P.expiryStatus(l)==='expired').length?'alert':''}"><div class="l">Expired, still active</div><div class="v">${act.filter(l=>P.expiryStatus(l)==='expired').length}</div></div><div class="kpi"><div class="l">Expire within 24 hrs</div><div class="v">${act.filter(l=>P.expiryStatus(l)==='today').length}</div></div><div class="kpi"><div class="l">In date</div><div class="v">${act.filter(l=>P.expiryStatus(l)==='ok').length}</div></div><div class="kpi"><div class="l">Used before expiry</div><div class="v">${closed.length?Math.round(closed.filter(l=>l.status==='used').length/closed.length*100):0}%</div><div class="s">of closed items</div></div></div>
-  <div class="tbl"><table><thead><tr><th>Status</th><th>Product</th><th>Use by</th><th>Storage</th><th>Printed</th><th>By</th><th>Site</th><th></th></tr></thead><tbody>
+  <div class="tbl"><table><thead><tr><th>Status</th><th>Product</th><th>Use by</th><th>Storage</th><th>Printed</th><th>By</th><th>Location</th><th></th></tr></thead><tbody>
   ${act.map(l=>`<tr><td>${st(P.expiryStatus(l))}</td><td><b>${esc(l.name)}</b>${l.qty>1?' ×'+l.qty:''}</td><td style="white-space:nowrap">${P.fmtDay(l.expiry)} ${P.fmtDate(l.expiry,true)}</td><td>${esc(l.ruleName||'')}</td><td class="hint">${P.fmtDate(l.printedAt,true)}</td><td>${esc(userName(l.userId))}</td><td class="hint">${esc(siteName(l.siteId))}</td><td style="white-space:nowrap"><button class="btn ghost sm" data-u="${l.id}">Used</button> <button class="btn ghost sm" data-w="${l.id}">Wasted</button></td></tr>`).join('')||'<tr><td colspan="8" class="empty">Nothing active.</td></tr>'}</tbody></table></div>`;
   el.querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>{ const l=P.byId('labels',b.dataset.u); P.upsert('labels',{...l,status:'used'}); render(); });
   el.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{ const l=P.byId('labels',b.dataset.w); const p=P.byId('products',l.productId)||{}; P.upsert('labels',{...l,status:'wasted'}); P.upsert('wastage',{id:P.uid('w_'),orgId:l.orgId,productId:l.productId,name:l.name,qty:l.qty||1,unit:'portion',reason:P.expiryStatus(l)==='expired'?'Expired':'Other',notes:'Logged from back-office',photo:'',cost:Math.round((p.price||2.5)*(l.qty||1)*100)/100,userId:me().id,siteId:l.siteId,at:P.now(),labelId:l.id}); toast('Logged as wastage'); render(); });
-  el.querySelector('#ex').onclick=()=>exportCSV('Expiry log',ls,[{key:'name',label:'product'},{label:'status',get:l=>P.expiryStatus(l)},{label:'use_by',get:l=>P.fmtDate(l.expiry,true)},{key:'ruleName',label:'storage'},{label:'printed',get:l=>P.fmtDate(l.printedAt,true)},{label:'user',get:l=>userName(l.userId)},{label:'site',get:l=>siteName(l.siteId)}]);
+  el.querySelector('#ex').onclick=()=>exportCSV('Expiry log',ls,[{key:'name',label:'product'},{label:'status',get:l=>P.expiryStatus(l)},{label:'use_by',get:l=>P.fmtDate(l.expiry,true)},{key:'ruleName',label:'storage'},{label:'printed',get:l=>P.fmtDate(l.printedAt,true)},{label:'user',get:l=>userName(l.userId)},{label:'location',get:l=>siteName(l.siteId)}]);
 };
 
 VIEWS.wastage=(el)=>{
@@ -1948,29 +2014,31 @@ VIEWS.wastage=(el)=>{
   el.innerHTML=`<div class="ph"><div><h1>Wastage <span>report</span></h1><p>What was thrown away, why, and what it cost.</p></div><div class="btns"><select class="sel" id="wr">${[['7','Last 7 days'],['30','Last 30 days'],['all','All time']].map(([v,l])=>`<option value="${v}" ${lf.range===v?'selected':''}>${l}</option>`).join('')}</select><button class="btn ghost" id="ex">Export CSV</button></div></div>
   <div class="kpis"><div class="kpi"><div class="l">Estimated cost</div><div class="v">${P.money(cost)}</div></div><div class="kpi"><div class="l">Items wasted</div><div class="v">${ws.reduce((a,w)=>a+(+w.qty||0),0)}</div></div><div class="kpi"><div class="l">Entries</div><div class="v">${ws.length}</div></div><div class="kpi"><div class="l">With photo</div><div class="v">${ws.filter(w=>w.photo).length}</div><div class="s">${curOrg()?'Photo '+(orgSettings(curOrg()).requirePhoto?'required':'optional')+' – change in Users & permissions':'Photo rules are set per business'}</div></div></div>
   <div class="cols eq"><div class="card"><h3>Cost by reason</h3>${hbars(Object.entries(byR).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({k,v})),P.money)}</div><div class="card"><h3>Most wasted products</h3><div class="sub">Item count</div>${hbars(Object.entries(byP).sort((a,b)=>b[1]-a[1]).slice(0,7).map(([k,v])=>({k,v})))}</div></div>
-  <div class="tbl"><table><thead><tr><th>When</th><th>Product</th><th>Qty</th><th>Reason</th><th>Notes</th><th>Photo</th><th>Cost</th><th>By</th><th>Site</th></tr></thead><tbody>
+  <div class="tbl"><table><thead><tr><th>When</th><th>Product</th><th>Qty</th><th>Reason</th><th>Notes</th><th>Photo</th><th>Cost</th><th>By</th><th>Location</th></tr></thead><tbody>
   ${ws.map(w=>`<tr><td style="white-space:nowrap">${P.fmtDate(w.at,true)}</td><td><b>${esc(w.name)}</b></td><td>${w.qty}</td><td>${esc(w.reason)}</td><td class="hint">${esc(w.notes||'')}</td><td>${w.photo?`<img src="${w.photo}" data-ph="${w.id}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;cursor:zoom-in">`:''}</td><td>${P.money(w.cost)}</td><td>${esc(userName(w.userId))}</td><td class="hint">${esc(siteName(w.siteId))}</td></tr>`).join('')||'<tr><td colspan="9" class="empty">No wastage in this period.</td></tr>'}</tbody></table></div>`;
   el.querySelector('#wr').onchange=e=>{lf.range=e.target.value;render();};
   el.querySelectorAll('[data-ph]').forEach(i=>i.onclick=()=>modal('Wastage photo',`<img src="${i.src}" style="width:100%;border-radius:8px">`));
-  el.querySelector('#ex').onclick=()=>exportCSV('Wastage',ws,[{label:'date',get:w=>P.fmtDate(w.at,true)},{key:'name',label:'product'},{key:'qty'},{key:'reason'},{key:'notes'},{key:'cost'},{label:'user',get:w=>userName(w.userId)},{label:'site',get:w=>siteName(w.siteId)}]);
+  el.querySelector('#ex').onclick=()=>exportCSV('Wastage',ws,[{label:'date',get:w=>P.fmtDate(w.at,true)},{key:'name',label:'product'},{key:'qty'},{key:'reason'},{key:'notes'},{key:'cost'},{label:'user',get:w=>userName(w.userId)},{label:'location',get:w=>siteName(w.siteId)}]);
 };
 
+// the stored entity name stays as it is (data); the screen says "Location" for a site
+const entName=(e)=>e==='Site'?'Location':e;
 VIEWS.history=(el)=>{
   const a=bySite(P.live('audit')).sort((x,y)=>new Date(y.at)-new Date(x.at));
   el.innerHTML=`<div class="ph"><div><h1>Amendment <span>history</span></h1><p>What changed, and who changed it. Includes support requests sent from devices.</p></div><button class="btn ghost" id="ex">Export CSV</button></div>
-  <div class="tbl"><table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>What</th><th>Detail</th></tr></thead><tbody>${a.map(x=>`<tr><td style="white-space:nowrap">${P.fmtDate(x.at,true)}</td><td><b>${esc(x.user)}</b></td><td><span class="tag ${x.action==='deleted'?'bad':x.action==='created'?'ok':x.action==='support request'?'warn':'blue'}">${esc(x.action)}</span></td><td>${esc(x.entity)}</td><td>${esc(x.detail)}</td></tr>`).join('')}</tbody></table></div>`;
-  el.querySelector('#ex').onclick=()=>exportCSV('Amendment history',a,[{label:'when',get:x=>P.fmtDate(x.at,true)},{key:'user'},{key:'action'},{key:'entity'},{key:'detail'}]);
+  <div class="tbl"><table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>What</th><th>Detail</th></tr></thead><tbody>${a.map(x=>`<tr><td style="white-space:nowrap">${P.fmtDate(x.at,true)}</td><td><b>${esc(x.user)}</b></td><td><span class="tag ${x.action==='deleted'?'bad':x.action==='created'?'ok':x.action==='support request'?'warn':'blue'}">${esc(x.action)}</span></td><td>${esc(entName(x.entity))}</td><td>${esc(x.detail)}</td></tr>`).join('')}</tbody></table></div>`;
+  el.querySelector('#ex').onclick=()=>exportCSV('Amendment history',a,[{label:'when',get:x=>P.fmtDate(x.at,true)},{key:'user'},{key:'action'},{label:'entity',get:x=>entName(x.entity)},{key:'detail'}]);
 };
 
 VIEWS.orders=(el)=>{
   const os=bySite(P.live('orders')).sort((a,b)=>new Date(b.at)-new Date(a.at));
   const flow=['pending','approved','dispatched','delivered'];
   el.innerHTML=`<div class="ph"><div><h1>Label <span>orders</span></h1><p>Roll orders placed from devices. Single height 180 labels/roll, double 90/roll · £1.95 per roll ex. VAT.</p></div><button class="btn" id="add">+ New order</button></div>
-  <div class="tbl"><table><thead><tr><th>Placed</th><th>Site</th><th>Label type</th><th>Rolls</th><th>Mode</th><th>Delivery</th><th>By</th><th>Total ex. VAT</th><th>Status</th><th></th></tr></thead><tbody>
+  <div class="tbl"><table><thead><tr><th>Placed</th><th>Location</th><th>Label type</th><th>Rolls</th><th>Mode</th><th>Delivery</th><th>By</th><th>Total ex. VAT</th><th>Status</th><th></th></tr></thead><tbody>
   ${os.map(o=>{const lt=P.LABEL_TYPES.find(t=>t.id===o.labelType)||{};const i=flow.indexOf(o.status);return `<tr><td>${P.fmtDate(o.at,true)}</td><td>${esc(siteName(o.siteId))}</td><td>${esc(lt.name||o.labelType)}</td><td>${o.rolls}</td><td>${esc(o.mode)}${o.freq?' · '+esc(o.freq):''}</td><td>${esc(o.delivery||'')}</td><td>${esc(userName(o.userId))}</td><td>${P.money(o.rolls*(1.95+(o.labelType==='easy'?.2:0)))}</td><td><span class="tag ${o.status==='pending'?'warn':o.status==='cancelled'?'mute':'ok'}">${esc(o.status)}</span></td><td style="white-space:nowrap">${i>=0&&i<flow.length-1?`<button class="btn sm" data-adv="${o.id}">Mark ${flow[i+1]}</button>`:''} ${o.status==='pending'?`<button class="btn ghost sm" data-cx="${o.id}">Cancel</button>`:''}</td></tr>`;}).join('')||'<tr><td colspan="10" class="empty">No orders.</td></tr>'}</tbody></table></div>`;
   el.querySelectorAll('[data-adv]').forEach(b=>b.onclick=()=>{ const o=P.byId('orders',b.dataset.adv); const n=flow[flow.indexOf(o.status)+1]; P.upsert('orders',{...o,status:n}); audit('updated','Label order',o.rolls+' rolls → '+n,o.orgId); render(); });
   el.querySelectorAll('[data-cx]').forEach(b=>b.onclick=()=>{ const o=P.byId('orders',b.dataset.cx); P.upsert('orders',{...o,status:'cancelled'}); render(); });
-  el.querySelector('#add').onclick=()=>{ const m=modal('New label order',`<div class="fld"><label>Site</label><select class="inp" id="s">${P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(siteFilter==='all'||siteFilter===x.id||siteFilter==='org:'+x.orgId)).map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div><div class="fld"><label>Label type</label><select class="inp" id="t">${P.LABEL_TYPES.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></div><div class="g2"><div class="fld"><label>Rolls</label><input class="inp" id="r" type="number" value="10" min="1"></div><div class="fld"><label>Delivery</label><select class="inp" id="d"><option>Standard (free)</option><option>Royal Mail 24</option></select></div></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Place order</button>`);
+  el.querySelector('#add').onclick=()=>{ const m=modal('New label order',`<div class="fld"><label>Location</label><select class="inp" id="s">${P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(siteFilter==='all'||siteFilter===x.id||siteFilter==='org:'+x.orgId)).map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div><div class="fld"><label>Label type</label><select class="inp" id="t">${P.LABEL_TYPES.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></div><div class="g2"><div class="fld"><label>Rolls</label><input class="inp" id="r" type="number" value="10" min="1"></div><div class="fld"><label>Delivery</label><select class="inp" id="d"><option>Standard (free)</option><option>Royal Mail 24</option></select></div></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Place order</button>`);
     m.querySelector('#sv').onclick=()=>{ P.upsert('orders',{id:P.uid('o_'),siteId:m.querySelector('#s').value,orgId:(P.byId('sites',m.querySelector('#s').value)||{}).orgId,mode:'on-demand',labelType:m.querySelector('#t').value,rolls:+m.querySelector('#r').value||1,delivery:m.querySelector('#d').value,status:'pending',at:P.now(),userId:me().id}); closeModal(); render(); }; };
 };
 
@@ -1984,13 +2052,13 @@ VIEWS.sites=(el)=>{
   const status=(o)=>stateTag(o);
   const trialOk=!CLOUD||(WHO&&Cloud.trialReady&&Cloud.trialReady(WHO));
   const tr=(r)=>{ const st=r.s?siteStats(r.s.id):null; const q=(r.o.name+' '+(r.s?r.s.name+' '+(r.s.address||'')+' '+(r.s.region||''):'')).toLowerCase();
-    return `<tr data-q="${esc(q)}"><td><b>${esc(r.o.name)}</b>${r.s&&r.first?`<div><a href="#overview" class="hint" data-openbiz="${esc(r.o.id)}" title="See this business across all its sites, as its owner does">Open business</a></div>`:''}</td><td>${r.s?`<b>${esc(r.s.name)}</b><div class="hint">${esc(r.s.address||r.s.region||'')}</div>`:'<span class="hint">No sites yet</span>'}</td><td>${status(r.o)}</td>
+    return `<tr data-q="${esc(q)}"><td><b>${esc(r.o.name)}</b>${r.s&&r.first?`<div><a href="#overview" class="hint" data-openbiz="${esc(r.o.id)}" title="See this business across all its locations, as its owner does">Open business</a></div>`:''}</td><td>${r.s?`<b>${esc(r.s.name)}</b><div class="hint">${esc(r.s.address||r.s.region||'')}</div>`:'<span class="hint">No locations yet</span>'}</td><td>${status(r.o)}</td>
       <td>${st?st.devices:'—'}</td><td class="hint">${st?(st.lastSync?P.fmtDate(st.lastSync,true):'Never'):'—'}</td>
       <td style="text-align:right;white-space:nowrap">${trialOk&&r.first?`<button class="btn ghost sm" data-trial="${esc(r.o.id)}" title="Extend, end or clear this business's free trial">Trial…</button> `:''}${r.s?`<button class="btn sm" data-open="${esc(r.s.id)}">Open</button>`:`<button class="btn ghost sm" data-openorg="${esc(r.o.id)}">Open</button>`}</td></tr>`; };
   const empty=`<tr><td colspan="6"><div class="empty" style="padding:38px 20px"><h3 style="font-size:17px;color:var(--ink)">No businesses yet</h3><p class="hint" style="max-width:460px;margin:8px auto 16px">Add a customer business and invite its owner. They can then add their kitchens, menu and staff, or you can set it up for them.</p><div class="btns" style="justify-content:center"><button class="btn" data-addb>+ Add business</button><button class="btn ghost" data-refresh>Refresh</button></div></div></td></tr>`;
-  el.innerHTML=`<div class="ph keep"><div><h1>All sites</h1><p>${orgs.length} business${orgs.length!==1?'es':''} · ${nSites} site${nSites!==1?'s':''} across Proview Label</p></div><div class="btns"><button class="btn ghost" data-refresh>Refresh</button><button class="btn" data-addb>+ Add business</button></div></div>
-  ${rows.length>6?`<div class="filters"><input id="asq" placeholder="Search business or site" value="${esc(asq)}" style="min-width:260px"><span class="count" id="asc"></span></div>`:''}
-  <div class="tbl"><table><thead><tr><th>Business</th><th>Site</th><th>Status</th><th>Devices</th><th>Last sync</th><th></th></tr></thead><tbody>${rows.length?rows.map(tr).join(''):empty}<tr id="asnone" style="display:none"><td colspan="6" class="empty">No business or site matches “<span></span>”.</td></tr></tbody></table></div>`;
+  el.innerHTML=`<div class="ph keep"><div><h1>Locations</h1><p>${orgs.length} business${orgs.length!==1?'es':''} · ${nSites} location${nSites!==1?'s':''} across Proview Label</p></div><div class="btns"><button class="btn ghost" data-refresh>Refresh</button><button class="btn" data-addb>+ Add business</button></div></div>
+  ${rows.length>6?`<div class="filters"><input id="asq" placeholder="Search business or location" value="${esc(asq)}" style="min-width:260px"><span class="count" id="asc"></span></div>`:''}
+  <div class="tbl"><table><thead><tr><th>Business</th><th>Location</th><th>Status</th><th>Devices</th><th>Last sync</th><th></th></tr></thead><tbody>${rows.length?rows.map(tr).join(''):empty}<tr id="asnone" style="display:none"><td colspan="6" class="empty">No business or location matches “<span></span>”.</td></tr></tbody></table></div>`;
   const filt=()=>{ const q=asq.trim().toLowerCase(); let n=0; el.querySelectorAll('tr[data-q]').forEach(t=>{ const on=!q||t.dataset.q.includes(q); t.style.display=on?'':'none'; if(on) n++; });
     const c=el.querySelector('#asc'); if(c) c.textContent=q?n+' of '+rows.length:''; const no=el.querySelector('#asnone'); if(no){ no.style.display=q&&!n?'':'none'; no.querySelector('span').textContent=asq; } };
   const qi=el.querySelector('#asq'); if(qi){ qi.oninput=()=>{ asq=qi.value; filt(); }; filt(); }
@@ -2019,7 +2087,7 @@ function trialForm(orgId){ const o=(S.orgs||[]).find(x=>x.id===orgId); if(!o) re
   const c=m.querySelector('#tclr'); if(c) c.onclick=()=>save(null);
 }
 // Master: create a customer business (and optionally invite its owner). Used by All sites and Sites & devices.
-function addBusiness(after){ const m=modal('Add business',`<div class="fld"><label>Business name</label><input class="inp" id="bn" placeholder="e.g. Pepe's Piri Piri"></div><div class="g2"><div class="fld"><label>Owner's name</label><input class="inp" id="on"></div><div class="fld"><label>Owner's email</label><input class="inp" id="oe" type="email" placeholder="They sign in with this"></div></div><p class="hint">The owner signs in with “Sign in with Proview account” or “Create a login” using that email. They can then add their sites, staff and menu.</p>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Add business</button>`);
+function addBusiness(after){ const m=modal('Add business',`<div class="fld"><label>Business name</label><input class="inp" id="bn" placeholder="e.g. Pepe's Piri Piri"></div><div class="g2"><div class="fld"><label>Owner's name</label><input class="inp" id="on"></div><div class="fld"><label>Owner's email</label><input class="inp" id="oe" type="email" placeholder="They sign in with this"></div></div><p class="hint">The owner signs in with “Sign in with Proview account” or “Create a login” using that email. They can then add their locations, staff and menu.</p>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Add business</button>`);
     m.querySelector('#sv').onclick=async()=>{ const n=m.querySelector('#bn').value.trim(), oe=m.querySelector('#oe').value.trim().toLowerCase(), on=m.querySelector('#on').value.trim(); if(!n) return toast('Enter the business name'); if(oe&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(oe)) return toast('Check the owner’s email');
       try{ let id; if(CLOUD){ id=await Cloud.createOrg(n,oe,on); await refreshWho(); } else { id='org_'+P.uid(''); S.orgs.push({id,name:n,settings:{}}); if(oe) P.upsert('users',{id:P.uid('u_'),orgId:id,name:on||oe,email:oe,password:'demo',role:'admin',pin:'0000',siteIds:[]}); P.save(); }
         P.ensureRules(id); closeModal(); toast(n+' added'); if(after) after(id); else setSite('org:'+id); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } }; }
@@ -2027,13 +2095,13 @@ VIEWS.devices=(el)=>{
   const ss=P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(siteFilter==='all'||x.id===siteFilter||siteFilter==='org:'+x.orgId)), ds=bySite(P.live('devices'));
   const canAddSite=scopeOrgIds().some(o=>['master','owner','admin'].includes(orgRole(o)));
   const orgs=visibleOrgs().filter(o=>scopeOrgIds().includes(o.id)); // the open business only
-  el.innerHTML=`<div class="ph"><div><h1>Sites & devices</h1><p>${isMaster()?esc(orgName(curOrg()))+': its kitchens and the handhelds running Proview Label.':'Your kitchens and the handhelds running Proview Label.'}</p></div><div class="btns">${!CLOUD?'<button class="btn ghost" id="imp">Import from device</button><button class="btn ghost" id="cfg">Device config file</button>':''}${canAddSite?'<button class="btn" id="addS">+ Add site</button>':''}</div></div>
-  ${isMaster()?`<div class="card"><h3>Business</h3><div class="sub">The business you're working in. New businesses are set up from All sites.</div><table><thead><tr><th>Business</th><th>Sites</th><th>Devices</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${orgs.map(o=>{ const os=P.live('sites').filter(x=>x.orgId===o.id); return `<tr><td><b>${esc(o.name)}</b>${orgState(o)!=='active'?' '+stateTag(o):''}</td><td>${os.length}</td><td>${P.live('devices').filter(d=>os.some(x=>x.id===d.siteId)).length}</td><td>${P.live('labels').filter(l=>os.some(x=>x.id===l.siteId)&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap"><button class="icbtn" data-eo="${o.id}" title="Rename">✎</button></td></tr>`; }).join('')||'<tr><td colspan="5" class="empty">No business open.</td></tr>'}</tbody></table></div>`:''}
-  <div class="card"><h3>Sites</h3><table><thead><tr><th>Site</th>${multiOrg()?'<th>Business</th>':''}<th>Address (printed on sale labels)</th><th>Device staff</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${ss.map(s=>`<tr><td><b>${esc(s.name)}</b><div class="hint">${esc(s.region||'')}</div></td>${multiOrg()?`<td class="hint">${esc(orgName(s.orgId))}</td>`:''}<td>${esc(s.address||'')}</td><td>${P.live('users').filter(u=>(u.siteIds||[]).includes(s.id)).length}</td><td>${P.live('labels').filter(l=>l.siteId===s.id&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap">${siteFilter!==s.id&&allowedSiteIds().length>1?`<button class="btn ghost sm" data-open="${s.id}">Open</button> `:''}${['master','owner','admin'].includes(orgRole(s.orgId))?`<button class="icbtn" data-es="${s.id}">✎</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No sites yet.</td></tr>'}</tbody></table></div>
-  <div class="card"><h3>Devices</h3><div class="sub">${CLOUD?'Handhelds appear here once they sign in (Android app → Settings → Connect to Proview Label).':'Sample devices.'}</div><table><thead><tr><th>Device</th><th>Site</th><th>Battery</th><th>Labels left</th><th>App</th><th>Last sync</th></tr></thead><tbody>${ds.map(d=>`<tr><td><b>${esc(d.name)}</b><div class="hint">${esc(d.id)}</div></td><td>${esc(siteName(d.siteId))}</td><td>${d.battery!=null?d.battery+'%':'—'}</td><td>${d.labelsLeft<60?`<span class="tag bad">${d.labelsLeft} – low</span>`:d.labelsLeft}</td><td>v${esc(d.version||'')}</td><td>${d.lastSync?P.fmtDate(d.lastSync,true):'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No devices connected yet.</td></tr>'}</tbody></table></div>`;
-  const siteForm=(s,orgId)=>{ const isNew=!s; s=s||{id:'site_'+P.uid(''),orgId,name:'',address:'',region:''}; const m=modal((isNew?'Add site':'Edit site')+' · '+orgName(s.orgId),`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(s.name)}"></div><div class="fld"><label>Address</label><input class="inp" id="a" value="${esc(s.address||'')}"></div><div class="fld"><label>Area</label><input class="inp" id="g" value="${esc(s.region||'')}" placeholder="e.g. North London"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
+  el.innerHTML=`<div class="ph"><div><h1>Locations & devices</h1><p>${isMaster()?esc(orgName(curOrg()))+': its kitchens and the handhelds running Proview Label.':'Your kitchens and the handhelds running Proview Label.'}</p></div><div class="btns">${!CLOUD?'<button class="btn ghost" id="imp">Import from device</button><button class="btn ghost" id="cfg">Device config file</button>':''}${canAddSite?'<button class="btn" id="addS">+ Add location</button>':''}</div></div>
+  ${isMaster()?`<div class="card"><h3>Business</h3><div class="sub">The business you're working in. New businesses are set up from Locations.</div><table><thead><tr><th>Business</th><th>Locations</th><th>Devices</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${orgs.map(o=>{ const os=P.live('sites').filter(x=>x.orgId===o.id); return `<tr><td><b>${esc(o.name)}</b>${orgState(o)!=='active'?' '+stateTag(o):''}</td><td>${os.length}</td><td>${P.live('devices').filter(d=>os.some(x=>x.id===d.siteId)).length}</td><td>${P.live('labels').filter(l=>os.some(x=>x.id===l.siteId)&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap"><button class="icbtn" data-eo="${o.id}" title="Rename">✎</button></td></tr>`; }).join('')||'<tr><td colspan="5" class="empty">No business open.</td></tr>'}</tbody></table></div>`:''}
+  <div class="card"><h3>Locations</h3><table><thead><tr><th>Location</th>${multiOrg()?'<th>Business</th>':''}<th>Address (printed on sale labels)</th><th>Device staff</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${ss.map(s=>`<tr><td><b>${esc(s.name)}</b><div class="hint">${esc(s.region||'')}</div></td>${multiOrg()?`<td class="hint">${esc(orgName(s.orgId))}</td>`:''}<td>${esc(s.address||'')}</td><td>${P.live('users').filter(u=>(u.siteIds||[]).includes(s.id)).length}</td><td>${P.live('labels').filter(l=>l.siteId===s.id&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap">${siteFilter!==s.id&&allowedSiteIds().length>1?`<button class="btn ghost sm" data-open="${s.id}">Open</button> `:''}${['master','owner','admin'].includes(orgRole(s.orgId))?`<button class="icbtn" data-es="${s.id}">✎</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No locations yet.</td></tr>'}</tbody></table></div>
+  <div class="card"><h3>Devices</h3><div class="sub">${CLOUD?'Handhelds appear here once they sign in (Android app → Settings → Connect to Proview Label).':'Sample devices.'}</div><table><thead><tr><th>Device</th><th>Location</th><th>Battery</th><th>Labels left</th><th>App</th><th>Last sync</th></tr></thead><tbody>${ds.map(d=>`<tr><td><b>${esc(d.name)}</b><div class="hint">${esc(d.id)}</div></td><td>${esc(siteName(d.siteId))}</td><td>${d.battery!=null?d.battery+'%':'—'}</td><td>${d.labelsLeft<60?`<span class="tag bad">${d.labelsLeft} – low</span>`:d.labelsLeft}</td><td>v${esc(d.version||'')}</td><td>${d.lastSync?P.fmtDate(d.lastSync,true):'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No devices connected yet.</td></tr>'}</tbody></table></div>`;
+  const siteForm=(s,orgId)=>{ const isNew=!s; s=s||{id:'site_'+P.uid(''),orgId,name:'',address:'',region:''}; const m=modal((isNew?'Add location':'Edit location')+' · '+orgName(s.orgId),`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(s.name)}"></div><div class="fld"><label>Address</label><input class="inp" id="a" value="${esc(s.address||'')}"></div><div class="fld"><label>Area</label><input class="inp" id="g" value="${esc(s.region||'')}" placeholder="e.g. North London"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
     m.querySelector('#sv').onclick=()=>{ s.name=m.querySelector('#n').value.trim(); s.address=m.querySelector('#a').value.trim(); s.region=m.querySelector('#g').value.trim(); if(!s.name) return toast('Enter a name'); P.upsert('sites',s); audit(isNew?'created':'updated','Site',s.name,s.orgId); closeModal(); render(); }; };
-  if(canAddSite) el.querySelector('#addS').onclick=()=>withOrg(o=>{ if(!['master','owner','admin'].includes(orgRole(o))) return toast('Only an owner or admin can add sites.'); siteForm(null,o); });
+  if(canAddSite) el.querySelector('#addS').onclick=()=>withOrg(o=>{ if(!['master','owner','admin'].includes(orgRole(o))) return toast('Only an owner or admin can add locations.'); siteForm(null,o); });
   el.querySelectorAll('[data-es]').forEach(b=>b.onclick=()=>siteForm({...P.byId('sites',b.dataset.es)}));
   el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ setSite(b.dataset.open); location.hash='overview'; });
   el.querySelectorAll('[data-openorg]').forEach(b=>b.onclick=()=>{ setSite('org:'+b.dataset.openorg); location.hash='overview'; });
@@ -2063,18 +2131,18 @@ VIEWS.users=(el)=>{
   const roleTag=(r)=>`<span class="tag ${r==='owner'?'pur':r==='admin'?'blue':'mute'}">${r==='owner'?'Owner':P.ROLES[r]||r}</span>`;
   el.innerHTML=`<div class="ph"><div><h1>Users & permissions</h1><p>Back-office logins use email (or “Sign in with Proview account”). Kitchen staff use a 4-digit PIN on the device.</p></div><div class="btns">${canLogins?'<button class="btn ghost" id="addL">+ Back-office login</button>':''}<button class="btn" id="addU">+ Device staff</button></div></div>
   <div class="cols"><div>
-    <div class="card"><h3>Back-office logins</h3><div class="sub">People who can sign in here. Managers only see their own sites.</div><div id="logins"><div class="hint">Loading…</div></div></div>
+    <div class="card"><h3>Back-office logins</h3><div class="sub">People who can sign in here. Managers only see their own locations.</div><div id="logins"><div class="hint">Loading…</div></div></div>
     <div class="card"><h3>Device staff</h3><div class="sub">Sign in on the handheld with a PIN. They print, scan and log wastage; device managers can also edit products.</div>
-      <table><thead><tr><th>Name</th><th>On device</th>${multiOrg()?'<th>Business</th>':''}<th>Sites</th><th>Labels printed</th><th></th></tr></thead><tbody>${staff.map(u=>`<tr><td><div class="row"><div class="av">${esc(P.initials(u.name))}</div><b>${esc(u.name)}</b></div></td><td>${roleTag(u.role)}</td>${multiOrg()?`<td class="hint">${esc(orgName(u.orgId))}</td>`:''}<td>${(u.siteIds||[]).map(siteName).map(esc).join(', ')}</td><td>${P.live('labels').filter(l=>l.userId===u.id).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right"><button class="icbtn" data-ed="${u.id}">✎</button><button class="icbtn" data-del="${u.id}">🗑</button></td></tr>`).join('')||`<tr><td colspan="6" class="empty">No device staff yet.</td></tr>`}</tbody></table></div>
+      <table><thead><tr><th>Name</th><th>On device</th>${multiOrg()?'<th>Business</th>':''}<th>Locations</th><th>Labels printed</th><th></th></tr></thead><tbody>${staff.map(u=>`<tr><td><div class="row"><div class="av">${esc(P.initials(u.name))}</div><b>${esc(u.name)}</b></div></td><td>${roleTag(u.role)}</td>${multiOrg()?`<td class="hint">${esc(orgName(u.orgId))}</td>`:''}<td>${(u.siteIds||[]).map(siteName).map(esc).join(', ')}</td><td>${P.live('labels').filter(l=>l.userId===u.id).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right"><button class="icbtn" data-ed="${u.id}">✎</button><button class="icbtn" data-del="${u.id}">🗑</button></td></tr>`).join('')||`<tr><td colspan="6" class="empty">No device staff yet.</td></tr>`}</tbody></table></div>
   </div>
   <div class="card" style="align-self:start"><h3>Permissions</h3><div class="sub">${org?'Apply to every device at '+esc(orgName(org)):'Pick one business in the picker to change its permissions.'}</div>
     ${[['requirePhoto','Require a photo for wastage','Staff must attach a photo before logging wastage'],['requireApproval','Approve new products','Products added from the menu analyser or devices wait for a manager'],['staffCanEdit','Staff can edit products','Off: only managers can add or change products on devices']].map(([k,t,d])=>`<div class="setrow"><div><b>${t}</b><span class="hint">${d}</span></div><button class="tgl ${st[k]?'on':''}" data-set="${k}" ${org&&['master','owner','admin'].includes(orgRole(org))?'':'disabled style="opacity:.4"'} aria-label="${t}"></button></div>`).join('')}
-    <div class="sub" style="margin-top:12px"><b>Owner/Admin</b> everything in their business · <b>Manager</b> their own sites and the features you switch on, no settings · <b>Master</b> (Proview) every business</div></div></div>`;
+    <div class="sub" style="margin-top:12px"><b>Owner/Admin</b> everything in their business · <b>Manager</b> their own locations and the features you switch on, no settings · <b>Master</b> (Proview) every business</div></div></div>`;
   // logins table (async in cloud mode)
   (async()=>{ const box=el.querySelector('#logins'); let rows=[];
     try{ rows=await Logins.list(orgIds); }catch(e){ box.innerHTML=`<div class="lg-err">${esc(Cloud.friendly(e))}</div>`; return; }
     rows=rows.filter(m=>['master','owner','admin'].includes(orgRole(m.org_id))||m.site_ids.some(id=>allowedSiteIds().includes(id))||m.email===(me().email||''));
-    box.innerHTML=`<table><thead><tr><th>Name</th><th>Role</th>${multiOrg()?'<th>Business</th>':''}<th>Sites</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(m=>`<tr><td><b>${esc(m.name||m.email)}</b><div class="hint">${esc(m.email)}</div></td><td>${roleTag(m.role)}</td>${multiOrg()?`<td class="hint">${esc(orgName(m.org_id))}</td>`:''}<td>${m.role==='manager'?(m.site_ids||[]).map(siteName).map(esc).join(', ')||'<span class="hint">None yet</span>':'<span class="hint">All sites</span>'}${m.role==='manager'?(()=>{ const off=FEATURES.filter(([k])=>((m.features||{})[k])===false); return `<div class="hint">${off.length?'No access to: '+off.map(([,l])=>esc(l.split(',')[0])).join(', '):'All features'}</div>`; })():''}</td><td>${m.active?'<span class="tag ok">Active</span>':'<span class="tag warn">Invited</span>'}</td><td style="text-align:right">${['master','owner','admin'].includes(orgRole(m.org_id))?`<button class="icbtn" data-em="${m.id}">✎</button><button class="icbtn" data-dm="${m.id}">🗑</button>`:''}</td></tr>`).join('')||`<tr><td colspan="6" class="empty">No logins yet.</td></tr>`}</tbody></table>`;
+    box.innerHTML=`<table><thead><tr><th>Name</th><th>Role</th>${multiOrg()?'<th>Business</th>':''}<th>Locations</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(m=>`<tr><td><b>${esc(m.name||m.email)}</b><div class="hint">${esc(m.email)}</div></td><td>${roleTag(m.role)}</td>${multiOrg()?`<td class="hint">${esc(orgName(m.org_id))}</td>`:''}<td>${m.role==='manager'?(m.site_ids||[]).map(siteName).map(esc).join(', ')||'<span class="hint">None yet</span>':'<span class="hint">All locations</span>'}${m.role==='manager'?(()=>{ const off=FEATURES.filter(([k])=>((m.features||{})[k])===false); return `<div class="hint">${off.length?'No access to: '+off.map(([,l])=>esc(l.split(',')[0])).join(', '):'All features'}</div>`; })():''}</td><td>${m.active?'<span class="tag ok">Active</span>':'<span class="tag warn">Invited</span>'}</td><td style="text-align:right">${['master','owner','admin'].includes(orgRole(m.org_id))?`<button class="icbtn" data-em="${m.id}">✎</button><button class="icbtn" data-dm="${m.id}">🗑</button>`:''}</td></tr>`).join('')||`<tr><td colspan="6" class="empty">No logins yet.</td></tr>`}</tbody></table>`;
     box.querySelectorAll('[data-em]').forEach(b=>b.onclick=()=>loginForm(rows.find(x=>x.id===b.dataset.em)));
     box.querySelectorAll('[data-dm]').forEach(b=>b.onclick=()=>{ const m=rows.find(x=>x.id===b.dataset.dm); confirmM('Remove '+(m.name||m.email)+'?','They will no longer be able to sign in to Proview Label for '+orgName(m.org_id)+'.','Remove',async()=>{ try{ await Logins.remove(m); audit('deleted','Login',m.email,m.org_id); render(); }catch(e){ toast(Cloud.friendly(e)); } }); });
   })();
@@ -2082,7 +2150,7 @@ VIEWS.users=(el)=>{
     const roles=[['owner','Owner'],['admin','Admin'],['manager','Manager']].filter(([k])=>k!=='owner'||['master','owner'].includes(orgRole(m.org_id)));
     const md=modal((isNew?'Add back-office login':'Edit login')+' · '+orgName(m.org_id),`<div class="g2"><div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(m.name)}"></div><div class="fld"><label>Email</label><input class="inp" id="e" type="email" value="${esc(m.email)}" ${isNew?'':'disabled'}></div></div>
       <div class="fld"><label>Role</label><select class="inp" id="r">${roles.map(([k,v])=>`<option value="${k}" ${m.role===k?'selected':''}>${v}</option>`).join('')}</select></div>
-      <div id="sb"><div class="lb">Sites this manager can see</div><div class="algrid" id="sitesG">${sites.map(x=>`<label class="${(m.site_ids||[]).includes(x.id)?'on':''}"><input type="checkbox" value="${x.id}" ${(m.site_ids||[]).includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join('')||'<span class="hint">Add a site first.</span>'}</div>
+      <div id="sb"><div class="lb">Locations they can use</div><div class="algrid" id="sitesG">${sites.map(x=>`<label class="${(m.site_ids||[]).includes(x.id)?'on':''}"><input type="checkbox" value="${x.id}" ${(m.site_ids||[]).includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join('')||'<span class="hint">Add a location first.</span>'}</div>
         <div class="lb" style="margin-top:14px">What this manager can use</div><div class="algrid" id="featG">${FEATURES.map(([k,l])=>{ const on=((m.features||{})[k])!==false; return `<label class="${on?'on':''}"><input type="checkbox" data-f="${k}" ${on?'checked':''}>${esc(l)}</label>`; }).join('')}</div>
         <p class="hint">Owners and admins always have every feature. Settings is owner/admin only.</p></div>
       ${isNew?'<p class="hint" style="margin-top:12px">They sign in at label.proviewcrm.co.uk with “Sign in with Proview account” (same login as your other Proview apps), or “Create a login” with this email.</p>':''}`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">${isNew?'Add login':'Save'}</button>`);
@@ -2090,15 +2158,15 @@ VIEWS.users=(el)=>{
     md.querySelectorAll('.algrid input').forEach(cb=>cb.onchange=()=>cb.parentElement.classList.toggle('on',cb.checked));
     md.querySelector('#sv').onclick=async()=>{ const e=md.querySelector('#e').value.trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return toast('Enter a valid email');
       const rec={...m,email:e,name:md.querySelector('#n').value.trim(),role:md.querySelector('#r').value,site_ids:[...md.querySelectorAll('#sitesG input:checked')].map(x=>x.value),features:Object.fromEntries([...md.querySelectorAll('#featG input')].map(x=>[x.dataset.f,x.checked]))};
-      if(rec.role==='manager'&&!rec.site_ids.length) return toast('Pick at least one site for a manager');
+      if(rec.role==='manager'&&!rec.site_ids.length) return toast('Pick at least one location for a manager');
       try{ await Logins.save(rec); audit(isNew?'created':'updated','Login',e+' ('+rec.role+')',rec.org_id); closeModal(); toast(isNew?'Login added':'Saved'); render(); }catch(ex){ toast(Cloud.friendly?Cloud.friendly(ex):ex.message); } }; };
   const staffForm=(u,orgId)=>{ const isNew=!u; u=u||{id:P.uid('u_'),orgId,name:'',role:'staff',pin:'',siteIds:allowedSiteIds().filter(id=>(P.byId('sites',id)||{}).orgId===orgId&&(siteFilter===id||!P.byId('sites',siteFilter))).slice(0,1)};
     const sites=P.live('sites').filter(x=>x.orgId===u.orgId&&allowedSiteIds().includes(x.id));
-    const md=modal((isNew?'Add device staff':'Edit device staff')+(multiOrg()||isMaster()?' · '+orgName(u.orgId):''),`<div class="g2"><div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(u.name)}"></div><div class="fld"><label>4-digit PIN</label><input class="inp" id="p" value="${esc(u.pin)}" maxlength="4" inputmode="numeric"></div></div><div class="fld"><label>On the device</label><select class="inp" id="r"><option value="staff">Staff</option><option value="manager" ${u.role==='manager'?'selected':''}>Manager (can edit products)</option></select></div><div class="lb">Sites</div><div class="algrid">${sites.map(x=>`<label class="${(u.siteIds||[]).includes(x.id)?'on':''}"><input type="checkbox" value="${x.id}" ${(u.siteIds||[]).includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join('')}</div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
+    const md=modal((isNew?'Add device staff':'Edit device staff')+(multiOrg()||isMaster()?' · '+orgName(u.orgId):''),`<div class="g2"><div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(u.name)}"></div><div class="fld"><label>4-digit PIN</label><input class="inp" id="p" value="${esc(u.pin)}" maxlength="4" inputmode="numeric"></div></div><div class="fld"><label>On the device</label><select class="inp" id="r"><option value="staff">Staff</option><option value="manager" ${u.role==='manager'?'selected':''}>Manager (can edit products)</option></select></div><div class="lb">Locations they can use</div><div class="algrid">${sites.map(x=>`<label class="${(u.siteIds||[]).includes(x.id)?'on':''}"><input type="checkbox" value="${x.id}" ${(u.siteIds||[]).includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join('')}</div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
     md.querySelectorAll('.algrid input').forEach(cb=>cb.onchange=()=>cb.parentElement.classList.toggle('on',cb.checked));
     md.querySelector('#sv').onclick=()=>{ u.name=md.querySelector('#n').value.trim(); u.pin=md.querySelector('#p').value.trim(); u.role=md.querySelector('#r').value; u.siteIds=[...md.querySelectorAll('.algrid input:checked')].map(x=>x.value);
-      if(!u.name) return toast('Enter a name'); if(!/^\d{4}$/.test(u.pin)) return toast('PIN must be 4 digits'); if(!u.siteIds.length) return toast('Pick at least one site');
-      if(P.live('users').some(x=>x.id!==u.id&&x.pin===u.pin&&x.orgId===u.orgId&&(x.siteIds||[]).some(id=>u.siteIds.includes(id)))) return toast('Someone at that site already uses this PIN');
+      if(!u.name) return toast('Enter a name'); if(!/^\d{4}$/.test(u.pin)) return toast('PIN must be 4 digits'); if(!u.siteIds.length) return toast('Pick at least one location');
+      if(P.live('users').some(x=>x.id!==u.id&&x.pin===u.pin&&x.orgId===u.orgId&&(x.siteIds||[]).some(id=>u.siteIds.includes(id)))) return toast('Someone at that location already uses this PIN');
       P.upsert('users',u); audit(isNew?'created':'updated','Device staff',u.name,u.orgId); closeModal(); render(); }; };
   const al=el.querySelector('#addL'); if(al) al.onclick=()=>withOrg(o=>{ if(!['master','owner','admin'].includes(orgRole(o))) return toast('Only an owner or admin can add logins.'); loginForm(null,o); });
   el.querySelector('#addU').onclick=()=>withOrg(o=>staffForm(null,o));
@@ -2118,9 +2186,9 @@ VIEWS.settings=(el)=>{
     <div class="card"><h3>Cloud</h3>
       ${CLOUD?`<div class="sub">Connected to the Proview Label server (London). Devices and this back-office stay in step automatically.</div>
         <div class="setrow"><div><b>Last sync</b><span class="hint">${sy.lastSync?P.fmtDate(sy.lastSync,true):'Not yet'} · checks every minute and after every change</span></div><button class="btn sm" id="sn">Sync now</button></div>
-        <div class="setrow"><div><b>Connect a handheld</b><span class="hint">On the device: Menu → Settings → Connect to Proview Label, then sign in with a back-office login and pick the site.</span></div></div>`
+        <div class="setrow"><div><b>Connect a handheld</b><span class="hint">On the device: Menu → Settings → Connect to Proview Label, then sign in with a back-office login and pick the location.</span></div></div>`
       :`<div class="sub">This preview runs on sample data saved in this browser. The hosted back-office (label.proviewcrm.co.uk) uses live accounts and syncs with every device.</div>
-        <div class="setrow"><div><b>Sample data</b><span class="hint">Put back the demo businesses, sites, products and 14 days of activity.</span></div><button class="btn red sm" id="rst">Reset demo data</button></div>`}
+        <div class="setrow"><div><b>Sample data</b><span class="hint">Put back the demo businesses, locations, products and 14 days of activity.</span></div><button class="btn red sm" id="rst">Reset demo data</button></div>`}
     </div></div>`;
   const chg=el.querySelector('#chg'); if(chg) chg.onclick=()=>{ const m=modal('Change password',`<div class="fld"><label>New password</label><input class="inp" id="a" type="password" autocomplete="new-password"></div><div class="fld"><label>Confirm</label><input class="inp" id="b" type="password" autocomplete="new-password"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
     m.querySelector('#sv').onclick=async()=>{ const a=m.querySelector('#a').value; if(a.length<8) return toast('Use at least 8 characters'); if(a!==m.querySelector('#b').value) return toast('The passwords don’t match'); try{ await Cloud.setPassword(a); closeModal(); toast('Password changed'); }catch(e){ toast(Cloud.friendly(e)); } }; };

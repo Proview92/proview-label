@@ -23,7 +23,7 @@ Food labelling for UK kitchens, part of the Proview CRM family (Bookings, Employ
   3. Proview Label's `sso-login` function (`supabase/functions/sso-login`) checks the token and signs them in.
 
 ### Adding a customer
-1. As master: **Sites & devices → + Add business**. Enter the name, plus the owner's name and email.
+1. As master: **Locations → + Add business**. Enter the name, plus the owner's name and email.
 2. The owner signs in, either with "Sign in with Proview account" or "Create a login" using that email. They add their sites, menu, back-office logins and device staff.
 3. On each handheld: **Menu → Settings → Connect to Proview Label**. Sign in with a back-office login, pick the site, then set your own name and PIN. Products, staff and settings come down to the device. Labels, expiry and wastage go up to the server.
 
