@@ -9,7 +9,7 @@ const jsb = R('node_modules/jsbarcode/dist/barcodes/JsBarcode.code128.min.js');
 const supa = R('node_modules/@supabase/supabase-js/dist/umd/supabase.js');
 const CONFIG = { SUPABASE_URL: 'https://fiqoirnlmhjzicvktdwa.supabase.co', SUPABASE_KEY: 'sb_publishable_j7p5qB-D6FMOV4B6zLiN_w_7xmfKLRM' };
 const uri = (f) => 'data:image/png;base64,' + fs.readFileSync(__dirname + '/assets/' + f).toString('base64');
-const assets = { '%%LOGO%%': uri('logo.png'), '%%LOGO_WHITE%%': uri('logo-white.png'), '%%MARK_SM%%': uri('mark-sm.png'), '%%MARK_LG%%': uri('mark-lg.png'), '%%MARK%%': uri('mark.png') };
+const assets = { '%%LOGO%%': uri('logo.png'), '%%LOGO_WHITE%%': uri('logo-white.png'), '%%MARK_SM%%': uri('mark-sm.png'), '%%MARK_LG%%': uri('mark-lg.png'), '%%MARK%%': uri('mark.png'), '%%APP_ICON%%': uri('app-icon.png') };
 const js = (code) => '<script>\n' + code.replace(/<\/script/gi, '<\\/script') + '\n</script>';
 function build(file, live) {
   let h = R('src/' + file);
