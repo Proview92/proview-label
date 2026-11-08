@@ -763,7 +763,7 @@ pre{background:#141418;color:#d6dcf5;padding:14px;border-radius:10px;overflow:au
     async saveOrgSettings(id, settings) { const { error } = await sb.from('pl_orgs').update({ settings }).eq('id', id); if (error) throw error; },
     async members(orgIds) { let q = sb.from('pl_members').select('*').order('name'); if (orgIds) q = q.in('org_id', orgIds); const { data, error } = await q; if (error) throw error; return data || []; },
     async saveMember(m) {
-      const row = { org_id: m.org_id, email: String(m.email || '').trim().toLowerCase(), name: m.name || '', role: m.role, site_ids: m.site_ids || [] };
+      const row = { org_id: m.org_id, email: String(m.email || '').trim().toLowerCase(), name: m.name || '', role: m.role, site_ids: m.site_ids || [], features: m.role === 'manager' ? (m.features || {}) : {} };
       const q = m.id ? sb.from('pl_members').update(row).eq('id', m.id) : sb.from('pl_members').insert(row);
       const { error } = await q; if (error) throw new Error(/duplicate/i.test(error.message) ? 'That email already has a login for this business.' : error.message);
     },
@@ -859,7 +859,14 @@ const ICON={
   pin:'<path d="M12 21s-7-6.1-7-11a7 7 0 1 1 14 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>'
 };
 const ic=(k,s)=>`<svg width="${s||17}" height="${s||17}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICON[k]||''}</svg>`;
-function canView(k){ const u=me(); if(!u) return false; if(u.role==='manager') return !['settings'].includes(k); return true; }
+// Feature switches for managers (owners/admins always have everything). Keep keys in step with supabase/migrations/002.
+const FEATURES=[['expiry','Expiry log'],['printlog','Print log'],['wastage','Wastage'],['products','Products, categories, allergens & menu analyser'],['rules','Expiry rules'],['orders','Label orders'],['devices','Sites & devices'],['users','Device staff (add, edit, remove)'],['history','Amendment history']];
+const VIEW_FEATURE={expiry:'expiry',printlog:'printlog',wastage:'wastage',products:'products',categories:'products',matrix:'products',analyser:'products',rules:'rules',orders:'orders',devices:'devices',users:'users',history:'history'};
+// true if the signed-in manager has this feature in at least one business they can see (missing key = on)
+function hasFeature(f){ const u=me(); if(!u) return false; if(u.role!=='manager') return true;
+  if(CLOUD){ return (WHO.orgs||[]).filter(o=>o.role==='manager').some(o=>((o.features||{})[f])!==false); }
+  return ((u.features||{})[f])!==false; }
+function canView(k){ const u=me(); if(!u) return false; if(u.role==='manager'){ if(k==='settings') return false; const f=VIEW_FEATURE[k]; return !f||hasFeature(f); } return true; }
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2400);}
 // records tied to a site (labels, wastage, orders, devices) follow the picker; others follow the business
 const bySite=(arr)=>{ const a=allowedSiteIds(), orgs=scopeOrgIds();
@@ -1331,10 +1338,10 @@ VIEWS.devices=(el)=>{
 // ----- back-office logins: pl_members in the cloud, demo users with an email in the demo -----
 const Logins={
   async list(orgIds){ if(CLOUD) return (await Cloud.members(orgIds)).map(m=>({...m,active:!!m.user_id}));
-    return P.live('users').filter(u=>u.email&&u.role!=='master'&&orgIds.includes(u.orgId)).map(u=>({id:u.id,org_id:u.orgId,email:u.email,name:u.name,role:u.role==='admin'?'admin':u.role,site_ids:u.siteIds||[],active:true,_demo:true})); },
+    return P.live('users').filter(u=>u.email&&u.role!=='master'&&orgIds.includes(u.orgId)).map(u=>({id:u.id,org_id:u.orgId,email:u.email,name:u.name,role:u.role==='admin'?'admin':u.role,site_ids:u.siteIds||[],features:u.features||{},active:true,_demo:true})); },
   async save(m){ if(CLOUD) return Cloud.saveMember(m);
     const u=m.id?P.byId('users',m.id):{id:P.uid('u_'),pin:String(1000+Math.floor(Math.random()*9000)),password:'demo'};
-    P.upsert('users',{...u,orgId:m.org_id,name:m.name,email:m.email,role:m.role==='owner'?'admin':m.role,siteIds:m.role==='manager'?m.site_ids:P.live('sites').filter(x=>x.orgId===m.org_id).map(x=>x.id)}); },
+    P.upsert('users',{...u,orgId:m.org_id,name:m.name,email:m.email,features:m.features||{},role:m.role==='owner'?'admin':m.role,siteIds:m.role==='manager'?m.site_ids:P.live('sites').filter(x=>x.orgId===m.org_id).map(x=>x.id)}); },
   async remove(m){ if(CLOUD) return Cloud.removeMember(m.id); P.remove('users',m.id); }
 };
 VIEWS.users=(el)=>{
@@ -1350,12 +1357,12 @@ VIEWS.users=(el)=>{
   </div>
   <div class="card" style="align-self:start"><h3>Permissions</h3><div class="sub">${org?'Apply to every device at '+esc(orgName(org)):'Pick one business in the picker to change its permissions.'}</div>
     ${[['requirePhoto','Require a photo for wastage','Staff must attach a photo before logging wastage'],['requireApproval','Approve new products','Products added from the menu analyser or devices wait for a manager'],['staffCanEdit','Staff can edit products','Off: only managers can add or change products on devices']].map(([k,t,d])=>`<div class="setrow"><div><b>${t}</b><span class="hint">${d}</span></div><button class="tgl ${st[k]?'on':''}" data-set="${k}" ${org&&['master','owner','admin'].includes(orgRole(org))?'':'disabled style="opacity:.4"'} aria-label="${t}"></button></div>`).join('')}
-    <div class="sub" style="margin-top:12px"><b>Owner/Admin</b> everything in their business · <b>Manager</b> their own sites, no settings · <b>Master</b> (Proview) every business</div></div></div>`;
+    <div class="sub" style="margin-top:12px"><b>Owner/Admin</b> everything in their business · <b>Manager</b> their own sites and the features you switch on, no settings · <b>Master</b> (Proview) every business</div></div></div>`;
   // logins table (async in cloud mode)
   (async()=>{ const box=el.querySelector('#logins'); let rows=[];
     try{ rows=await Logins.list(orgIds); }catch(e){ box.innerHTML=`<div class="lg-err">${esc(Cloud.friendly(e))}</div>`; return; }
     rows=rows.filter(m=>['master','owner','admin'].includes(orgRole(m.org_id))||m.site_ids.some(id=>allowedSiteIds().includes(id))||m.email===(me().email||''));
-    box.innerHTML=`<table><thead><tr><th>Name</th><th>Role</th>${multiOrg()?'<th>Business</th>':''}<th>Sites</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(m=>`<tr><td><b>${esc(m.name||m.email)}</b><div class="hint">${esc(m.email)}</div></td><td>${roleTag(m.role)}</td>${multiOrg()?`<td class="hint">${esc(orgName(m.org_id))}</td>`:''}<td>${m.role==='manager'?(m.site_ids||[]).map(siteName).map(esc).join(', ')||'<span class="hint">None yet</span>':'<span class="hint">All sites</span>'}</td><td>${m.active?'<span class="tag ok">Active</span>':'<span class="tag warn">Invited</span>'}</td><td style="text-align:right">${['master','owner','admin'].includes(orgRole(m.org_id))?`<button class="icbtn" data-em="${m.id}">✎</button><button class="icbtn" data-dm="${m.id}">🗑</button>`:''}</td></tr>`).join('')||`<tr><td colspan="6" class="empty">No logins yet.</td></tr>`}</tbody></table>`;
+    box.innerHTML=`<table><thead><tr><th>Name</th><th>Role</th>${multiOrg()?'<th>Business</th>':''}<th>Sites</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(m=>`<tr><td><b>${esc(m.name||m.email)}</b><div class="hint">${esc(m.email)}</div></td><td>${roleTag(m.role)}</td>${multiOrg()?`<td class="hint">${esc(orgName(m.org_id))}</td>`:''}<td>${m.role==='manager'?(m.site_ids||[]).map(siteName).map(esc).join(', ')||'<span class="hint">None yet</span>':'<span class="hint">All sites</span>'}${m.role==='manager'?(()=>{ const off=FEATURES.filter(([k])=>((m.features||{})[k])===false); return `<div class="hint">${off.length?'No access to: '+off.map(([,l])=>esc(l.split(',')[0])).join(', '):'All features'}</div>`; })():''}</td><td>${m.active?'<span class="tag ok">Active</span>':'<span class="tag warn">Invited</span>'}</td><td style="text-align:right">${['master','owner','admin'].includes(orgRole(m.org_id))?`<button class="icbtn" data-em="${m.id}">✎</button><button class="icbtn" data-dm="${m.id}">🗑</button>`:''}</td></tr>`).join('')||`<tr><td colspan="6" class="empty">No logins yet.</td></tr>`}</tbody></table>`;
     box.querySelectorAll('[data-em]').forEach(b=>b.onclick=()=>loginForm(rows.find(x=>x.id===b.dataset.em)));
     box.querySelectorAll('[data-dm]').forEach(b=>b.onclick=()=>{ const m=rows.find(x=>x.id===b.dataset.dm); confirmM('Remove '+(m.name||m.email)+'?','They will no longer be able to sign in to Proview Label for '+orgName(m.org_id)+'.','Remove',async()=>{ try{ await Logins.remove(m); audit('deleted','Login',m.email,m.org_id); render(); }catch(e){ toast(Cloud.friendly(e)); } }); });
   })();
@@ -1363,12 +1370,14 @@ VIEWS.users=(el)=>{
     const roles=[['owner','Owner'],['admin','Admin'],['manager','Manager']].filter(([k])=>k!=='owner'||['master','owner'].includes(orgRole(m.org_id)));
     const md=modal((isNew?'Add back-office login':'Edit login')+' · '+orgName(m.org_id),`<div class="g2"><div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(m.name)}"></div><div class="fld"><label>Email</label><input class="inp" id="e" type="email" value="${esc(m.email)}" ${isNew?'':'disabled'}></div></div>
       <div class="fld"><label>Role</label><select class="inp" id="r">${roles.map(([k,v])=>`<option value="${k}" ${m.role===k?'selected':''}>${v}</option>`).join('')}</select></div>
-      <div id="sb"><div class="lb">Sites this manager can see</div><div class="algrid">${sites.map(x=>`<label class="${(m.site_ids||[]).includes(x.id)?'on':''}"><input type="checkbox" value="${x.id}" ${(m.site_ids||[]).includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join('')||'<span class="hint">Add a site first.</span>'}</div></div>
+      <div id="sb"><div class="lb">Sites this manager can see</div><div class="algrid" id="sitesG">${sites.map(x=>`<label class="${(m.site_ids||[]).includes(x.id)?'on':''}"><input type="checkbox" value="${x.id}" ${(m.site_ids||[]).includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join('')||'<span class="hint">Add a site first.</span>'}</div>
+        <div class="lb" style="margin-top:14px">What this manager can use</div><div class="algrid" id="featG">${FEATURES.map(([k,l])=>{ const on=((m.features||{})[k])!==false; return `<label class="${on?'on':''}"><input type="checkbox" data-f="${k}" ${on?'checked':''}>${esc(l)}</label>`; }).join('')}</div>
+        <p class="hint">Owners and admins always have every feature. Settings is owner/admin only.</p></div>
       ${isNew?'<p class="hint" style="margin-top:12px">They sign in at label.proviewcrm.co.uk with “Sign in with Proview account” (same login as your other Proview apps), or “Create a login” with this email.</p>':''}`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">${isNew?'Add login':'Save'}</button>`);
     const sync=()=>md.querySelector('#sb').style.display=md.querySelector('#r').value==='manager'?'':'none'; sync(); md.querySelector('#r').onchange=sync;
     md.querySelectorAll('.algrid input').forEach(cb=>cb.onchange=()=>cb.parentElement.classList.toggle('on',cb.checked));
     md.querySelector('#sv').onclick=async()=>{ const e=md.querySelector('#e').value.trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return toast('Enter a valid email');
-      const rec={...m,email:e,name:md.querySelector('#n').value.trim(),role:md.querySelector('#r').value,site_ids:[...md.querySelectorAll('.algrid input:checked')].map(x=>x.value)};
+      const rec={...m,email:e,name:md.querySelector('#n').value.trim(),role:md.querySelector('#r').value,site_ids:[...md.querySelectorAll('#sitesG input:checked')].map(x=>x.value),features:Object.fromEntries([...md.querySelectorAll('#featG input')].map(x=>[x.dataset.f,x.checked]))};
       if(rec.role==='manager'&&!rec.site_ids.length) return toast('Pick at least one site for a manager');
       try{ await Logins.save(rec); audit(isNew?'created':'updated','Login',e+' ('+rec.role+')',rec.org_id); closeModal(); toast(isNew?'Login added':'Saved'); render(); }catch(ex){ toast(Cloud.friendly?Cloud.friendly(ex):ex.message); } }; };
   const staffForm=(u,orgId)=>{ const isNew=!u; u=u||{id:P.uid('u_'),orgId,name:'',role:'staff',pin:'',siteIds:allowedSiteIds().filter(id=>(P.byId('sites',id)||{}).orgId===orgId&&(siteFilter===id||!P.byId('sites',siteFilter))).slice(0,1)};

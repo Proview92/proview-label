@@ -61,7 +61,7 @@
     async saveOrgSettings(id, settings) { const { error } = await sb.from('pl_orgs').update({ settings }).eq('id', id); if (error) throw error; },
     async members(orgIds) { let q = sb.from('pl_members').select('*').order('name'); if (orgIds) q = q.in('org_id', orgIds); const { data, error } = await q; if (error) throw error; return data || []; },
     async saveMember(m) {
-      const row = { org_id: m.org_id, email: String(m.email || '').trim().toLowerCase(), name: m.name || '', role: m.role, site_ids: m.site_ids || [] };
+      const row = { org_id: m.org_id, email: String(m.email || '').trim().toLowerCase(), name: m.name || '', role: m.role, site_ids: m.site_ids || [], features: m.role === 'manager' ? (m.features || {}) : {} };
       const q = m.id ? sb.from('pl_members').update(row).eq('id', m.id) : sb.from('pl_members').insert(row);
       const { error } = await q; if (error) throw new Error(/duplicate/i.test(error.message) ? 'That email already has a login for this business.' : error.message);
     },
