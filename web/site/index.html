@@ -37,6 +37,10 @@ a{color:var(--pri)}
 .side .nav a:hover{background:#1f1f25;color:#fff}
 .side .nav a.active{background:#26262e;color:#fff}
 .side .nav a.active svg{color:var(--pri)}
+.side .nav a.off{opacity:.45;cursor:not-allowed}
+.side .nav a.off:hover{background:none;color:#c9c9d1}
+.hdr-pick.pulse select{animation:pvpulse 1s ease-out}
+@keyframes pvpulse{0%{box-shadow:0 0 0 0 rgba(90,141,238,.7)}30%{box-shadow:0 0 0 4px rgba(90,141,238,.55)}100%{box-shadow:0 0 0 0 rgba(90,141,238,0)}}
 .side .nav .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .side .nav .slbl{display:none}
 .side .nav .cnt{margin-left:auto;font-size:11px;line-height:16px;font-weight:600;background:rgba(255,255,255,.12);padding:0 7px;border-radius:10px}
@@ -1227,13 +1231,18 @@ function fixSite(){
   const a=allowedSiteIds(), orgs=visibleOrgs();
   if(siteFilter.startsWith('org:')){ if(!orgs.some(o=>'org:'+o.id===siteFilter)) siteFilter='all'; }
   else if(siteFilter!=='all'&&!a.includes(siteFilter)) siteFilter='all';
-  if(siteFilter==='all'&&a.length===1) siteFilter=a[0];
+  if(siteFilter==='all'&&a.length===1&&!isMaster()) siteFilter=a[0];
   else if(siteFilter==='all'&&orgs.length===1&&a.length>1&&!isMaster()) siteFilter='org:'+orgs[0].id;
 }
-function setSite(id){ siteFilter=id; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),id); render(); }
-function pickSite(id){ if(id==='all'&&isMaster()&&location.hash!=='#sites'){ siteFilter='all'; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),'all'); location.hash='sites'; return; }
-  // stay on the same page if it exists for the new choice; the master All sites page doesn't, so go to its Dashboard
-  if(id!=='all'&&location.hash==='#sites'){ siteFilter=id; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),id); location.hash='overview'; return; }
+const onSitesPage=()=>isMaster()&&(location.hash||'#sites')==='#sites';
+// picking a business or site from the master All sites page opens its Dashboard (All sites is only for "all")
+function setSite(id){ siteFilter=id; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),id); if(id!=='all'&&onSitesPage()){ location.hash='overview'; return; } render(); }
+// Master on All sites (nothing picked): the usual pages are greyed out until a site is chosen in the header dropdown
+const masterAll=()=>isMaster()&&siteFilter==='all';
+function chooseSiteFirst(){ toast('Choose a site in the dropdown first'); const s=$('#sitePick'), w=$('.hdr-pick'); if(s) s.focus();
+  if(w){ w.classList.remove('pulse'); void w.offsetWidth; w.classList.add('pulse'); clearTimeout(w._p); w._p=setTimeout(()=>w.classList.remove('pulse'),1000); } }
+function goPage(k){ if(masterAll()&&k!=='sites') return chooseSiteFirst(); location.hash=k; }
+function pickSite(id){ if(id==='all'&&isMaster()&&!onSitesPage()){ siteFilter='all'; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),'all'); location.hash='sites'; return; }
   setSite(id); }
 // A business must be chosen before creating catalogue items, sites or staff
 function withOrg(cb){
@@ -1294,6 +1303,7 @@ const siteName=(id)=>(P.byId('sites',id)||{}).name||'—';
 const userName=(id)=>(P.byId('users',id)||{}).name||'—';
 const catOf=(p)=>P.byId('categories',p.categoryId)||{};
 function route(){ const h=(location.hash||(isMaster()?'#sites':'#overview')).slice(1); const r=VIEWS[h]&&canView(h)?h:'overview';
+  if(masterAll()) return 'sites';
   if(r==='overview'&&isMaster()&&(!visibleOrgs().length||(siteFilter==='all'&&!allowedSiteIds().length))) return 'sites';
   return r; }
 
@@ -1342,10 +1352,12 @@ function render(){
   if(CLOUD&&TRIAL_SETUP&&!WHO) return renderTrialSetup();
   if(!me()){ if(window.PVHub) PVHub.close(); return renderLogin(); }
   fixSite();
-  const r=route(); const u=me();
+  if(onSitesPage()&&siteFilter!=='all'){ siteFilter='all'; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),'all'); }
+  const r=route(); const u=me(); const off=masterAll();
   const badge={expiry:expiredCount(),orders:bySite(P.live('orders')).filter(o=>o.status==='pending').length,products:byOrg(P.live('products')).filter(p=>p.approved===false).length};
   const title=(NAV.flatMap(([,i])=>i).find(x=>x[0]===r)||[])[1]||'Dashboard';
-  const link=([k,l,i])=>`<a href="#${k}" class="${r===k?'active':''}" title="${esc(l)}" aria-label="${esc(l)}">${ic(i)}<span class="lbl">${esc(l)}</span><span class="slbl">${esc(SHORT[k]||l)}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`;
+  const link=([k,l,i])=>off&&k!=='sites'?`<a class="off" role="link" tabindex="0" aria-disabled="true" data-off="${k}" title="${esc(l)} – choose a site first" aria-label="${esc(l)} – choose a site first">${ic(i)}<span class="lbl">${esc(l)}</span><span class="slbl">${esc(SHORT[k]||l)}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`
+    :`<a href="#${k}" class="${r===k?'active':''}" title="${esc(l)}" aria-label="${esc(l)}">${ic(i)}<span class="lbl">${esc(l)}</span><span class="slbl">${esc(SHORT[k]||l)}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`;
   const col=sideCollapsed();
   $('#app').innerHTML=`<div class="app${col?' collapsed':''}">
     <aside class="side">
@@ -1365,6 +1377,7 @@ function render(){
   const tbn=trialBanner(); if(tbn&&r!=='sites') $('#main').insertAdjacentHTML('afterbegin',tbn);
   const sp=$('#sitePick'); if(sp&&!sp.disabled) sp.onchange=e=>pickSite(e.target.value);
   $('#sfCollapse').onclick=toggleSide;
+  document.querySelectorAll('.side .nav a.off').forEach(a=>{ a.onclick=(e)=>{ e.preventDefault(); chooseSiteFirst(); }; a.onkeydown=(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); chooseSiteFirst(); } }; });
   $('#tbOut').onclick=()=>signOut();
   $('#tbMe').onclick=()=>{ const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open every business and site from All sites or the site picker.':'You can see '+allowedSiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
     m.querySelector('#mo').onclick=()=>{closeModal();signOut();}; m.querySelector('#msync').onclick=()=>{closeModal();doSync(false);}; };
@@ -1413,7 +1426,7 @@ function inboxItems(){ if(!me()) return []; const out=[];
   return out; }
 // Search (Ctrl+K): pages, sites, products, categories and device staff
 function searchItems(q){ if(!me()) return []; const out=[]; const has=(x)=>String(x||'').toLowerCase().includes(q);
-  NAV.flatMap(([,i])=>i).filter(([k,l])=>canView(k)&&(!q||has(l)||has(SHORT[k]))).forEach(([k,l])=>out.push({group:'Pages',icon:'page',label:l,run:()=>{ location.hash=k; }}));
+  NAV.flatMap(([,i])=>i).filter(([k,l])=>canView(k)&&(!q||has(l)||has(SHORT[k]))).forEach(([k,l])=>out.push({group:'Pages',icon:'page',label:l,run:()=>goPage(k)}));
   if(!q) return out;
   P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(has(x.name)||has(x.address))).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,8).forEach(x=>out.push({group:'Sites',icon:ICON.pin,label:x.name,hint:[orgName(x.orgId),x.address].filter(Boolean).join(' · '),run:()=>{ setSite(x.id); if(location.hash==='#sites'||!canView((location.hash||'').slice(1))) location.hash='overview'; }}));
   if(canView('products')){ byOrg(P.live('products')).filter(p=>has(p.name)||has(p.barcode)).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,8).forEach(p=>out.push({group:'Products',icon:ICON.tag,label:p.name,hint:(catOf(p).name||'')+(p.approved===false?' · awaiting approval':''),run:()=>{ location.hash='products'; }}));
