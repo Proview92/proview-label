@@ -709,7 +709,51 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
   // ---------- Sync (Supabase REST / PostgREST, table pl_records) ----------
   // opts: { url, key, token }  token = the signed-in user's access token (row-level security decides
   // what they can read and write). Records carry orgId (+ siteId for site data).
+  // One business per request: changes are sent per business, each request naming it (x-pl-org header).
+  // opts.scoped (the Proview master): pull only the All sites list (sites + devices of every business) and,
+  // when a business is open (opts.org), that one business's data. Other businesses' data is dropped locally.
+  const LIST_KINDS = ['sites', 'devices'];
   const siteOf = (kind, r) => (kind === 'sites' ? r.id : (r.siteId || null));
+  // The master's pull: the All sites list (sites + devices of every business) plus the open business, if any.
+  async function pullScoped(s, base, headers, org, full) {
+    const by = s.settings.sync.lastSyncBy = s.settings.sync.lastSyncBy || {};
+    const parts = [{ key: '*', q: '&kind=in.(' + LIST_KINDS.join(',') + ')', h: {} }];
+    if (org) parts.push({ key: org, q: '&org_id=eq.' + encodeURIComponent(org), h: { 'x-pl-org': org } });
+    let pulled = 0, dropped = 0;
+    for (const part of parts) {
+      const started = new Date(Date.now() - 5000).toISOString(), since = by[part.key] || '1970-01-01T00:00:00Z';
+      for (let offset = 0; ; offset += 1000) {
+        const res = await fetch(base + '?select=id,kind,org_id,data,deleted,updated_at&updated_at=gt.' + encodeURIComponent(since) + part.q + '&order=updated_at.asc,id.asc&limit=1000&offset=' + offset, { headers: { ...headers, ...part.h } });
+        if (!res.ok) throw new Error('Couldn’t load from the server (' + res.status + ').');
+        const rows = await res.json();
+        rows.forEach((row) => {
+          const coll = s[row.kind]; if (!coll) return;
+          const i = coll.findIndex((x) => x.id === row.id);
+          const rec = { ...row.data, orgId: row.org_id, deleted: row.deleted, _dirty: false };
+          if (i < 0) { coll.push(rec); pulled++; } else if (!coll[i]._dirty) { coll[i] = rec; pulled++; }
+        });
+        if (rows.length < 1000) break;
+      }
+      if (full) { // drop clean cached records of this part the server no longer returns
+        const seen = new Set();
+        for (let off = 0; ; off += 1000) {
+          const r3 = await fetch(base + '?select=id' + part.q + '&order=id.asc&limit=1000&offset=' + off, { headers: { ...headers, ...part.h } });
+          if (!r3.ok) throw new Error('Couldn’t load from the server (' + r3.status + ').');
+          const ids = await r3.json(); ids.forEach((x) => seen.add(x.id));
+          if (ids.length < 1000) break;
+        }
+        COLLECTIONS.forEach((k) => { if (part.key === '*' && !LIST_KINDS.includes(k)) return; const n = s[k].length;
+          s[k] = s[k].filter((r) => r._dirty || !r.orgId || seen.has(r.id) || (part.key !== '*' && r.orgId !== part.key)); dropped += n - s[k].length; });
+      }
+      by[part.key] = started;
+    }
+    // keep nothing of other businesses but the All sites list (unsent changes stay until they're sent)
+    const gone = new Set();
+    COLLECTIONS.forEach((k) => { if (LIST_KINDS.includes(k)) return; const n = s[k].length;
+      s[k] = s[k].filter((r) => { const keep = r._dirty || !r.orgId || r.orgId === org; if (!keep) gone.add(r.orgId); return keep; }); dropped += n - s[k].length; });
+    gone.forEach((id) => { delete by[id]; });
+    return { pulled, dropped };
+  }
   async function sync(opts) {
     const s = get();
     const o = opts || {};
@@ -726,9 +770,10 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
       const d = { ...r }; delete d._dirty; delete d.password;
       dirty.push({ id: r.id, kind: k, org_id: r.orgId, site_id: siteOf(k, r), data: d, deleted: !!r.deleted });
     }));
-    for (let i = 0; i < dirty.length; i += 200) {
-      const chunk = dirty.slice(i, i + 200);
-      const res = await fetch(base + '?on_conflict=id', { method: 'POST', headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(chunk) });
+    const chunks = [];
+    [...new Set(dirty.map((d) => d.org_id))].forEach((org) => { const rows = dirty.filter((d) => d.org_id === org); for (let i = 0; i < rows.length; i += 200) chunks.push(rows.slice(i, i + 200)); });
+    for (const chunk of chunks) {
+      const res = await fetch(base + '?on_conflict=id', { method: 'POST', headers: { ...headers, 'x-pl-org': chunk[0].org_id, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(chunk) });
       if (!res.ok) {
         const t = (await res.text()).slice(0, 300);
         if (res.status === 401 || res.status === 403 || /row-level security/i.test(t)) throw new Error('You don’t have permission to change some of these records. Ask an owner or Proview.');
@@ -736,6 +781,11 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
       }
       chunk.forEach((row) => { const r = s[row.kind].find((x) => x.id === row.id); if (r) r._dirty = false; });
       pushed += chunk.length;
+    }
+    if (o.scoped) {
+      const r = await pullScoped(s, base, headers, o.org || null, !!o.full);
+      save();
+      return { ok: true, pushed, pulled: r.pulled, skipped, dropped: r.dropped };
     }
     // pull everything newer than the last sync, page by page
     const started = new Date(Date.now() - 5000).toISOString();
@@ -822,9 +872,19 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
   const enabled = !!(C.SUPABASE_URL && C.SUPABASE_KEY && g.supabase && g.supabase.createClient);
   const PV_ACCOUNT = C.PV_ACCOUNT_URL || 'https://dashboard.proviewcrm.co.uk/';
   let sb = null;
+  // One business at a time: the Proview master works in the business that is open (or none, on All sites).
+  // Every database request names it in the x-pl-org header, and the server only lets the master read and
+  // change that business (plus the All sites list). Business logins don't need it.
+  let scope = { master: false, org: null };
+  const scopedFetch = (url, init) => {
+    if (!scope.org || !/\/rest\/v1\//.test(String(url))) return fetch(url, init);
+    const h = new Headers((init && init.headers) || {}); h.set('x-pl-org', scope.org);
+    return fetch(url, { ...(init || {}), headers: h });
+  };
   if (enabled) {
     sb = g.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: C.STORAGE_KEY || 'pv-label-auth' }
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: C.STORAGE_KEY || 'pv-label-auth' },
+      global: { fetch: scopedFetch }
     });
   }
   const friendly = (e) => {
@@ -885,7 +945,9 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     },
     // { email, master, orgs: [{ id, name, role, site_ids, settings, suspended }] }
     async whoami() { const { data, error } = await sb.rpc('pl_whoami'); if (error) throw error; return data; },
-    async sync(P, opts) { return P.sync({ url: C.SUPABASE_URL, key: C.SUPABASE_KEY, token: await Cloud.token(), full: !!(opts && opts.full) }); },
+    setScope(master, org) { scope = { master: !!master, org: (master && org) || null }; },
+    scopeOrg: () => scope.org,
+    async sync(P, opts) { return P.sync({ url: C.SUPABASE_URL, key: C.SUPABASE_KEY, token: await Cloud.token(), full: !!(opts && opts.full), scoped: scope.master, org: scope.org }); },
     // Re-read this person's access and purge cached data for businesses they no longer belong to.
     // Returns the whoami result (or null if it couldn't be checked; then nothing is purged).
     async prune(P) { let w; try { w = await Cloud.whoami(); } catch (e) { return null; } if (!w) return null; P.prune((w.orgs || []).map((o) => o.id)); return w; },
@@ -1220,21 +1282,27 @@ function me(){
 }
 const isMaster=()=>!!me()&&me().role==='master';
 const visibleOrgs=()=>(S.orgs||[]).filter(o=>orgRole(o.id));
-function allowedSiteIds(){
+// every site this person may open (the dropdown and access checks)
+function mySiteIds(){
   if(!me()) return [];
   return P.live('sites').filter(s=>{ const r=orgRole(s.orgId); if(!r) return false; if(r!=='manager') return true;
     const ids=CLOUD?(((WHO.orgs||[]).find(o=>o.id===s.orgId)||{}).site_ids||[]):(me().siteIds||[]); return ids.includes(s.id); }).map(s=>s.id);
 }
 let siteFilter=(!CLOUD&&sessionId&&lsGet('pvl-site:'+sessionId))||'all';
-const scopeOrgIds=()=>{ if(siteFilter==='all') return visibleOrgs().map(o=>o.id); if(siteFilter.startsWith('org:')) return [siteFilter.slice(4)]; const s=P.byId('sites',siteFilter); return s?[s.orgId]:[]; };
+// One business at a time (ONE_BUSINESS_RULE.md): pages only ever see the business that is open.
+// Nothing is open on the master's All sites; everyone else always has one business open.
+const scopeOrgIds=()=>{ if(siteFilter==='all') return []; if(siteFilter.startsWith('org:')) return [siteFilter.slice(4)]; const s=P.byId('sites',siteFilter); return s?[s.orgId]:[]; };
 const curOrg=()=>{ const a=scopeOrgIds(); return a.length===1?a[0]:null; };
+// the sites of the open business this person may see (every page uses this)
+function allowedSiteIds(){ const o=scopeOrgIds(); return mySiteIds().filter(id=>o.includes((P.byId('sites',id)||{}).orgId)); }
 const orgName=(id)=>(((S.orgs||[]).find(o=>o.id===id))||{}).name||'—';
 function fixSite(){
-  const a=allowedSiteIds(), orgs=visibleOrgs();
+  const a=mySiteIds(), orgs=visibleOrgs();
   if(siteFilter.startsWith('org:')){ if(!orgs.some(o=>'org:'+o.id===siteFilter)) siteFilter='all'; }
   else if(siteFilter!=='all'&&!a.includes(siteFilter)) siteFilter='all';
   if(siteFilter==='all'&&a.length===1&&!isMaster()) siteFilter=a[0];
-  else if(siteFilter==='all'&&orgs.length===1&&a.length>1&&!isMaster()) siteFilter='org:'+orgs[0].id;
+  else if(siteFilter==='all'&&!isMaster()){ // business logins always have one business open (one at a time)
+    const o=orgs.length===1?orgs[0].id:((P.byId('sites',a[0])||{}).orgId||(orgs[0]||{}).id); if(o) siteFilter='org:'+o; }
 }
 const onSitesPage=()=>isMaster()&&(location.hash||'#sites')==='#sites';
 // picking a business or site from the master All sites page opens its Dashboard (All sites is only for "all")
@@ -1251,7 +1319,7 @@ function withOrg(cb){
   const o=curOrg(); if(o) return cb(o);
   const orgs=visibleOrgs().filter(x=>orgRole(x.id)!=='manager'||true);
   if(!orgs.length) return toast('No business to add this to yet.');
-  const m=modal('Which business?',`<div class="fld"><label>Business</label><select class="inp" id="wo">${orgs.map(o=>`<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select></div><p class="hint">Tip: pick a business or site in the picker under the logo and you won't be asked again.</p>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="wok">Continue</button>`);
+  const m=modal('Which business?',`<div class="fld"><label>Business</label><select class="inp" id="wo">${orgs.map(o=>`<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select></div><p class="hint">Tip: pick a business or site in the dropdown at the top and you won't be asked again.</p>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="wok">Continue</button>`);
   m.querySelector('#wok').onclick=()=>{ const v=m.querySelector('#wo').value; closeModal(); cb(v); };
 }
 function orgSettings(orgId){ const o=(S.orgs||[]).find(x=>x.id===orgId); return (o&&o.settings)||{}; }
@@ -1301,12 +1369,13 @@ const bySite=(arr)=>{ const a=allowedSiteIds(), orgs=scopeOrgIds();
     return !x.orgId||orgs.includes(x.orgId); }); };
 const byOrg=(arr)=>{ const orgs=scopeOrgIds(); return arr.filter(x=>orgs.includes(x.orgId)); };
 const multiOrg=()=>scopeOrgIds().length>1;
+const COLL_KEYS=['sites','categories','products','rules','users','labels','wastage','orders','devices','audit'];
 const siteName=(id)=>(P.byId('sites',id)||{}).name||'—';
 const userName=(id)=>(P.byId('users',id)||{}).name||'—';
 const catOf=(p)=>P.byId('categories',p.categoryId)||{};
 function route(){ const h=(location.hash||(isMaster()?'#sites':'#overview')).slice(1); const r=VIEWS[h]&&canView(h)?h:'overview';
   if(masterAll()) return 'sites';
-  if(r==='overview'&&isMaster()&&(!visibleOrgs().length||(siteFilter==='all'&&!allowedSiteIds().length))) return 'sites';
+  if(r==='overview'&&isMaster()&&(!visibleOrgs().length||(siteFilter==='all'&&!mySiteIds().length))) return 'sites';
   return r; }
 
 function siteStats(id){
@@ -1325,7 +1394,7 @@ function siteStats(id){
 // Owner/admin/manager with several sites: "All my sites (N)" and each site. Exactly one site: a disabled box with its name.
 function pickerHtml(){
   const byName=(x,y)=>String(x.name).localeCompare(String(y.name));
-  const a=allowedSiteIds(); const sites=P.live('sites').filter(s=>a.includes(s.id)).sort(byName);
+  const a=mySiteIds(); const sites=P.live('sites').filter(s=>a.includes(s.id)).sort(byName);
   const sel=(v)=>siteFilter===v?' selected':'';
   // a whole business open (All sites → Open business): the closed box reads "<Business> (all sites)", a hidden option not in the list
   const curOrg=siteFilter.startsWith('org:')?`<option value="${esc(siteFilter)}" selected hidden>${esc(orgName(siteFilter.slice(4)))} (all sites)</option>`:'';
@@ -1336,9 +1405,12 @@ function pickerHtml(){
   if(!sites.length) return '';
   if(sites.length===1) return `<select id="sitePick" aria-label="Choose site" disabled><option>${esc(sites[0].name)}</option></select>`;
   const orgs=[...new Set(sites.map(s=>s.orgId))];
-  const allVal=orgs.length===1?'org:'+orgs[0]:'all';
-  const orgOpt=siteFilter!==allVal?curOrg:'';
-  return `<select id="sitePick" aria-label="Choose site"><option value="${allVal}"${sel(allVal)}>All my sites (${sites.length})</option>${orgOpt}${sites.map(s=>`<option value="${esc(s.id)}"${sel(s.id)}>${esc(s.name)}</option>`).join('')}</select>`;
+  if(orgs.length>1){ // a login in several businesses: one business at a time, never all of them together
+    const bz=orgs.map(o=>({o,n:orgName(o)})).sort(byName);
+    return `<select id="sitePick" aria-label="Choose site">${bz.map(b=>`<option value="org:${esc(b.o)}"${sel('org:'+b.o)}>${esc(b.n)} (all sites)</option>`).join('')}${sites.map(s=>`<option value="${esc(s.id)}"${sel(s.id)}>${esc(s.name)} · ${esc(orgName(s.orgId))}</option>`).join('')}</select>`;
+  }
+  const allVal='org:'+orgs[0];
+  return `<select id="sitePick" aria-label="Choose site"><option value="${allVal}"${sel(allVal)}>All my sites (${sites.length})</option>${sites.map(s=>`<option value="${esc(s.id)}"${sel(s.id)}>${esc(s.name)}</option>`).join('')}</select>`;
 }
 function scopeLabel(){ if(siteFilter==='all') return visibleOrgs().length>1?'all businesses':'all sites'; if(siteFilter.startsWith('org:')) return orgName(siteFilter.slice(4)); return siteName(siteFilter); }
 
@@ -1356,6 +1428,7 @@ function render(){
   if(!me()){ if(window.PVHub) PVHub.close(); return renderLogin(); }
   fixSite();
   if(onSitesPage()&&siteFilter!=='all'){ siteFilter='all'; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),'all'); }
+  if(CLOUD&&WHO&&isMaster()&&SCOPE_ORG!==undefined&&applyScope()) setTimeout(()=>doSync(true),0); // opened another business: load it, drop the last one
   const r=route(); const u=me(); const off=masterAll();
   const badge={expiry:expiredCount(),orders:bySite(P.live('orders')).filter(o=>o.status==='pending').length,products:byOrg(P.live('products')).filter(p=>p.approved===false).length};
   const title=(NAV.flatMap(([,i])=>i).find(x=>x[0]===r)||[])[1]||'Dashboard';
@@ -1382,7 +1455,7 @@ function render(){
   $('#sfCollapse').onclick=toggleSide;
   document.querySelectorAll('.side .nav a.off').forEach(a=>{ a.onclick=(e)=>{ e.preventDefault(); chooseSiteFirst(); }; a.onkeydown=(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); chooseSiteFirst(); } }; });
   $('#tbOut').onclick=()=>signOut();
-  $('#tbMe').onclick=()=>{ const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open every business and site from All sites or the site picker.':'You can see '+allowedSiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
+  $('#tbMe').onclick=()=>{ const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open any business or site from All sites or the site dropdown, one business at a time.':'You can see '+mySiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
     m.querySelector('#mo').onclick=()=>{closeModal();signOut();}; m.querySelector('#msync').onclick=()=>{closeModal();doSync(false);}; };
 }
 // ---------- header tray: status dot (sync), search, inbox and notifications ----------
@@ -1444,13 +1517,16 @@ if(window.PVHub){
   addEventListener('hashchange',()=>PVHub.close());
 }
 let syncing=false, syncTimer=null, lockToastShown=false;
-async function doSync(quiet){
+// the master's database requests and sync cover the open business only (none on All sites)
+let SCOPE_ORG, SYNC_AGAIN=false;
+function applyScope(){ if(!CLOUD) return false; const o=isMaster()?curOrg():null; const ch=o!==SCOPE_ORG; SCOPE_ORG=o; Cloud.setScope(isMaster(),o); return ch; }
+async function doSync(quiet){ applyScope();
   if(!CLOUD){ if(!quiet) toast('This is the demo. In the hosted back-office changes sync to every device automatically.'); return; }
-  if(syncing) return; syncing=true; SYNC_STATE='saving'; paintDot();
+  if(syncing){ SYNC_AGAIN=true; return; } syncing=true; SYNC_STATE='saving'; paintDot();
   try{ let changed=false; if(!quiet){ if(!(await checkAccess())) return; changed=true; }
     const r=await Cloud.sync(P,{full:!quiet}); S=P.get(); SYNC_STATE='ok'; if(!quiet) toast(`Synced · ${r.pushed} sent, ${r.pulled} received`); if(r.pulled||r.dropped||changed) render(); }
   catch(e){ SYNC_STATE=navigator.onLine?'error':'ok'; const lo=(S.orgs||[]).find(o=>lockMsgOf(o)); if(lo&&!isMaster()){ if(!quiet||!lockToastShown){ lockToastShown=true; toast(lockMsgOf(lo).title+': changes can’t be saved. Buy a licence at license.proviewcrm.co.uk.'); } } else toast(Cloud.friendly(e)); }
-  finally{ syncing=false; if(SYNC_STATE==='saving') SYNC_STATE='ok'; paintDot(); }
+  finally{ syncing=false; if(SYNC_STATE==='saving') SYNC_STATE='ok'; paintDot(); if(SYNC_AGAIN){ SYNC_AGAIN=false; setTimeout(()=>doSync(true),0); } }
 }
 // push changes shortly after any edit; pull every minute
 P.on(()=>{ if(!CLOUD||!WHO) return; const dirty=P.COLLECTIONS.some(k=>P.get()[k].some(r=>r._dirty)); if(!dirty) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>doSync(true),1200); });
@@ -1549,10 +1625,10 @@ async function boot(fresh,newOrg){
     forgetCaches('cloud:'+u.id);
     P.useStore('cloud:'+u.id,{blank:true}); applyWho(w);
     siteFilter=(fresh&&w.master)?'all':(lsGet('pvl-site:'+w.email)||'all');
-    await Cloud.sync(P,{full:true}); S=P.get();
+    applyScope(); await Cloud.sync(P,{full:true}); S=P.get();
     if(newOrg){ P.ensureRules(newOrg); siteFilter=lsGet('pvl-site:'+w.email)||siteFilter; }
     // a manager with no sites they can open has nothing to work on: back to sign-in
-    if(!w.master&&!allowedSiteIds().length&&!(w.orgs||[]).some(o=>o.role==='owner'||o.role==='admin')){ P.forget('cloud:'+u.id); return signOut(NO_ACCESS); }
+    if(!w.master&&!mySiteIds().length&&!(w.orgs||[]).some(o=>o.role==='owner'||o.role==='admin')){ P.forget('cloud:'+u.id); return signOut(NO_ACCESS); }
     if(w.master&&(fresh||!location.hash||location.hash==='#overview')&&siteFilter==='all') location.hash='sites';
     else if(!location.hash) location.hash='overview';
     render();
@@ -1680,7 +1756,7 @@ VIEWS.overview=(el)=>{
     <table><tbody>${active.filter(l=>P.expiryStatus(l)!=='ok').slice(0,5).map(l=>`<tr><td><b>${esc(l.name)}</b><div class="hint">${esc(siteName(l.siteId))} · ${esc(l.code)}</div></td><td>${P.expiryStatus(l)==='expired'?'<span class="tag bad">Expired</span>':'<span class="tag warn">Today</span>'}</td><td class="hint">${P.fmtDate(l.expiry,true)}</td></tr>`).join('')}
     ${bySite(P.live('orders')).filter(o=>o.status==='pending').map(o=>`<tr><td><b>Label order: ${o.rolls} rolls</b><div class="hint">${esc(siteName(o.siteId))}</div></td><td><span class="tag warn">Pending</span></td><td><a href="#orders">Review</a></td></tr>`).join('')}
     ${byOrg(P.live('products')).filter(p=>p.approved===false).map(p=>`<tr><td><b>${esc(p.name)}</b><div class="hint">New product awaiting approval</div></td><td><span class="tag blue">Approval</span></td><td><a href="#products">Review</a></td></tr>`).join('')}</tbody></table></div></div>
-  <div class="card"><h3>Recent changes</h3><div class="sub">Amendment history</div><table><tbody>${P.live('audit').sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,6).map(a=>`<tr><td class="hint" style="width:140px">${P.fmtDate(a.at,true)}</td><td><b>${esc(a.user)}</b> ${esc(a.action)} ${esc(a.entity)}</td><td>${esc(a.detail)}</td></tr>`).join('')}</tbody></table></div>`;
+  <div class="card"><h3>Recent changes</h3><div class="sub">Amendment history</div><table><tbody>${bySite(P.live('audit')).sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,6).map(a=>`<tr><td class="hint" style="width:140px">${P.fmtDate(a.at,true)}</td><td><b>${esc(a.user)}</b> ${esc(a.action)} ${esc(a.entity)}</td><td>${esc(a.detail)}</td></tr>`).join('')}</tbody></table></div>`;
   barChart(el.querySelector('#ch1'),days,{label:'Labels printed per day',unit:'labels'});
   el.querySelectorAll('[data-site]').forEach(b=>b.onclick=()=>setSite(b.dataset.site));
 };
@@ -1837,7 +1913,7 @@ VIEWS.printlog=(el)=>{
   bindLogFilters(el);
   el.querySelector('#ex').onclick=()=>exportCSV('Print log',ls,[{label:'printed_at',get:l=>P.fmtDate(l.printedAt,true)},{key:'name',label:'product'},{key:'type'},{key:'qty'},{label:'use_by',get:l=>P.fmtDate(l.expiry,true)},{key:'ruleName',label:'storage'},{key:'batch'},{key:'useFirst',label:'use_first'},{key:'defrost'},{label:'user',get:l=>userName(l.userId)},{label:'site',get:l=>siteName(l.siteId)},{key:'code'}]);
 };
-function logFilters(){ return `<div class="filters"><input id="lq" placeholder="Search product, code, batch" value="${esc(lf.q)}"><select id="lr">${[['1','Today'],['7','Last 7 days'],['30','Last 30 days'],['all','All time']].map(([v,l])=>`<option value="${v}" ${lf.range===v?'selected':''}>${l}</option>`).join('')}</select><select id="lu"><option value="all">All staff</option>${P.live('users').map(u=>`<option value="${u.id}" ${lf.user===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select><select id="lt"><option value="all">Prep & sale</option><option value="prep" ${lf.type==='prep'?'selected':''}>Prep</option><option value="sale" ${lf.type==='sale'?'selected':''}>Sale</option></select></div>`; }
+function logFilters(){ return `<div class="filters"><input id="lq" placeholder="Search product, code, batch" value="${esc(lf.q)}"><select id="lr">${[['1','Today'],['7','Last 7 days'],['30','Last 30 days'],['all','All time']].map(([v,l])=>`<option value="${v}" ${lf.range===v?'selected':''}>${l}</option>`).join('')}</select><select id="lu"><option value="all">All staff</option>${byOrg(P.live('users')).map(u=>`<option value="${u.id}" ${lf.user===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select><select id="lt"><option value="all">Prep & sale</option><option value="prep" ${lf.type==='prep'?'selected':''}>Prep</option><option value="sale" ${lf.type==='sale'?'selected':''}>Sale</option></select></div>`; }
 function bindLogFilters(el){ const q=el.querySelector('#lq'); q.oninput=()=>{lf.q=q.value;clearTimeout(q._t);q._t=setTimeout(()=>{render();const n=$('#lq');n.focus();n.setSelectionRange(n.value.length,n.value.length);},250);}; el.querySelector('#lr').onchange=e=>{lf.range=e.target.value;render();}; el.querySelector('#lu').onchange=e=>{lf.user=e.target.value;render();}; el.querySelector('#lt').onchange=e=>{lf.type=e.target.value;render();}; }
 
 VIEWS.expiry=(el)=>{
@@ -1913,7 +1989,7 @@ VIEWS.sites=(el)=>{
   el.querySelectorAll('[data-addb]').forEach(b=>b.onclick=()=>addBusiness(()=>render()));
   el.querySelectorAll('[data-trial]').forEach(b=>b.onclick=()=>trialForm(b.dataset.trial));
   el.querySelectorAll('[data-refresh]').forEach(b=>b.onclick=async()=>{ if(!CLOUD){ render(); return toast('Up to date'); }
-    b.disabled=true; try{ if(!(await checkAccess())) return; await Cloud.sync(P,{full:true}); S=P.get(); render(); toast('Up to date'); }catch(e){ b.disabled=false; toast(Cloud.friendly(e)); } });
+    b.disabled=true; try{ if(!(await checkAccess())) return; applyScope(); await Cloud.sync(P,{full:true}); S=P.get(); render(); toast('Up to date'); }catch(e){ b.disabled=false; toast(Cloud.friendly(e)); } });
 };
 
 // Master: extend, end now or clear (= licensed, no longer a trial) a business's free trial
@@ -1938,10 +2014,10 @@ function addBusiness(after){ const m=modal('Add business',`<div class="fld"><lab
         P.ensureRules(id); closeModal(); toast(n+' added'); if(after) after(id); else setSite('org:'+id); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } }; }
 VIEWS.devices=(el)=>{
   const ss=P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(siteFilter==='all'||x.id===siteFilter||siteFilter==='org:'+x.orgId)), ds=bySite(P.live('devices'));
-  const canAddSite=visibleOrgs().some(o=>['master','owner','admin'].includes(orgRole(o.id)));
-  const orgs=visibleOrgs();
-  el.innerHTML=`<div class="ph"><div><h1>Sites & devices</h1><p>${isMaster()?'Every business, its kitchens and the handhelds running Proview Label.':'Your kitchens and the handhelds running Proview Label.'}</p></div><div class="btns">${!CLOUD?'<button class="btn ghost" id="imp">Import from device</button><button class="btn ghost" id="cfg">Device config file</button>':''}${isMaster()?'<button class="btn ghost" id="addB">+ Add business</button>':''}${canAddSite?'<button class="btn" id="addS">+ Add site</button>':''}</div></div>
-  ${isMaster()?`<div class="card"><h3>Businesses</h3><div class="sub">Customers using Proview Label. Open one to work in it, or add a new customer.</div><table><thead><tr><th>Business</th><th>Sites</th><th>Devices</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${orgs.map(o=>{ const os=P.live('sites').filter(x=>x.orgId===o.id); return `<tr><td><b>${esc(o.name)}</b>${orgState(o)!=='active'?' '+stateTag(o):''}</td><td>${os.length}</td><td>${P.live('devices').filter(d=>os.some(x=>x.id===d.siteId)).length}</td><td>${P.live('labels').filter(l=>os.some(x=>x.id===l.siteId)&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-openorg="${o.id}">Open</button> <button class="icbtn" data-eo="${o.id}" title="Rename">✎</button></td></tr>`; }).join('')||'<tr><td colspan="5" class="empty">No businesses yet. Add your first customer.</td></tr>'}</tbody></table></div>`:''}
+  const canAddSite=scopeOrgIds().some(o=>['master','owner','admin'].includes(orgRole(o)));
+  const orgs=visibleOrgs().filter(o=>scopeOrgIds().includes(o.id)); // the open business only
+  el.innerHTML=`<div class="ph"><div><h1>Sites & devices</h1><p>${isMaster()?esc(orgName(curOrg()))+': its kitchens and the handhelds running Proview Label.':'Your kitchens and the handhelds running Proview Label.'}</p></div><div class="btns">${!CLOUD?'<button class="btn ghost" id="imp">Import from device</button><button class="btn ghost" id="cfg">Device config file</button>':''}${canAddSite?'<button class="btn" id="addS">+ Add site</button>':''}</div></div>
+  ${isMaster()?`<div class="card"><h3>Business</h3><div class="sub">The business you're working in. New businesses are set up from All sites.</div><table><thead><tr><th>Business</th><th>Sites</th><th>Devices</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${orgs.map(o=>{ const os=P.live('sites').filter(x=>x.orgId===o.id); return `<tr><td><b>${esc(o.name)}</b>${orgState(o)!=='active'?' '+stateTag(o):''}</td><td>${os.length}</td><td>${P.live('devices').filter(d=>os.some(x=>x.id===d.siteId)).length}</td><td>${P.live('labels').filter(l=>os.some(x=>x.id===l.siteId)&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap"><button class="icbtn" data-eo="${o.id}" title="Rename">✎</button></td></tr>`; }).join('')||'<tr><td colspan="5" class="empty">No business open.</td></tr>'}</tbody></table></div>`:''}
   <div class="card"><h3>Sites</h3><table><thead><tr><th>Site</th>${multiOrg()?'<th>Business</th>':''}<th>Address (printed on sale labels)</th><th>Device staff</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${ss.map(s=>`<tr><td><b>${esc(s.name)}</b><div class="hint">${esc(s.region||'')}</div></td>${multiOrg()?`<td class="hint">${esc(orgName(s.orgId))}</td>`:''}<td>${esc(s.address||'')}</td><td>${P.live('users').filter(u=>(u.siteIds||[]).includes(s.id)).length}</td><td>${P.live('labels').filter(l=>l.siteId===s.id&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap">${siteFilter!==s.id&&allowedSiteIds().length>1?`<button class="btn ghost sm" data-open="${s.id}">Open</button> `:''}${['master','owner','admin'].includes(orgRole(s.orgId))?`<button class="icbtn" data-es="${s.id}">✎</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No sites yet.</td></tr>'}</tbody></table></div>
   <div class="card"><h3>Devices</h3><div class="sub">${CLOUD?'Handhelds appear here once they sign in (Android app → Settings → Connect to Proview Label).':'Sample devices.'}</div><table><thead><tr><th>Device</th><th>Site</th><th>Battery</th><th>Labels left</th><th>App</th><th>Last sync</th></tr></thead><tbody>${ds.map(d=>`<tr><td><b>${esc(d.name)}</b><div class="hint">${esc(d.id)}</div></td><td>${esc(siteName(d.siteId))}</td><td>${d.battery!=null?d.battery+'%':'—'}</td><td>${d.labelsLeft<60?`<span class="tag bad">${d.labelsLeft} – low</span>`:d.labelsLeft}</td><td>v${esc(d.version||'')}</td><td>${d.lastSync?P.fmtDate(d.lastSync,true):'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No devices connected yet.</td></tr>'}</tbody></table></div>`;
   const siteForm=(s,orgId)=>{ const isNew=!s; s=s||{id:'site_'+P.uid(''),orgId,name:'',address:'',region:''}; const m=modal((isNew?'Add site':'Edit site')+' · '+orgName(s.orgId),`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(s.name)}"></div><div class="fld"><label>Address</label><input class="inp" id="a" value="${esc(s.address||'')}"></div><div class="fld"><label>Area</label><input class="inp" id="g" value="${esc(s.region||'')}" placeholder="e.g. North London"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
@@ -1952,8 +2028,7 @@ VIEWS.devices=(el)=>{
   el.querySelectorAll('[data-openorg]').forEach(b=>b.onclick=()=>{ setSite('org:'+b.dataset.openorg); location.hash='overview'; });
   el.querySelectorAll('[data-eo]').forEach(b=>b.onclick=()=>{ const o=S.orgs.find(x=>x.id===b.dataset.eo); const m=modal('Rename business',`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(o.name)}"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
     m.querySelector('#sv').onclick=async()=>{ const n=m.querySelector('#n').value.trim(); if(!n) return; try{ if(CLOUD) await Cloud.renameOrg(o.id,n); o.name=n; P.save(); closeModal(); render(); }catch(e){ toast(Cloud.friendly(e)); } }; });
-  const ab=el.querySelector('#addB'); if(ab) ab.onclick=()=>addBusiness();
-  const cfg=el.querySelector('#cfg'); if(cfg) cfg.onclick=()=>{ const data=P.exportJSON(); const m=modal('Device config file',`<p class="hint">Copy this to the device, or save it as a .json file and use Settings → Import data in the app.</p><textarea class="inp" style="min-height:200px;font-family:monospace;font-size:11px" readonly>${esc(data)}</textarea>`,`<button class="btn ghost" id="dl">Download .json</button><button class="btn" id="cp">Copy</button>`);
+  const cfg=el.querySelector('#cfg'); if(cfg) cfg.onclick=()=>{ const all=JSON.parse(P.exportJSON()), o=curOrg(); COLL_KEYS.forEach(k=>{ if(Array.isArray(all[k])) all[k]=all[k].filter(r=>r.orgId===o); }); if(all.orgs) all.orgs=all.orgs.filter(x=>x.id===o); const data=JSON.stringify(all); const m=modal('Device config file',`<p class="hint">Copy this to the device, or save it as a .json file and use Settings → Import data in the app.</p><textarea class="inp" style="min-height:200px;font-family:monospace;font-size:11px" readonly>${esc(data)}</textarea>`,`<button class="btn ghost" id="dl">Download .json</button><button class="btn" id="cp">Copy</button>`);
     m.querySelector('#cp').onclick=()=>{ m.querySelector('textarea').select(); (navigator.clipboard?navigator.clipboard.writeText(data):Promise.reject()).then(()=>toast('Copied')).catch(()=>{try{document.execCommand('copy');toast('Copied');}catch(e){}}); };
     m.querySelector('#dl').onclick=()=>{ try{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([data],{type:'application/json'})); a.download='proview-label-config.json'; document.body.appendChild(a); a.click(); a.remove(); }catch(e){} toast('If nothing downloaded, use Copy'); }; };
   const imp=el.querySelector('#imp'); if(imp) imp.onclick=()=>{ const m=modal('Import from device',`<p class="hint">Paste the text from the device's Export data, or choose the exported file. Newer records win; nothing is deleted.</p><textarea class="inp" id="t" style="min-height:180px;font-family:monospace;font-size:11px"></textarea><input type="file" id="f" accept=".json" style="margin-top:8px">`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="go">Import</button>`);

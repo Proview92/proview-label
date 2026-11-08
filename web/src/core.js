@@ -395,7 +395,51 @@
   // ---------- Sync (Supabase REST / PostgREST, table pl_records) ----------
   // opts: { url, key, token }  token = the signed-in user's access token (row-level security decides
   // what they can read and write). Records carry orgId (+ siteId for site data).
+  // One business per request: changes are sent per business, each request naming it (x-pl-org header).
+  // opts.scoped (the Proview master): pull only the All sites list (sites + devices of every business) and,
+  // when a business is open (opts.org), that one business's data. Other businesses' data is dropped locally.
+  const LIST_KINDS = ['sites', 'devices'];
   const siteOf = (kind, r) => (kind === 'sites' ? r.id : (r.siteId || null));
+  // The master's pull: the All sites list (sites + devices of every business) plus the open business, if any.
+  async function pullScoped(s, base, headers, org, full) {
+    const by = s.settings.sync.lastSyncBy = s.settings.sync.lastSyncBy || {};
+    const parts = [{ key: '*', q: '&kind=in.(' + LIST_KINDS.join(',') + ')', h: {} }];
+    if (org) parts.push({ key: org, q: '&org_id=eq.' + encodeURIComponent(org), h: { 'x-pl-org': org } });
+    let pulled = 0, dropped = 0;
+    for (const part of parts) {
+      const started = new Date(Date.now() - 5000).toISOString(), since = by[part.key] || '1970-01-01T00:00:00Z';
+      for (let offset = 0; ; offset += 1000) {
+        const res = await fetch(base + '?select=id,kind,org_id,data,deleted,updated_at&updated_at=gt.' + encodeURIComponent(since) + part.q + '&order=updated_at.asc,id.asc&limit=1000&offset=' + offset, { headers: { ...headers, ...part.h } });
+        if (!res.ok) throw new Error('Couldn’t load from the server (' + res.status + ').');
+        const rows = await res.json();
+        rows.forEach((row) => {
+          const coll = s[row.kind]; if (!coll) return;
+          const i = coll.findIndex((x) => x.id === row.id);
+          const rec = { ...row.data, orgId: row.org_id, deleted: row.deleted, _dirty: false };
+          if (i < 0) { coll.push(rec); pulled++; } else if (!coll[i]._dirty) { coll[i] = rec; pulled++; }
+        });
+        if (rows.length < 1000) break;
+      }
+      if (full) { // drop clean cached records of this part the server no longer returns
+        const seen = new Set();
+        for (let off = 0; ; off += 1000) {
+          const r3 = await fetch(base + '?select=id' + part.q + '&order=id.asc&limit=1000&offset=' + off, { headers: { ...headers, ...part.h } });
+          if (!r3.ok) throw new Error('Couldn’t load from the server (' + r3.status + ').');
+          const ids = await r3.json(); ids.forEach((x) => seen.add(x.id));
+          if (ids.length < 1000) break;
+        }
+        COLLECTIONS.forEach((k) => { if (part.key === '*' && !LIST_KINDS.includes(k)) return; const n = s[k].length;
+          s[k] = s[k].filter((r) => r._dirty || !r.orgId || seen.has(r.id) || (part.key !== '*' && r.orgId !== part.key)); dropped += n - s[k].length; });
+      }
+      by[part.key] = started;
+    }
+    // keep nothing of other businesses but the All sites list (unsent changes stay until they're sent)
+    const gone = new Set();
+    COLLECTIONS.forEach((k) => { if (LIST_KINDS.includes(k)) return; const n = s[k].length;
+      s[k] = s[k].filter((r) => { const keep = r._dirty || !r.orgId || r.orgId === org; if (!keep) gone.add(r.orgId); return keep; }); dropped += n - s[k].length; });
+    gone.forEach((id) => { delete by[id]; });
+    return { pulled, dropped };
+  }
   async function sync(opts) {
     const s = get();
     const o = opts || {};
@@ -412,9 +456,10 @@
       const d = { ...r }; delete d._dirty; delete d.password;
       dirty.push({ id: r.id, kind: k, org_id: r.orgId, site_id: siteOf(k, r), data: d, deleted: !!r.deleted });
     }));
-    for (let i = 0; i < dirty.length; i += 200) {
-      const chunk = dirty.slice(i, i + 200);
-      const res = await fetch(base + '?on_conflict=id', { method: 'POST', headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(chunk) });
+    const chunks = [];
+    [...new Set(dirty.map((d) => d.org_id))].forEach((org) => { const rows = dirty.filter((d) => d.org_id === org); for (let i = 0; i < rows.length; i += 200) chunks.push(rows.slice(i, i + 200)); });
+    for (const chunk of chunks) {
+      const res = await fetch(base + '?on_conflict=id', { method: 'POST', headers: { ...headers, 'x-pl-org': chunk[0].org_id, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(chunk) });
       if (!res.ok) {
         const t = (await res.text()).slice(0, 300);
         if (res.status === 401 || res.status === 403 || /row-level security/i.test(t)) throw new Error('You don’t have permission to change some of these records. Ask an owner or Proview.');
@@ -422,6 +467,11 @@
       }
       chunk.forEach((row) => { const r = s[row.kind].find((x) => x.id === row.id); if (r) r._dirty = false; });
       pushed += chunk.length;
+    }
+    if (o.scoped) {
+      const r = await pullScoped(s, base, headers, o.org || null, !!o.full);
+      save();
+      return { ok: true, pushed, pulled: r.pulled, skipped, dropped: r.dropped };
     }
     // pull everything newer than the last sync, page by page
     const started = new Date(Date.now() - 5000).toISOString();

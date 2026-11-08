@@ -9,9 +9,19 @@
   const enabled = !!(C.SUPABASE_URL && C.SUPABASE_KEY && g.supabase && g.supabase.createClient);
   const PV_ACCOUNT = C.PV_ACCOUNT_URL || 'https://dashboard.proviewcrm.co.uk/';
   let sb = null;
+  // One business at a time: the Proview master works in the business that is open (or none, on All sites).
+  // Every database request names it in the x-pl-org header, and the server only lets the master read and
+  // change that business (plus the All sites list). Business logins don't need it.
+  let scope = { master: false, org: null };
+  const scopedFetch = (url, init) => {
+    if (!scope.org || !/\/rest\/v1\//.test(String(url))) return fetch(url, init);
+    const h = new Headers((init && init.headers) || {}); h.set('x-pl-org', scope.org);
+    return fetch(url, { ...(init || {}), headers: h });
+  };
   if (enabled) {
     sb = g.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: C.STORAGE_KEY || 'pv-label-auth' }
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: C.STORAGE_KEY || 'pv-label-auth' },
+      global: { fetch: scopedFetch }
     });
   }
   const friendly = (e) => {
@@ -72,7 +82,9 @@
     },
     // { email, master, orgs: [{ id, name, role, site_ids, settings, suspended }] }
     async whoami() { const { data, error } = await sb.rpc('pl_whoami'); if (error) throw error; return data; },
-    async sync(P, opts) { return P.sync({ url: C.SUPABASE_URL, key: C.SUPABASE_KEY, token: await Cloud.token(), full: !!(opts && opts.full) }); },
+    setScope(master, org) { scope = { master: !!master, org: (master && org) || null }; },
+    scopeOrg: () => scope.org,
+    async sync(P, opts) { return P.sync({ url: C.SUPABASE_URL, key: C.SUPABASE_KEY, token: await Cloud.token(), full: !!(opts && opts.full), scoped: scope.master, org: scope.org }); },
     // Re-read this person's access and purge cached data for businesses they no longer belong to.
     // Returns the whoami result (or null if it couldn't be checked; then nothing is purged).
     async prune(P) { let w; try { w = await Cloud.whoami(); } catch (e) { return null; } if (!w) return null; P.prune((w.orgs || []).map((o) => o.id)); return w; },
