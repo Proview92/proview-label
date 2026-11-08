@@ -18,49 +18,103 @@ body{margin:0;font-family:Inter,"Segoe UI",system-ui,-apple-system,Roboto,Helvet
 button,input,select,textarea{font:inherit;color:inherit}
 h1,h2,h3,h4{margin:0;font-weight:650;letter-spacing:-.01em}
 a{color:var(--pri)}
-.app{display:grid;grid-template-columns:236px 1fr;height:100vh}
-/* sidebar */
-.side{background:#141418;color:#c9c9d1;display:flex;flex-direction:column;overflow:hidden}
-.brand{display:flex;align-items:center;gap:10px;padding:18px 18px 14px;color:#fff;text-decoration:none}
+/* ===== Proview app shell: the same menu, header tray and breakpoints as Proview Signage and Bookings =====
+   desktop: 236px menu (COLLAPSE to a 72px icon rail) · 701-900px: 72px labelled rail, site picker in the header
+   phones: 60px labelled rail with the site (building) button under the mark */
+.app{display:grid;grid-template-columns:236px minmax(0,1fr);height:100vh;height:100dvh}
+.side{background:#141418;color:#c9c9d1;display:flex;flex-direction:column;overflow:hidden;min-height:0;font-size:15px}
+.side .brand{display:flex;align-items:center;gap:10px;padding:18px 10px 14px 14px;color:#fff;text-decoration:none;flex:none}
+.brand-mark{width:36px;height:26px;flex:none;background:url(%%MARK_SM%%) center/contain no-repeat}
 .logo{width:36px;height:26px;flex:none;background:url(%%MARK_SM%%) center/contain no-repeat}
-.wordmark{letter-spacing:.04em;font-size:15px;white-space:nowrap;font-weight:500;color:#fff}
+.wordmark{letter-spacing:.04em;font-size:15px;line-height:20px;white-space:nowrap;font-weight:500;color:#fff}
 .wordmark span{background:var(--grad-light);-webkit-background-clip:text;background-clip:text;color:transparent}
-.client-pick{margin:0 14px 12px;position:relative}.client-pick:empty{display:none}
-/* site picker in the sidebar: same as Proview Bookings, Employee, Signage and WiFi */
+.client-pick{margin:0 14px 12px;position:relative;flex:none}.client-pick:empty{display:none}
 .side .pv-viewing{display:block;font-size:11px;line-height:15px;letter-spacing:.06em;text-transform:uppercase;color:#8b8b95;margin:0 2px 6px;font-weight:400}
 .side .client-pick select{width:100%;height:42px;border-radius:10px;border:1px solid #2c2c35;background-color:#1f1f25;color:#fff;font:inherit;font-size:14px;font-weight:600;padding:0 34px 0 12px;appearance:none;-webkit-appearance:none;cursor:pointer;text-overflow:ellipsis;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b4b4bd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:16px 16px}
 .side .client-pick select:hover{border-color:#4a4a55}
 .side .client-pick select:focus-visible{outline:2px solid #5a8dee;outline-offset:2px}
 .side .client-pick option{color:#141418;background:#fff;font-weight:400}
 .client-pick .sp-title{color:#9a9aa4;font-size:13px;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-@media (hover:none) and (pointer:coarse){.client-pick select,.top .tpick select{font-size:16px!important}}
-.nav{flex:1;overflow:auto;padding:6px 10px}
-.nav-sec{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#6e6e78;padding:14px 10px 6px}
-.nav a{display:flex;align-items:center;gap:12px;width:100%;color:#c9c9d1;padding:9px 12px;border-radius:9px;text-decoration:none;font-weight:500;position:relative}
-.nav a svg{flex:none;width:17px;height:17px}
-.nav a:hover{background:#1f1f25;color:#fff}
-.nav a.on{background:#26262e;color:#fff}
-.nav a.on svg{color:var(--pri)}
-.nav .cnt{margin-left:auto;font-size:11px;background:rgba(255,255,255,.12);padding:1px 7px;border-radius:10px}
-.nav .cnt.red{background:var(--bad);color:#fff}
-.venue{margin:10px;padding:12px;border-radius:12px;background:#1f1f25;border:1px solid #26262e;font-size:12px}
-.venue b{color:#fff;display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px}
-.side-foot{display:flex;gap:6px;padding:0 10px 14px}
-.side-foot button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#23232a;border:1px solid #33333c;color:#ddd;border-radius:9px;padding:8px;cursor:pointer;font-size:12.5px}
-.side-foot button:hover{background:#2c2c34}
-/* main */
-.main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
-.top{display:flex;align-items:center;gap:12px;padding:12px 22px;background:var(--card);border-bottom:1px solid var(--line);min-height:62px}
-.top h2{font-size:18px;white-space:nowrap}
+.side .nav{flex:1;min-height:0;overflow:auto;padding:6px 10px;display:flex;flex-direction:column}
+.side .nav-sep{font-size:11px;line-height:13px;letter-spacing:.08em;text-transform:uppercase;color:#6e6e78;padding:10px 10px 3px;flex:none}
+.side .nav a{display:flex;align-items:center;gap:10px;height:30px;flex:none;box-sizing:border-box;padding:0 12px;border-radius:9px;color:#c9c9d1;text-decoration:none;font-size:14px;font-weight:550;line-height:22px;position:relative}
+.side .nav a svg{width:16px;height:16px;flex:none}
+.side .nav a:hover{background:#1f1f25;color:#fff}
+.side .nav a.active{background:#26262e;color:#fff}
+.side .nav a.active svg{color:var(--pri)}
+.side .nav .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side .nav .slbl{display:none}
+.side .nav .cnt{margin-left:auto;font-size:11px;line-height:16px;font-weight:600;background:rgba(255,255,255,.12);padding:0 7px;border-radius:10px}
+.side .nav .cnt.red{background:var(--bad);color:#fff}
+.side-foot{display:flex;align-items:center;padding:0 10px 14px;flex:none}
+.sf-link{display:flex;align-items:center;gap:6px;background:none;border:0;color:#8b8b95;letter-spacing:.06em;font-size:12px;font-weight:600;line-height:17px;padding:6px 8px;border-radius:9px;cursor:pointer;font-family:inherit}
+.sf-link:hover{color:#fff}.sf-link svg{width:14px;height:14px;flex:none}
+.app.collapsed{grid-template-columns:72px minmax(0,1fr)}
+@media (min-width:901px){
+ .app.collapsed .side{padding:18px 10px}
+ .app.collapsed .wordmark,.app.collapsed .client-pick,.app.collapsed .nav-sep,.app.collapsed .nav .lbl,.app.collapsed .nav .cnt,.app.collapsed .sf-link .lbl{display:none}
+ .app.collapsed .side .brand{justify-content:center;padding:4px 0 18px}
+ .app.collapsed .side .nav a{justify-content:center;padding:0}
+ .app.collapsed .side-foot{flex-direction:column;gap:4px;padding:0 0 14px}
+ .app.collapsed .sf-link{width:30px;height:26px;padding:0;justify-content:center}
+ .app.collapsed .sf-link svg{transform:rotate(180deg)}
+}
+/* main column and header */
+.main{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+.top{display:flex;align-items:center;gap:12px;padding:12px 22px;background:var(--card);border-bottom:1px solid var(--line);min-height:62px;box-sizing:border-box;flex:none;font-size:15px;position:relative;z-index:20}
+.top h2{font-size:18px;font-weight:700;letter-spacing:-.015em;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .top .sp{flex:1}
-.top .mchip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;background:#141418;color:#fff}
-.top .mchip i{width:7px;height:7px;border-radius:50%;background:#62b0ec}
-.icon-btn{position:relative;background:none;border:1px solid transparent;border-radius:10px;width:38px;height:38px;display:grid;place-items:center;cursor:pointer;color:var(--ink)}
+.top-pick{display:none}
+.top-pick select{width:100%;padding:7px 28px 7px 10px;font:inherit;font-weight:500;font-size:15px;line-height:20px;border-radius:9px;background-color:#fff;color:var(--ink);border:1px solid var(--line);appearance:none;-webkit-appearance:none;cursor:pointer;text-overflow:ellipsis;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23555' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center}
+.hdr-dot[role=button]{cursor:pointer}
+.icon-btn{position:relative;background:none;border:1px solid transparent;border-radius:10px;width:38px;height:38px;padding:0;display:grid;place-items:center;cursor:pointer;color:var(--ink)}
 .icon-btn:hover{background:var(--bg);border-color:var(--line)}
-.icon-btn .badge{position:absolute;top:3px;right:3px;background:var(--bad);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:grid;place-items:center;padding:0 4px}
+.top .top-me{display:flex;align-items:center;gap:4px;margin-left:8px;flex:none}
+.top-av{width:34px;height:34px;border-radius:50%;border:0;padding:0;flex:none;display:grid;place-items:center;background:var(--grad);color:#fff;font-family:inherit;font-weight:700;font-size:12.5px;line-height:1;cursor:pointer}
+.top-av:hover{filter:brightness(1.08)}
+.top-me .top-out svg{width:18px;height:18px}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px}
 .av{width:34px;height:34px;border-radius:50%;background:var(--pri);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12.5px;flex:none;border:0}
 .av.master{background:var(--grad)}
+/* notifications list (bell) */
+.nt-list{margin:-18px -20px}
+.nt-list .hub-item{cursor:pointer}.nt-list .hub-item:hover{background:#faf9f6}
+.nt-list .ii.bad{background:var(--badl);color:var(--bad)}.nt-list .ii.warn{background:var(--warnl);color:var(--warn)}
+.nt-list .hub-note{padding:30px 20px}
+/* iPad and narrow windows: a 72px rail with a short label under each icon */
+@media (min-width:701px) and (max-width:900px){
+ .app,.app.collapsed{grid-template-columns:72px minmax(0,1fr)}
+ .app .side{padding:0}
+ .app .wordmark,.app .client-pick,.app .nav-sep,.app .side-foot,.app .nav .cnt,.app .nav .lbl{display:none}
+ .app .side .brand{justify-content:center;padding:18px 0 14px}
+ .app .side .nav{padding:6px 10px}
+ .app .side .nav a{height:56px;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:0 2px;font-size:15px}
+ .app .side .nav a svg{width:18px;height:18px}
+ .app .side .nav .slbl{display:block;font-size:10.5px;line-height:12px;font-weight:500;letter-spacing:-.1px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px}
+ .top-pick{display:block;max-width:46%;min-width:0;margin:0 6px}
+ .top-pick:empty,.top-pick>div{display:none}
+ .top .tag{display:none}
+}
+/* phones: the same compact icon menu always on the left (60px; every button 50 x 52) */
+@media (max-width:700px){
+ .app,.app.collapsed{grid-template-columns:60px minmax(0,1fr)}
+ .app .side{padding:10px 5px calc(10px + env(safe-area-inset-bottom));overflow-y:auto;overflow-x:hidden}
+ .app .side .brand{justify-content:center;padding:2px 0 10px;gap:0}
+ .app .side .brand-mark{width:32px;height:23px;margin:0 auto}
+ .app .wordmark,.app .side .pv-viewing,.app .side .sp-title,.app .nav-sep,.app .side-foot,.app .nav .cnt,.app .nav .lbl{display:none}
+ .app .side .client-pick{display:block;margin:0 0 8px;padding:0}
+ .app .side .client-pick select{width:50px;height:40px;min-width:0;padding:0;margin:0 auto;display:block;color:transparent;text-indent:-999px;font-size:16px;border-radius:10px;background-position:center;background-size:18px 18px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23d9d9e0' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4'/%3E%3C/svg%3E")}
+ .app .side .nav{padding:0;align-items:center;overflow:visible;flex:1 0 auto}
+ .app .side .nav a{width:50px;height:52px;margin:0 auto;padding:0 1px;flex-direction:column;justify-content:center;align-items:center;gap:4px;font-size:15px}
+ .app .side .nav a svg{width:18px;height:18px}
+ .app .side .nav .slbl{display:block;font-size:10px;line-height:12px;font-weight:500;letter-spacing:-.1px;text-align:center;white-space:nowrap;max-width:58px}
+ .top{padding:8px 10px;gap:2px}
+ .top h2{flex:1}
+ .top .sp,.top .tag{display:none}
+ .top .top-me{margin-left:4px;gap:2px}
+ .top-av{width:32px;height:32px;font-size:12px}
+ .icon-btn{width:36px;height:36px}
+}
 .content{flex:1;overflow:auto;padding:20px 22px 40px}
 /* page header inside content */
 .ph{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap}
@@ -212,11 +266,10 @@ pre{background:#141418;color:#d6dcf5;padding:14px;border-radius:10px;overflow:au
 .art-pill i{width:26px;height:26px;border-radius:50%;background:var(--ok);display:grid;place-items:center;color:#fff;font-style:normal;font-weight:800}
 .art-glow{position:absolute;right:-120px;top:20%;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(74,108,208,.45),transparent 65%)}
 
-.top .tpick{display:none}
+@media (hover:none) and (pointer:coarse){.client-pick select,.top-pick select{font-size:16px!important}}
 @media (max-width:1180px){.auth2-art h2{max-width:300px;font-size:32px}}
-@media (max-width:900px){.app{grid-template-columns:64px 1fr}.side .wordmark,.side .nav-sec,.side .venue,.side .cnt,.side .lbl,.client-pick{display:none}.nav a{justify-content:center;padding:10px}.brand{justify-content:center;padding:16px 8px}.side-foot{flex-direction:column}.top .tpick{display:block}#tbSync,#tbOut{display:none}.top{padding:10px 12px;gap:8px}.cols,.cols.eq{grid-template-columns:1fr}.auth2{grid-template-columns:1fr}.auth2-art{display:none}.g3{grid-template-columns:1fr 1fr}}
-
-.top .tpick select{border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:var(--card);max-width:46vw}
+@media (max-width:700px){.content{padding:14px 12px 40px}}
+@media (max-width:900px){.cols,.cols.eq{grid-template-columns:1fr}.auth2{grid-template-columns:1fr}.auth2-art{display:none}.g3{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -228,6 +281,7 @@ pre{background:#141418;color:#d6dcf5;padding:14px;border-radius:10px;overflow:au
 <script>/*CONFIG*/</script>
 <script>/*CORE*/</script>
 <script>/*CLOUD*/</script>
+<script>/*HUB*/</script>
 <script>
 (function(){
 'use strict';
@@ -315,9 +369,11 @@ const ICON={
   sync:'<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/>',
   bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
   out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
-  pin:'<path d="M12 21s-7-6.1-7-11a7 7 0 1 1 14 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>'
+  pin:'<path d="M12 21s-7-6.1-7-11a7 7 0 1 1 14 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  left:'<path d="M15 18l-6-6 6-6"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>'
 };
-const ic=(k,s)=>`<svg width="${s||17}" height="${s||17}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICON[k]||''}</svg>`;
+const ic=(k,s)=>`<svg width="${s||17}" height="${s||17}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[k]||''}</svg>`;
 // Feature switches for managers (owners/admins always have everything). Keep keys in step with supabase/migrations/002.
 const FEATURES=[['expiry','Expiry log'],['printlog','Print log'],['wastage','Wastage'],['products','Products, categories, allergens & menu analyser'],['rules','Expiry rules'],['orders','Label orders'],['devices','Sites & devices'],['users','Device staff (add, edit, remove)'],['history','Amendment history']];
 const VIEW_FEATURE={expiry:'expiry',printlog:'printlog',wastage:'wastage',products:'products',categories:'products',matrix:'products',analyser:'products',rules:'rules',orders:'orders',devices:'devices',users:'users',history:'history'};
@@ -367,56 +423,114 @@ function pickerHtml(compact){
 }
 function scopeLabel(){ if(siteFilter==='all') return visibleOrgs().length>1?'all businesses':'all sites'; if(siteFilter.startsWith('org:')) return orgName(siteFilter.slice(4)); return siteName(siteFilter); }
 
+// short names under each icon on the iPad and phone rail (same idea as Proview Bookings)
+const SHORT={sites:'All sites',overview:'Dashboard',expiry:'Expiry',printlog:'Print log',wastage:'Wastage',products:'Products',categories:'Categories',matrix:'Allergens',analyser:'Analyser',rules:'Rules',orders:'Orders',devices:'Devices',users:'Users',history:'History',settings:'Settings'};
+// desktop menu: COLLAPSE to an icon rail (remembered on this device, as in Proview Signage)
+const sideCollapsed=()=>lsGet('pvl.sideCollapsed')==='1';
+function toggleSide(){ const on=!sideCollapsed(); lsSet('pvl.sideCollapsed',on?'1':'0'); const a=$('.app'); if(a) a.classList.toggle('collapsed',on); const b=$('#sfCollapse'); if(b){ b.title=on?'Expand menu':'Collapse menu'; b.setAttribute('aria-label',b.title); } }
+// the site in view (one site picked, or the only site this person has)
+function siteInView(){ if(siteFilter!=='all'&&!siteFilter.startsWith('org:')) return P.byId('sites',siteFilter); const a=allowedSiteIds(); return a.length===1?P.byId('sites',a[0]):null; }
+
 function render(){
   S=P.get();
   if(CLOUD&&TRIAL_SETUP&&!WHO) return renderTrialSetup();
-  if(!me()){ return renderLogin(); }
+  if(!me()){ if(window.PVHub) PVHub.close(); return renderLogin(); }
   fixSite();
   const r=route(); const u=me();
-  const A=bySite(P.live('labels')).filter(l=>l.type==='prep'&&(!l.status||l.status==='active'));
-  const expired=A.filter(l=>P.expiryStatus(l)==='expired').length;
-  const badge={expiry:expired,orders:bySite(P.live('orders')).filter(o=>o.status==='pending').length,products:byOrg(P.live('products')).filter(p=>p.approved===false).length};
+  const badge={expiry:expiredCount(),orders:bySite(P.live('orders')).filter(o=>o.status==='pending').length,products:byOrg(P.live('products')).filter(p=>p.approved===false).length};
   const title=(NAV.flatMap(([,i])=>i).find(x=>x[0]===r)||[])[1]||'Dashboard';
-  const single=allowedSiteIds().length===1;
-  const cur=siteFilter==='all'||siteFilter.startsWith('org:')?null:P.byId('sites',siteFilter);
-  $('#app').innerHTML=`<div class="app">
+  const link=([k,l,i])=>`<a href="#${k}" class="${r===k?'active':''}" title="${esc(l)}" aria-label="${esc(l)}">${ic(i)}<span class="lbl">${esc(l)}</span><span class="slbl">${esc(SHORT[k]||l)}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`;
+  const col=sideCollapsed();
+  $('#app').innerHTML=`<div class="app${col?' collapsed':''}">
     <aside class="side">
-      <a class="brand" href="#${isMaster()?'sites':'overview'}"><div class="logo"></div><div class="wordmark">PROVIEW<span>LABEL</span></div></a>
+      <a class="brand" href="#${isMaster()?'sites':'overview'}" title="Proview Label"><div class="brand-mark"></div><div class="wordmark">PROVIEW<span>LABEL</span></div></a>
       <div class="client-pick" id="orgPick">${pickerHtml()}</div>
-      <nav class="nav">${NAV.map(([g,items])=>{ const vis=items.filter(([k])=>canView(k)); return vis.length?`<div class="nav-sec">${g}</div>`+vis.map(([k,l,i])=>`<a href="#${k}" class="${r===k?'on':''}" title="${l}">${ic(i)}<span class="lbl">${l}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`).join(''):''; }).join('')}</nav>
-      ${cur||single?`<div class="venue"><span class="dot" style="background:${siteStats((cur||P.byId('sites',allowedSiteIds()[0])).id).online?'#12a150':'#8b8b95'}"></span>${siteStats((cur||P.byId('sites',allowedSiteIds()[0])).id).online?'Devices online':'Devices offline'}<b>${esc((cur||P.byId('sites',allowedSiteIds()[0])).name)}</b><span style="color:#8b8b95">${esc((cur||P.byId('sites',allowedSiteIds()[0])).address||'')}</span></div>`:''}
-      <div class="side-foot"><button id="sbSync" title="Sync">${ic('sync',15)}<span class="lbl">Sync</span></button><button id="sbOut" title="Sign out">${ic('out',15)}<span class="lbl">Sign out</span></button></div>
+      <nav class="nav">${NAV.map(([g,items])=>{ const vis=items.filter(([k])=>canView(k)); return vis.length?`<div class="nav-sep">${g}</div>`+vis.map(link).join(''):''; }).join('')}</nav>
+      <div class="side-foot"><button class="sf-link" id="sfCollapse" title="${col?'Expand menu':'Collapse menu'}" aria-label="${col?'Expand menu':'Collapse menu'}">${ic('left',14)}<span class="lbl">COLLAPSE</span></button></div>
     </aside>
     <div class="main">
-      <div class="top"><h2>${esc(title)}</h2>
-        ${isMaster()?`<span class="mchip"><i></i>Master · ${esc(scopeLabel())}</span>`:''}
-        ${!CLOUD?'<span class="tag warn" title="Sample data in this browser only">Demo</span>':''}
-        <span class="tpick">${pickerHtml(true).replace('id="sitePick"','id="sitePick2"')}</span>
-        <div class="sp"></div>
-        <button class="icon-btn" id="tbBell" title="Expired items">${ic('bell',19)}${expired?`<span class="badge">${expired}</span>`:''}</button>
-        <button class="icon-btn" id="tbSync" title="Sync">${ic('sync',19)}</button>
-        <button class="av ${u.role==='master'?'master':''}" id="tbMe" title="${esc(u.name)} · ${P.ROLES[u.role]}">${esc(P.initials(u.name))}</button>
-        <button class="icon-btn" id="tbOut" title="Sign out">${ic('out',19)}</button>
-      </div>
+      <header class="top" id="top"><h2>${esc(title)}</h2>${!CLOUD?'<span class="tag warn" title="Sample data in this browser only">Demo</span>':''}<div class="sp"></div><span class="top-pick">${pickerHtml(true).replace('id="sitePick"','id="sitePick2"')}</span></header>
       <div class="content" id="main"></div>
     </div></div>`;
+  // header: tray (status, search, inbox, notifications), Proview dashboard, avatar and sign out
+  const top=$('#top');
+  if(window.PVHub){ const cap=PVHub.tray({dot:syncDot(),bell:bellBtn()}); const chat=cap.querySelector('.hub-chat'); if(chat) chat.remove(); top.appendChild(cap); const d=PVHub.dashLink(true); if(d) top.appendChild(d); PVHub.paint(); }
+  top.insertAdjacentHTML('beforeend',`<div class="top-me"><button class="top-av" id="tbMe" title="${esc(u.name)} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}" aria-label="My account">${esc(P.initials(u.name))}</button><button class="icon-btn top-out" id="tbOut" title="Sign out" aria-label="Sign out">${ic('out',18)}</button></div>`);
   VIEWS[r]($('#main'));
   const tbn=trialBanner(); if(tbn&&r!=='sites') $('#main').insertAdjacentHTML('afterbegin',tbn);
   const sp=$('#sitePick'); if(sp) sp.onchange=e=>pickSite(e.target.value);
   const sp2=$('#sitePick2'); if(sp2) sp2.onchange=e=>pickSite(e.target.value);
-  $('#tbBell').onclick=()=>location.hash='expiry';
-  $('#tbSync').onclick=$('#sbSync').onclick=()=>doSync(false);
-  $('#tbOut').onclick=$('#sbOut').onclick=signOut;
-  $('#tbMe').onclick=()=>modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open every business and site from All sites or the picker under the logo.':'You can see '+allowedSiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn" id="mo">Sign out</button>`).querySelector('#mo').onclick=()=>{closeModal();signOut();};
+  $('#sfCollapse').onclick=toggleSide;
+  $('#tbOut').onclick=()=>signOut();
+  $('#tbMe').onclick=()=>{ const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open every business and site from All sites or the site picker.':'You can see '+allowedSiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
+    m.querySelector('#mo').onclick=()=>{closeModal();signOut();}; m.querySelector('#msync').onclick=()=>{closeModal();doSync(false);}; };
+}
+// ---------- header tray: status dot (sync), search, inbox and notifications ----------
+let SYNC_STATE='ok';
+function syncDot(){ const d=document.createElement('span'); d.id='syncDot'; d.setAttribute('role','button'); d.tabIndex=0; paintDot(d);
+  d.onclick=()=>doSync(false); d.onkeydown=(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); doSync(false); } }; return d; }
+function paintDot(d){ d=d||$('#syncDot'); if(!d) return; const off=!navigator.onLine; const st=off?'offline':SYNC_STATE;
+  d.className='hdr-dot'+(st==='ok'?'':' '+st);
+  const t=!CLOUD?'Demo: sample data in this browser only':off?'Offline: changes are kept and sync when you’re back online':st==='saving'?'Syncing…':st==='error'?'Last sync didn’t finish: click to try again':'Online, all changes synced. Click to sync now';
+  d.title=t; d.setAttribute('aria-label',t); }
+addEventListener('online',()=>paintDot()); addEventListener('offline',()=>paintDot());
+const activeLabels=()=>bySite(P.live('labels')).filter(l=>l.type==='prep'&&(!l.status||l.status==='active'));
+const expiredCount=()=>canView('expiry')?activeLabels().filter(l=>P.expiryStatus(l)==='expired').length:0;
+// Notifications (the bell): everything that needs attention for the sites in view
+function attention(){
+  const out=[]; const act=activeLabels();
+  if(canView('expiry')){
+    act.filter(l=>P.expiryStatus(l)==='expired').sort((a,b)=>new Date(a.expiry)-new Date(b.expiry)).forEach(l=>out.push({lvl:'bad',icon:'clock',title:`${l.name} has expired`,sub:`${siteName(l.siteId)} · ${l.code||''} · use by ${P.fmtDate(l.expiry,true)}`,at:l.expiry,go:'expiry'}));
+    act.filter(l=>P.expiryStatus(l)==='today').sort((a,b)=>new Date(a.expiry)-new Date(b.expiry)).forEach(l=>out.push({lvl:'warn',icon:'clock',title:`${l.name} expires within 24 hrs`,sub:`${siteName(l.siteId)} · ${l.code||''} · use by ${P.fmtDate(l.expiry,true)}`,at:l.expiry,go:'expiry'}));
+  }
+  if(canView('devices')) bySite(P.live('devices')).forEach(d=>{
+    if(d.labelsLeft<60) out.push({lvl:'bad',icon:'print',title:`${d.name} is low on labels`,sub:`${siteName(d.siteId)} · ${d.labelsLeft} left on the roll`,go:canView('orders')?'orders':'devices'});
+    if(d.lastSync&&Date.now()-new Date(d.lastSync)>24*3600e3) out.push({lvl:'warn',icon:'device',title:`${d.name} hasn’t synced since ${P.fmtDate(d.lastSync,true)}`,sub:siteName(d.siteId),at:d.lastSync,go:'devices'}); });
+  const ids=scopeOrgIds(); (S.orgs||[]).filter(o=>ids.includes(o.id)).forEach(o=>{ const m=lockMsgOf(o);
+    if(m) out.push({lvl:'bad',icon:'shield',title:`${o.name}: ${m.title}`,sub:m.text,go:isMaster()?'sites':null});
+    else if(orgState(o)==='trial') out.push({lvl:'warn',icon:'shield',title:`${o.name}: free trial`,sub:'Ends '+P.fmtDate(o.trial_ends_at,true),go:isMaster()?'sites':null}); });
+  return out;
+}
+function bellBtn(){ const n=attention().filter(x=>x.lvl==='bad').length; const b=document.createElement('button'); b.type='button'; b.id='tbBell'; b.className='hub-bell'; b.title='Notifications'; b.setAttribute('aria-label','Notifications');
+  b.innerHTML=ic('bell',18)+`<span class="hub-badge${n?'':' hidden'}">${n>9?'9+':n||''}</span>`; b.onclick=(e)=>{ e.preventDefault(); openNotifications(); }; return b; }
+function openNotifications(){ if(window.PVHub) PVHub.close(); const items=attention(); const sv=(k)=>window.PVHub?PVHub.svg(k==='clock'?'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>':ICON[k]||k,17):'';
+  const m=modal('Notifications',`<div class="nt-list">${items.length?items.slice(0,60).map((x,i)=>`<div class="hub-item" data-i="${i}" ${x.go?'':'style="cursor:default"'}><span class="ii ${x.lvl}">${sv(x.icon)}</span><div class="it"><b>${esc(x.title)}</b>${x.sub?`<div class="is">${esc(x.sub)}</div>`:''}</div></div>`).join(''):'<div class="hub-note">Nothing needs your attention. Expired items, low label rolls, devices that stop syncing and trial reminders show up here.</div>'}</div>`,
+    `${canView('expiry')?'<a class="btn ghost" href="#expiry" data-x>Open expiry log</a>':''}<button class="btn" data-x>Close</button>`);
+  m.querySelectorAll('.hub-item[data-i]').forEach(el=>el.onclick=()=>{ const x=items[+el.dataset.i]; if(!x.go) return; closeModal(); location.hash=x.go; }); }
+// Inbox: things waiting for someone to decide (product approvals, label orders), with Approve buttons
+const inboxSeenKey=()=>'pvl.inboxSeen.'+((me()||{}).email||'');
+function inboxItems(){ if(!me()) return []; const out=[];
+  if(canView('products')) byOrg(P.live('products')).filter(p=>p.approved===false).forEach(p=>out.push({icon:'page',need:true,unread:true,title:`New product awaiting approval: ${p.name}`,sub:(multiOrg()?orgName(p.orgId)+' · ':'')+(catOf(p).name||'Product'),open:()=>{ location.hash='products'; },
+    actions:[{label:'Approve',kind:'pri',run:async()=>{ const x=P.byId('products',p.id); P.upsert('products',{...x,approved:true}); audit('approved','Product',x.name,x.orgId); toast('Approved – will sync to devices'); render(); }}]}));
+  if(canView('orders')) bySite(P.live('orders')).filter(o=>o.status==='pending').sort((a,b)=>new Date(b.at)-new Date(a.at)).forEach(o=>{ const lt=P.LABEL_TYPES.find(t=>t.id===o.labelType)||{};
+    out.push({icon:'page',need:true,unread:true,at:o.at,title:`Label order: ${o.rolls} roll${o.rolls==1?'':'s'} for ${siteName(o.siteId)}`,sub:[lt.name||o.labelType,o.by?'by '+o.by:''].filter(Boolean).join(' · '),open:()=>{ location.hash='orders'; },
+      actions:[{label:'Approve',kind:'pri',run:async()=>{ const x=P.byId('orders',o.id); P.upsert('orders',{...x,status:'approved'}); audit('updated','Label order',x.rolls+' rolls → approved',x.orgId); toast('Order approved'); render(); }},
+        {label:'Cancel order',kind:'bad',run:async()=>{ const x=P.byId('orders',o.id); P.upsert('orders',{...x,status:'cancelled'}); audit('updated','Label order',x.rolls+' rolls → cancelled',x.orgId); toast('Order cancelled'); render(); }}]}); });
+  return out; }
+// Search (Ctrl+K): pages, sites, products, categories and device staff
+function searchItems(q){ if(!me()) return []; const out=[]; const has=(x)=>String(x||'').toLowerCase().includes(q);
+  NAV.flatMap(([,i])=>i).filter(([k,l])=>canView(k)&&(!q||has(l)||has(SHORT[k]))).forEach(([k,l])=>out.push({group:'Pages',icon:'page',label:l,run:()=>{ location.hash=k; }}));
+  if(!q) return out;
+  P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(has(x.name)||has(x.address))).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,8).forEach(x=>out.push({group:'Sites',icon:ICON.pin,label:x.name,hint:[orgName(x.orgId),x.address].filter(Boolean).join(' · '),run:()=>{ setSite(x.id); if(location.hash==='#sites'||!canView((location.hash||'').slice(1))) location.hash='overview'; }}));
+  if(canView('products')){ byOrg(P.live('products')).filter(p=>has(p.name)||has(p.barcode)).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,8).forEach(p=>out.push({group:'Products',icon:ICON.tag,label:p.name,hint:(catOf(p).name||'')+(p.approved===false?' · awaiting approval':''),run:()=>{ location.hash='products'; }}));
+    byOrg(P.live('categories')).filter(c=>has(c.name)).slice(0,6).forEach(c=>out.push({group:'Categories',icon:ICON.grid,label:c.name,hint:c.type||'',run:()=>{ location.hash='categories'; }})); }
+  if(canView('users')){ const oi=scopeOrgIds(), a=allowedSiteIds(); P.live('users').filter(x=>!x.email&&x.role!=='master'&&oi.includes(x.orgId)&&(x.siteIds||[]).some(id=>a.includes(id))&&has(x.name)).slice(0,6).forEach(x=>out.push({group:'People',av:true,label:x.name,hint:'Device staff · '+(x.siteIds||[]).filter(id=>a.includes(id)).map(siteName).join(', '),run:()=>{ location.hash='users'; }})); }
+  return out; }
+if(window.PVHub){
+  PVHub.init({ key:()=>((me()||{}).email||'x')+'.'+siteFilter, searchItems,
+    inbox:{ empty:'Nothing waiting for you. New products awaiting approval and label orders to approve show up here.',
+      items:async()=>inboxItems(), count:()=>{ const seen=+(lsGet(inboxSeenKey())||0); return inboxItems().filter(i=>i.unread||(i.at&&new Date(i.at).getTime()>seen)).length; },
+      seen:()=>lsSet(inboxSeenKey(),String(Date.now())) } });
+  addEventListener('hashchange',()=>PVHub.close());
 }
 let syncing=false, syncTimer=null, lockToastShown=false;
 async function doSync(quiet){
   if(!CLOUD){ if(!quiet) toast('This is the demo. In the hosted back-office changes sync to every device automatically.'); return; }
-  if(syncing) return; syncing=true;
+  if(syncing) return; syncing=true; SYNC_STATE='saving'; paintDot();
   try{ let changed=false; if(!quiet){ if(!(await checkAccess())) return; changed=true; }
-    const r=await Cloud.sync(P,{full:!quiet}); S=P.get(); if(!quiet) toast(`Synced · ${r.pushed} sent, ${r.pulled} received`); if(r.pulled||r.dropped||changed) render(); }
-  catch(e){ const lo=(S.orgs||[]).find(o=>lockMsgOf(o)); if(lo&&!isMaster()){ if(!quiet||!lockToastShown){ lockToastShown=true; toast(lockMsgOf(lo).title+': changes can’t be saved. Buy a licence at license.proviewcrm.co.uk.'); } } else toast(Cloud.friendly(e)); }
-  finally{ syncing=false; }
+    const r=await Cloud.sync(P,{full:!quiet}); S=P.get(); SYNC_STATE='ok'; if(!quiet) toast(`Synced · ${r.pushed} sent, ${r.pulled} received`); if(r.pulled||r.dropped||changed) render(); }
+  catch(e){ SYNC_STATE=navigator.onLine?'error':'ok'; const lo=(S.orgs||[]).find(o=>lockMsgOf(o)); if(lo&&!isMaster()){ if(!quiet||!lockToastShown){ lockToastShown=true; toast(lockMsgOf(lo).title+': changes can’t be saved. Buy a licence at license.proviewcrm.co.uk.'); } } else toast(Cloud.friendly(e)); }
+  finally{ syncing=false; if(SYNC_STATE==='saving') SYNC_STATE='ok'; paintDot(); }
 }
 // push changes shortly after any edit; pull every minute
 P.on(()=>{ if(!CLOUD||!WHO) return; const dirty=P.COLLECTIONS.some(k=>P.get()[k].some(r=>r._dirty)); if(!dirty) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>doSync(true),1200); });
@@ -626,9 +740,9 @@ VIEWS.overview=(el)=>{
   const top={}; labels.filter(l=>Date.now()-new Date(l.printedAt)<14*day).forEach(l=>top[l.name]=(top[l.name]||0)+(+l.qty||1));
   const reasons={}; waste.forEach(w=>reasons[w.reason]=(reasons[w.reason]||0)+(+w.cost||0));
   const multi=(siteFilter==='all'||siteFilter.startsWith('org:'))&&bySite(P.live('sites').map(x=>({...x,siteId:x.id}))).length>1;
-  const sitesHtml=multi?`<div class="card" style="padding:16px 16px 4px"><div class="row" style="justify-content:space-between;margin-bottom:10px"><div><h3>${isMaster()?'All sites':'Your sites'}</h3><div class="sub" style="margin:0">Click a site to open it. You can also switch from the picker under the logo.</div></div></div>
+  const sitesHtml=multi?`<div class="card" style="padding:16px 16px 4px"><div class="row" style="justify-content:space-between;margin-bottom:10px"><div><h3>${isMaster()?'All sites':'Your sites'}</h3><div class="sub" style="margin:0">Click a site to open it. You can also switch from the site picker.</div></div></div>
     <div class="sitegrid">${P.live('sites').filter(x=>allowedSiteIds().includes(x.id)).sort((a,b)=>siteStats(b.id).expired-siteStats(a.id).expired||a.name.localeCompare(b.name)).map(x=>{const st=siteStats(x.id);return `<button class="sc" data-site="${x.id}"><div class="t"><b>${esc(x.name)}</b>${st.expired?`<span class="tag bad">${st.expired} expired</span>`:st.soon?`<span class="tag warn">${st.soon} due</span>`:'<span class="tag ok">All good</span>'}</div><div class="meta"><span class="dot" style="background:${st.online?'#12a150':'#8b8b95'}"></span>${st.devices} device${st.devices!==1?'s':''} · ${st.lastSync?'synced '+P.fmtDate(st.lastSync,true):'never synced'}${st.low?' · <span style="color:#d92d20">'+st.low+' low on labels</span>':''}</div><div class="nums"><div><span>${st.today}</span>labels today</div><div><span>${st.soon}</span>due 24 hrs</div><div><span>${P.money(st.waste7)}</span>waste 7d</div></div><div class="go">Open site →</div></button>`;}).join('')}</div></div>`:'';
-  el.innerHTML=`<div class="ph keep"><div><h1>${multi?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):visibleOrgs().length>1?'All businesses':isMaster()?'All sites':'Your sites'):siteFilter==='all'||siteFilter.startsWith('org:')?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):isMaster()?'All businesses':'Your sites'):esc(siteName(siteFilter))}</h1><p>${P.fmtDay(new Date())} ${P.fmtDate(new Date())}${multi?' · '+allowedSiteIds().length+' sites combined':''}</p></div><div class="btns"><a class="btn ghost" href="#analyser">Menu analyser</a><a class="btn" href="#products">+ Add product</a></div></div>
+  el.innerHTML=`<div class="ph keep"><div><h1>${multi?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):visibleOrgs().length>1?'All businesses':isMaster()?'All sites':'Your sites'):siteFilter==='all'||siteFilter.startsWith('org:')?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):isMaster()?'All businesses':'Your sites'):esc(siteName(siteFilter))}</h1><p>${P.fmtDay(new Date())} ${P.fmtDate(new Date())}${multi?' · '+allowedSiteIds().length+' sites combined':''}${(()=>{ const v=!multi&&siteInView(); if(!v) return ''; const on=siteStats(v.id).online; return ` · <span class="dot" style="background:${on?'#12a150':'#8b8b95'}"></span>${on?'Devices online':'Devices offline'}${v.address?' · '+esc(v.address):''}`; })()}</p></div><div class="btns"><a class="btn ghost" href="#analyser">Menu analyser</a><a class="btn" href="#products">+ Add product</a></div></div>
   ${expired?`<div class="banner">${ic('clock',20)}<div><b>${expired} expired item${expired!==1?'s':''} still marked active</b><span class="hint">Mark each as used or wasted so the expiry log stays accurate.</span></div><div class="sp"></div><a class="btn ghost sm" href="#expiry">Review</a></div>`:''}
   ${!allowedSiteIds().length?`<div class="card" style="text-align:center;padding:34px 20px"><h3 style="font-size:18px">${isMaster()&&!visibleOrgs().length?'Add your first business':'Add your first site'}</h3><p class="hint" style="max-width:520px;margin:8px auto 16px">${isMaster()&&!visibleOrgs().length?'Create a customer business and invite its owner. They can then add their kitchens, menu and staff, or you can set it up for them.':'Add a kitchen, then connect a handheld to it (Menu → Settings → Connect to Proview Label on the device).'}</p><a class="btn" href="#devices">${isMaster()&&!visibleOrgs().length?'+ Add business':'+ Add site'}</a></div>`:''}
   ${sitesHtml}

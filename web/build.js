@@ -4,7 +4,7 @@
 //   site/app.html                       the device app with the live connection (copied into the Android project)
 const fs = require('fs');
 const R = (f) => fs.readFileSync(__dirname + '/' + f, 'utf8');
-const core = R('src/core.js'), cloud = R('src/cloud.js');
+const core = R('src/core.js'), cloud = R('src/cloud.js'), hub = R('src/hub.js');
 const jsb = R('node_modules/jsbarcode/dist/barcodes/JsBarcode.code128.min.js');
 const supa = R('node_modules/@supabase/supabase-js/dist/umd/supabase.js');
 const CONFIG = { SUPABASE_URL: 'https://fiqoirnlmhjzicvktdwa.supabase.co', SUPABASE_KEY: 'sb_publishable_j7p5qB-D6FMOV4B6zLiN_w_7xmfKLRM' };
@@ -16,6 +16,7 @@ function build(file, live) {
   h = h.replace('<script>/*CORE*/</script>', () => js(core));
   h = h.replace('<script>/*JSBARCODE*/</script>', () => js(jsb));
   h = h.replace('<script>/*CLOUD*/</script>', () => js(cloud));
+  h = h.replace('<script>/*HUB*/</script>', () => js(hub));   // shared Proview header tray (same file as Proview Signage)
   h = h.replace('<script>/*SUPABASE*/</script>', () => (live ? js(supa) : ''));
   h = h.replace('<script>/*CONFIG*/</script>', () => (live ? js('window.PVL_CONFIG=' + JSON.stringify(CONFIG) + ';') : ''));
   for (const [k, v] of Object.entries(assets)) h = h.split(k).join(v);
