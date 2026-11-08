@@ -13,7 +13,7 @@
 :root{--pri:#4a6cd0;--pri-d:#3a59b8;--pri-l:#edf2fd;--grad:linear-gradient(135deg,#2f84d4 0%,#5a5fbb 100%);--grad-light:linear-gradient(90deg,#62b0ec 0%,#8b88dc 100%);
   --navy:#141418;--navy2:#26262e;--bg:#f4f3ef;--card:#fff;--ink:#17171c;--mut:#55555f;--line:#e4e2dc;
   --ok:#12a150;--okl:#e7f6ed;--warn:#d48a00;--warnl:#fdf3de;--bad:#d92d20;--badl:#fdf0ef;--pur:#6d5fc4;--purl:#efedfb;--grey:#8b8b95;--greyl:#efeee9;
-  --r:12px;--sh:0 1px 2px rgba(20,20,30,.06),0 4px 16px rgba(20,20,30,.05)}
+  --font:Inter,"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;--r:12px;--sh:0 1px 2px rgba(20,20,30,.06),0 4px 16px rgba(20,20,30,.05)}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;font-family:Inter,"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.4}
@@ -60,13 +60,22 @@ a{color:var(--pri)}
 .top h2{font-size:18px;font-weight:700;letter-spacing:-.015em;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .top .sp{flex:1}
 .top h2{flex:none;max-width:40%}
-/* Proview site dropdown, the one standard (PICKER_STANDARD.md; same .hdr-pick in WiFi, Signage, Bookings, Employee):
-   in the top header right after the page title; phones: its own full-width second header row */
-.top .hdr-pick{margin:0 0 0 6px;flex:0 1 auto;min-width:0;display:flex}
-.top .hdr-pick select{display:block;box-sizing:border-box;width:fit-content;height:38px;max-width:320px;min-width:170px;border-radius:10px;border:1px solid #dfe3ea;background-color:#fff;color:#1b2230;font:600 14px Inter,"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;line-height:normal;padding:0 34px 0 12px;cursor:pointer;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4.5l4 4 4-4' stroke='%231b2230' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:12px 12px}
-.top .hdr-pick select:focus{outline:none;border-color:#dfe3ea}
-.top .hdr-pick select:focus-visible{outline:2px solid #5a8dee;outline-offset:2px}
-.top .hdr-pick select:disabled{opacity:1;cursor:default;color:#5b6475;background-image:none;padding-right:12px}
+/* site picker: in the top header right after the page title, on every screen size (same as Proview WiFi;
+   Bookings and Label use the same .hdr-pick markup and rules) */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.top .hdr-pick { margin: 0 0 0 6px; flex: 0 1 auto; min-width: 0; }
+.top .hdr-pick select { display: block; width: auto; height: 38px; max-width: 320px; min-width: 170px; border-radius: 10px; border: 1px solid var(--line); background-color: #fff; color: var(--ink); font: 600 14px var(--font); padding: 0 30px 0 12px; cursor: pointer; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+.top .hdr-pick select:focus { outline: none; border-color: var(--line); }
+.top .hdr-pick select:focus-visible { outline: 2px solid #5a8dee; outline-offset: 2px; }
+.top .hdr-pick select:disabled { opacity: 1; cursor: default; color: var(--ink); appearance: none; -webkit-appearance: none; padding-right: 12px; }
+/* phones: the tray leaves no room on the title row, so the picker gets the header's second row, full width */
+@media (max-width: 700px) {
+  .top { flex-wrap: wrap; row-gap: 6px; }
+  .top .hdr-pick { order: 1; flex: 1 0 100%; margin: 0; }
+  .top .hdr-pick select { width: 100%; min-width: 0; max-width: none; height: 36px; font-size: 13px; }
+}
+/* Label only: the box can shrink (not below 170px) so it never runs under the tray on iPad */
+.top .hdr-pick{display:flex}
 .hdr-pick+.tag{flex:none}
 .hdr-dot[role=button]{cursor:pointer}
 .icon-btn{position:relative;background:none;border:1px solid transparent;border-radius:10px;width:38px;height:38px;padding:0;display:grid;place-items:center;cursor:pointer;color:var(--ink)}
@@ -108,10 +117,6 @@ a{color:var(--pri)}
  .app .side .nav .slbl{display:block;font-size:10px;line-height:12px;font-weight:500;letter-spacing:-.1px;text-align:center;white-space:nowrap;max-width:58px}
  .top{padding:8px 10px;gap:2px}
  .top h2{flex:1;max-width:none}
- /* site dropdown: its own full-width second header row, 12px from each side (header padding 10px + 2px) */
- .top{flex-wrap:wrap;row-gap:6px}
- .top .hdr-pick{order:1;flex:0 0 calc(100% - 4px);margin:0 2px}
- .top .hdr-pick select{width:100%;min-width:0;max-width:none}
  .top .sp,.top .tag{display:none}
  .top .top-me{margin-left:4px;gap:2px}
  .top-av{width:32px;height:32px;font-size:12px}
