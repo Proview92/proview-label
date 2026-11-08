@@ -19,8 +19,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 h1,h2,h3,h4{margin:0;font-weight:650;letter-spacing:-.01em}
 a{color:var(--pri)}
 /* ===== Proview app shell: the same menu, header tray and breakpoints as Proview Signage and Bookings =====
-   desktop: 236px menu (COLLAPSE to a 72px icon rail) · 701-900px: 72px labelled rail, site picker in the header
-   phones: 60px labelled rail with the site (building) button under the mark */
+   desktop: 236px menu (COLLAPSE to a 72px icon rail) · 701-900px: 72px labelled rail · phones: 60px labelled rail
+   the site drop-down is always in the header, straight after the page title (as in Proview WiFi) */
 .app{display:grid;grid-template-columns:236px minmax(0,1fr);height:100vh;height:100dvh}
 .side{background:#141418;color:#c9c9d1;display:flex;flex-direction:column;overflow:hidden;min-height:0;font-size:15px}
 .side .brand{display:flex;align-items:center;gap:10px;padding:18px 10px 14px 14px;color:#fff;text-decoration:none;flex:none}
@@ -28,13 +28,6 @@ a{color:var(--pri)}
 .logo{width:36px;height:26px;flex:none;background:url(%%MARK_SM%%) center/contain no-repeat}
 .wordmark{letter-spacing:.04em;font-size:15px;line-height:20px;white-space:nowrap;font-weight:500;color:#fff}
 .wordmark span{background:var(--grad-light);-webkit-background-clip:text;background-clip:text;color:transparent}
-.client-pick{margin:0 14px 12px;position:relative;flex:none}.client-pick:empty{display:none}
-.side .pv-viewing{display:block;font-size:11px;line-height:15px;letter-spacing:.06em;text-transform:uppercase;color:#8b8b95;margin:0 2px 6px;font-weight:400}
-.side .client-pick select{width:100%;height:42px;border-radius:10px;border:1px solid #2c2c35;background-color:#1f1f25;color:#fff;font:inherit;font-size:14px;font-weight:600;padding:0 34px 0 12px;appearance:none;-webkit-appearance:none;cursor:pointer;text-overflow:ellipsis;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b4b4bd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:16px 16px}
-.side .client-pick select:hover{border-color:#4a4a55}
-.side .client-pick select:focus-visible{outline:2px solid #5a8dee;outline-offset:2px}
-.side .client-pick option{color:#141418;background:#fff;font-weight:400}
-.client-pick .sp-title{color:#9a9aa4;font-size:13px;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .side .nav{flex:1;min-height:0;overflow:auto;padding:6px 10px;display:flex;flex-direction:column}
 .side .nav-sep{font-size:11px;line-height:13px;letter-spacing:.08em;text-transform:uppercase;color:#6e6e78;padding:10px 10px 3px;flex:none}
 .side .nav a{display:flex;align-items:center;gap:10px;height:30px;flex:none;box-sizing:border-box;padding:0 12px;border-radius:9px;color:#c9c9d1;text-decoration:none;font-size:14px;font-weight:550;line-height:22px;position:relative}
@@ -52,7 +45,7 @@ a{color:var(--pri)}
 .app.collapsed{grid-template-columns:72px minmax(0,1fr)}
 @media (min-width:901px){
  .app.collapsed .side{padding:18px 10px}
- .app.collapsed .wordmark,.app.collapsed .client-pick,.app.collapsed .nav-sep,.app.collapsed .nav .lbl,.app.collapsed .nav .cnt,.app.collapsed .sf-link .lbl{display:none}
+ .app.collapsed .wordmark,.app.collapsed .nav-sep,.app.collapsed .nav .lbl,.app.collapsed .nav .cnt,.app.collapsed .sf-link .lbl{display:none}
  .app.collapsed .side .brand{justify-content:center;padding:4px 0 18px}
  .app.collapsed .side .nav a{justify-content:center;padding:0}
  .app.collapsed .side-foot{flex-direction:column;gap:4px;padding:0 0 14px}
@@ -64,8 +57,13 @@ a{color:var(--pri)}
 .top{display:flex;align-items:center;gap:12px;padding:12px 22px;background:var(--card);border-bottom:1px solid var(--line);min-height:62px;box-sizing:border-box;flex:none;font-size:15px;position:relative;z-index:20}
 .top h2{font-size:18px;font-weight:700;letter-spacing:-.015em;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .top .sp{flex:1}
-.top-pick{display:none}
-.top-pick select{width:100%;padding:7px 28px 7px 10px;font:inherit;font-weight:500;font-size:15px;line-height:20px;border-radius:9px;background-color:#fff;color:var(--ink);border:1px solid var(--line);appearance:none;-webkit-appearance:none;cursor:pointer;text-overflow:ellipsis;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23555' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center}
+.top h2{flex:none;max-width:40%}
+/* site drop-down in the header, straight after the page title (same box as Proview WiFi): fills the free space up to 640px */
+.hdr-pick{flex:1 1 640px;max-width:640px;min-width:0;margin:0 0 0 6px}
+.hdr-pick select,.hdr-pick .hdr-one{display:block;width:100%;height:38px;border-radius:10px;border:1px solid var(--line);background-color:#fff;color:var(--ink);font:600 14px Inter,"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;padding:0 30px 0 12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-pick .hdr-one{line-height:36px;padding-right:12px;cursor:default}
+.hdr-pick select:focus-visible{outline:2px solid #5a8dee;outline-offset:2px}
+.hdr-pick+.tag{flex:none}
 .hdr-dot[role=button]{cursor:pointer}
 .icon-btn{position:relative;background:none;border:1px solid transparent;border-radius:10px;width:38px;height:38px;padding:0;display:grid;place-items:center;cursor:pointer;color:var(--ink)}
 .icon-btn:hover{background:var(--bg);border-color:var(--line)}
@@ -85,14 +83,12 @@ a{color:var(--pri)}
 @media (min-width:701px) and (max-width:900px){
  .app,.app.collapsed{grid-template-columns:72px minmax(0,1fr)}
  .app .side{padding:0}
- .app .wordmark,.app .client-pick,.app .nav-sep,.app .side-foot,.app .nav .cnt,.app .nav .lbl{display:none}
+ .app .wordmark,.app .nav-sep,.app .side-foot,.app .nav .cnt,.app .nav .lbl{display:none}
  .app .side .brand{justify-content:center;padding:18px 0 14px}
  .app .side .nav{padding:6px 10px}
  .app .side .nav a{height:56px;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:0 2px;font-size:15px}
  .app .side .nav a svg{width:18px;height:18px}
  .app .side .nav .slbl{display:block;font-size:10.5px;line-height:12px;font-weight:500;letter-spacing:-.1px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px}
- .top-pick{display:block;max-width:46%;min-width:0;margin:0 6px}
- .top-pick:empty,.top-pick>div{display:none}
  .top .tag{display:none}
 }
 /* phones: the same compact icon menu always on the left (60px; every button 50 x 52) */
@@ -101,15 +97,17 @@ a{color:var(--pri)}
  .app .side{padding:10px 5px calc(10px + env(safe-area-inset-bottom));overflow-y:auto;overflow-x:hidden}
  .app .side .brand{justify-content:center;padding:2px 0 10px;gap:0}
  .app .side .brand-mark{width:32px;height:23px;margin:0 auto}
- .app .wordmark,.app .side .pv-viewing,.app .side .sp-title,.app .nav-sep,.app .side-foot,.app .nav .cnt,.app .nav .lbl{display:none}
- .app .side .client-pick{display:block;margin:0 0 8px;padding:0}
- .app .side .client-pick select{width:50px;height:40px;min-width:0;padding:0;margin:0 auto;display:block;color:transparent;text-indent:-999px;font-size:16px;border-radius:10px;background-position:center;background-size:18px 18px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23d9d9e0' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4'/%3E%3C/svg%3E")}
+ .app .wordmark,.app .nav-sep,.app .side-foot,.app .nav .cnt,.app .nav .lbl{display:none}
  .app .side .nav{padding:0;align-items:center;overflow:visible;flex:1 0 auto}
  .app .side .nav a{width:50px;height:52px;margin:0 auto;padding:0 1px;flex-direction:column;justify-content:center;align-items:center;gap:4px;font-size:15px}
  .app .side .nav a svg{width:18px;height:18px}
  .app .side .nav .slbl{display:block;font-size:10px;line-height:12px;font-weight:500;letter-spacing:-.1px;text-align:center;white-space:nowrap;max-width:58px}
  .top{padding:8px 10px;gap:2px}
- .top h2{flex:1}
+ .top h2{display:none}
+ .hdr-pick{flex:1 1 auto;max-width:none;margin:0 2px 0 0}
+ .hdr-pick select,.hdr-pick .hdr-one{height:36px;font-size:13px;padding-left:8px}
+ .hdr-pick select{padding-right:20px;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23555' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center}
+ .hdr-pick .hdr-one{line-height:34px}
  .top .sp,.top .tag{display:none}
  .top .top-me{margin-left:4px;gap:2px}
  .top-av{width:32px;height:32px;font-size:12px}
@@ -266,7 +264,7 @@ pre{background:#141418;color:#d6dcf5;padding:14px;border-radius:10px;overflow:au
 .art-pill i{width:26px;height:26px;border-radius:50%;background:var(--ok);display:grid;place-items:center;color:#fff;font-style:normal;font-weight:800}
 .art-glow{position:absolute;right:-120px;top:20%;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(74,108,208,.45),transparent 65%)}
 
-@media (hover:none) and (pointer:coarse){.client-pick select,.top-pick select{font-size:16px!important}}
+@media (hover:none) and (pointer:coarse){.hdr-pick select{font-size:16px!important}}
 @media (max-width:1180px){.auth2-art h2{max-width:300px;font-size:32px}}
 @media (max-width:700px){.content{padding:14px 12px 40px}}
 @media (max-width:900px){.cols,.cols.eq{grid-template-columns:1fr}.auth2{grid-template-columns:1fr}.auth2-art{display:none}.g3{grid-template-columns:1fr 1fr}}
@@ -407,19 +405,25 @@ function siteStats(id){
     devices: devs.length, low: devs.filter(d=>d.labelsLeft<60).length, lastSync: last,
     online: devs.some(d=>d.lastSync&&Date.now()-new Date(d.lastSync)<6*3600e3) };
 }
-// Site picker under the logo: the same dropdown as Proview Bookings, Employee, Signage and WiFi.
-// "Viewing site" / "Master view" caption, then "All sites (N)" and every site A–Z.
-function pickerHtml(compact){
+// Site drop-down in the header, straight after the page title: the same box and wording as Proview WiFi.
+// Master: "All sites (N)" then every Business ▸ Site, grouped by business.
+// Everyone else: their own sites, with "All my sites (N)" (the business-wide view) when they have more than one;
+// one site only: the site name in the same box.
+function pickerHtml(){
   const a=allowedSiteIds(); const sites=P.live('sites').filter(s=>a.includes(s.id)).sort((x,y)=>String(x.name).localeCompare(String(y.name)));
   if(!sites.length) return '';
-  if(sites.length===1&&!isMaster()) return compact?'':`<div class="sp-title" title="${esc(sites[0].name)}">${esc(sites[0].name)}</div>`;
+  if(sites.length===1&&!isMaster()) return `<div class="hdr-one" title="${esc(sites[0].name)}">${esc(sites[0].name)}</div>`;
   const orgs=[...new Set(sites.map(s=>s.orgId))];
   const allVal=!isMaster()&&orgs.length===1?'org:'+orgs[0]:'all';
   const all=siteFilter===allVal;
-  const dup=(s)=>sites.filter(x=>x.name===s.name).length>1;
-  const opt=(s)=>`<option value="${esc(s.id)}" ${siteFilter===s.id?'selected':''}>${esc(s.name)}${dup(s)?' · '+esc(orgName(s.orgId)):''}</option>`;
   const orgOpt=siteFilter.startsWith('org:')&&!all?`<option value="${esc(siteFilter)}" selected>All ${esc(orgName(siteFilter.slice(4)))} sites</option>`:'';
-  return `${compact?'':`<label class="pv-viewing">${all&&isMaster()?'Master view':'Viewing site'}</label>`}<select id="sitePick" aria-label="Site" title="Switch site"><option value="${allVal}" ${all?'selected':''}>All sites (${sites.length})</option>${orgOpt}${sites.map(opt).join('')}</select>`;
+  const opt=(s,biz)=>`<option value="${esc(s.id)}" ${siteFilter===s.id?'selected':''}>${biz?esc(orgName(s.orgId))+' ▸ ':''}${esc(s.name)}</option>`;
+  let list;
+  if(isMaster()||orgs.length>1){ // grouped by business, A–Z
+    const groups=orgs.map(o=>({o,n:orgName(o)})).sort((x,y)=>String(x.n).localeCompare(String(y.n)));
+    list=groups.map(g=>`<optgroup label="${esc(g.n)}">${sites.filter(s=>s.orgId===g.o).map(s=>opt(s,true)).join('')}</optgroup>`).join('');
+  } else list=sites.map(s=>opt(s,false)).join('');
+  return `<select id="sitePick" aria-label="Site" title="${all&&isMaster()?'Master view: all sites':'Switch site'}"><option value="${allVal}" ${all?'selected':''}>${isMaster()?'All sites':'All my sites'} (${sites.length})</option>${orgOpt}${list}</select>`;
 }
 function scopeLabel(){ if(siteFilter==='all') return visibleOrgs().length>1?'all businesses':'all sites'; if(siteFilter.startsWith('org:')) return orgName(siteFilter.slice(4)); return siteName(siteFilter); }
 
@@ -444,12 +448,11 @@ function render(){
   $('#app').innerHTML=`<div class="app${col?' collapsed':''}">
     <aside class="side">
       <a class="brand" href="#${isMaster()?'sites':'overview'}" title="Proview Label"><div class="brand-mark"></div><div class="wordmark">PROVIEW<span>LABEL</span></div></a>
-      <div class="client-pick" id="orgPick">${pickerHtml()}</div>
       <nav class="nav">${NAV.map(([g,items])=>{ const vis=items.filter(([k])=>canView(k)); return vis.length?`<div class="nav-sep">${g}</div>`+vis.map(link).join(''):''; }).join('')}</nav>
       <div class="side-foot"><button class="sf-link" id="sfCollapse" title="${col?'Expand menu':'Collapse menu'}" aria-label="${col?'Expand menu':'Collapse menu'}">${ic('left',14)}<span class="lbl">COLLAPSE</span></button></div>
     </aside>
     <div class="main">
-      <header class="top" id="top"><h2>${esc(title)}</h2>${!CLOUD?'<span class="tag warn" title="Sample data in this browser only">Demo</span>':''}<div class="sp"></div><span class="top-pick">${pickerHtml(true).replace('id="sitePick"','id="sitePick2"')}</span></header>
+      <header class="top" id="top"><h2>${esc(title)}</h2>${(()=>{ const pk=pickerHtml(); return pk?`<div class="hdr-pick">${pk}</div>`:''; })()}${!CLOUD?'<span class="tag warn" title="Sample data in this browser only">Demo</span>':''}<div class="sp"></div></header>
       <div class="content" id="main"></div>
     </div></div>`;
   // header: tray (status, search, inbox, notifications), Proview dashboard, avatar and sign out
@@ -459,7 +462,6 @@ function render(){
   VIEWS[r]($('#main'));
   const tbn=trialBanner(); if(tbn&&r!=='sites') $('#main').insertAdjacentHTML('afterbegin',tbn);
   const sp=$('#sitePick'); if(sp) sp.onchange=e=>pickSite(e.target.value);
-  const sp2=$('#sitePick2'); if(sp2) sp2.onchange=e=>pickSite(e.target.value);
   $('#sfCollapse').onclick=toggleSide;
   $('#tbOut').onclick=()=>signOut();
   $('#tbMe').onclick=()=>{ const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open every business and site from All sites or the site picker.':'You can see '+allowedSiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);

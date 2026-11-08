@@ -19,8 +19,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 h1,h2,h3,h4{margin:0;font-weight:650;letter-spacing:-.01em}
 a{color:var(--pri)}
 /* ===== Proview app shell: the same menu, header tray and breakpoints as Proview Signage and Bookings =====
-   desktop: 236px menu (COLLAPSE to a 72px icon rail) · 701-900px: 72px labelled rail, site picker in the header
-   phones: 60px labelled rail with the site (building) button under the mark */
+   desktop: 236px menu (COLLAPSE to a 72px icon rail) · 701-900px: 72px labelled rail · phones: 60px labelled rail
+   the site drop-down is always in the header, straight after the page title (as in Proview WiFi) */
 .app{display:grid;grid-template-columns:236px minmax(0,1fr);height:100vh;height:100dvh}
 .side{background:#141418;color:#c9c9d1;display:flex;flex-direction:column;overflow:hidden;min-height:0;font-size:15px}
 .side .brand{display:flex;align-items:center;gap:10px;padding:18px 10px 14px 14px;color:#fff;text-decoration:none;flex:none}
@@ -28,13 +28,6 @@ a{color:var(--pri)}
 .logo{width:36px;height:26px;flex:none;background:url(data:image/png;base64,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) center/contain no-repeat}
 .wordmark{letter-spacing:.04em;font-size:15px;line-height:20px;white-space:nowrap;font-weight:500;color:#fff}
 .wordmark span{background:var(--grad-light);-webkit-background-clip:text;background-clip:text;color:transparent}
-.client-pick{margin:0 14px 12px;position:relative;flex:none}.client-pick:empty{display:none}
-.side .pv-viewing{display:block;font-size:11px;line-height:15px;letter-spacing:.06em;text-transform:uppercase;color:#8b8b95;margin:0 2px 6px;font-weight:400}
-.side .client-pick select{width:100%;height:42px;border-radius:10px;border:1px solid #2c2c35;background-color:#1f1f25;color:#fff;font:inherit;font-size:14px;font-weight:600;padding:0 34px 0 12px;appearance:none;-webkit-appearance:none;cursor:pointer;text-overflow:ellipsis;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b4b4bd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:16px 16px}
-.side .client-pick select:hover{border-color:#4a4a55}
-.side .client-pick select:focus-visible{outline:2px solid #5a8dee;outline-offset:2px}
-.side .client-pick option{color:#141418;background:#fff;font-weight:400}
-.client-pick .sp-title{color:#9a9aa4;font-size:13px;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .side .nav{flex:1;min-height:0;overflow:auto;padding:6px 10px;display:flex;flex-direction:column}
 .side .nav-sep{font-size:11px;line-height:13px;letter-spacing:.08em;text-transform:uppercase;color:#6e6e78;padding:10px 10px 3px;flex:none}
 .side .nav a{display:flex;align-items:center;gap:10px;height:30px;flex:none;box-sizing:border-box;padding:0 12px;border-radius:9px;color:#c9c9d1;text-decoration:none;font-size:14px;font-weight:550;line-height:22px;position:relative}
@@ -52,7 +45,7 @@ a{color:var(--pri)}
 .app.collapsed{grid-template-columns:72px minmax(0,1fr)}
 @media (min-width:901px){
  .app.collapsed .side{padding:18px 10px}
- .app.collapsed .wordmark,.app.collapsed .client-pick,.app.collapsed .nav-sep,.app.collapsed .nav .lbl,.app.collapsed .nav .cnt,.app.collapsed .sf-link .lbl{display:none}
+ .app.collapsed .wordmark,.app.collapsed .nav-sep,.app.collapsed .nav .lbl,.app.collapsed .nav .cnt,.app.collapsed .sf-link .lbl{display:none}
  .app.collapsed .side .brand{justify-content:center;padding:4px 0 18px}
  .app.collapsed .side .nav a{justify-content:center;padding:0}
  .app.collapsed .side-foot{flex-direction:column;gap:4px;padding:0 0 14px}
@@ -64,8 +57,13 @@ a{color:var(--pri)}
 .top{display:flex;align-items:center;gap:12px;padding:12px 22px;background:var(--card);border-bottom:1px solid var(--line);min-height:62px;box-sizing:border-box;flex:none;font-size:15px;position:relative;z-index:20}
 .top h2{font-size:18px;font-weight:700;letter-spacing:-.015em;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .top .sp{flex:1}
-.top-pick{display:none}
-.top-pick select{width:100%;padding:7px 28px 7px 10px;font:inherit;font-weight:500;font-size:15px;line-height:20px;border-radius:9px;background-color:#fff;color:var(--ink);border:1px solid var(--line);appearance:none;-webkit-appearance:none;cursor:pointer;text-overflow:ellipsis;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23555' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center}
+.top h2{flex:none;max-width:40%}
+/* site drop-down in the header, straight after the page title (same box as Proview WiFi): fills the free space up to 640px */
+.hdr-pick{flex:1 1 640px;max-width:640px;min-width:0;margin:0 0 0 6px}
+.hdr-pick select,.hdr-pick .hdr-one{display:block;width:100%;height:38px;border-radius:10px;border:1px solid var(--line);background-color:#fff;color:var(--ink);font:600 14px Inter,"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;padding:0 30px 0 12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-pick .hdr-one{line-height:36px;padding-right:12px;cursor:default}
+.hdr-pick select:focus-visible{outline:2px solid #5a8dee;outline-offset:2px}
+.hdr-pick+.tag{flex:none}
 .hdr-dot[role=button]{cursor:pointer}
 .icon-btn{position:relative;background:none;border:1px solid transparent;border-radius:10px;width:38px;height:38px;padding:0;display:grid;place-items:center;cursor:pointer;color:var(--ink)}
 .icon-btn:hover{background:var(--bg);border-color:var(--line)}
@@ -85,14 +83,12 @@ a{color:var(--pri)}
 @media (min-width:701px) and (max-width:900px){
  .app,.app.collapsed{grid-template-columns:72px minmax(0,1fr)}
  .app .side{padding:0}
- .app .wordmark,.app .client-pick,.app .nav-sep,.app .side-foot,.app .nav .cnt,.app .nav .lbl{display:none}
+ .app .wordmark,.app .nav-sep,.app .side-foot,.app .nav .cnt,.app .nav .lbl{display:none}
  .app .side .brand{justify-content:center;padding:18px 0 14px}
  .app .side .nav{padding:6px 10px}
  .app .side .nav a{height:56px;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:0 2px;font-size:15px}
  .app .side .nav a svg{width:18px;height:18px}
  .app .side .nav .slbl{display:block;font-size:10.5px;line-height:12px;font-weight:500;letter-spacing:-.1px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px}
- .top-pick{display:block;max-width:46%;min-width:0;margin:0 6px}
- .top-pick:empty,.top-pick>div{display:none}
  .top .tag{display:none}
 }
 /* phones: the same compact icon menu always on the left (60px; every button 50 x 52) */
@@ -101,15 +97,17 @@ a{color:var(--pri)}
  .app .side{padding:10px 5px calc(10px + env(safe-area-inset-bottom));overflow-y:auto;overflow-x:hidden}
  .app .side .brand{justify-content:center;padding:2px 0 10px;gap:0}
  .app .side .brand-mark{width:32px;height:23px;margin:0 auto}
- .app .wordmark,.app .side .pv-viewing,.app .side .sp-title,.app .nav-sep,.app .side-foot,.app .nav .cnt,.app .nav .lbl{display:none}
- .app .side .client-pick{display:block;margin:0 0 8px;padding:0}
- .app .side .client-pick select{width:50px;height:40px;min-width:0;padding:0;margin:0 auto;display:block;color:transparent;text-indent:-999px;font-size:16px;border-radius:10px;background-position:center;background-size:18px 18px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23d9d9e0' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4'/%3E%3C/svg%3E")}
+ .app .wordmark,.app .nav-sep,.app .side-foot,.app .nav .cnt,.app .nav .lbl{display:none}
  .app .side .nav{padding:0;align-items:center;overflow:visible;flex:1 0 auto}
  .app .side .nav a{width:50px;height:52px;margin:0 auto;padding:0 1px;flex-direction:column;justify-content:center;align-items:center;gap:4px;font-size:15px}
  .app .side .nav a svg{width:18px;height:18px}
  .app .side .nav .slbl{display:block;font-size:10px;line-height:12px;font-weight:500;letter-spacing:-.1px;text-align:center;white-space:nowrap;max-width:58px}
  .top{padding:8px 10px;gap:2px}
- .top h2{flex:1}
+ .top h2{display:none}
+ .hdr-pick{flex:1 1 auto;max-width:none;margin:0 2px 0 0}
+ .hdr-pick select,.hdr-pick .hdr-one{height:36px;font-size:13px;padding-left:8px}
+ .hdr-pick select{padding-right:20px;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23555' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center}
+ .hdr-pick .hdr-one{line-height:34px}
  .top .sp,.top .tag{display:none}
  .top .top-me{margin-left:4px;gap:2px}
  .top-av{width:32px;height:32px;font-size:12px}
@@ -266,7 +264,7 @@ pre{background:#141418;color:#d6dcf5;padding:14px;border-radius:10px;overflow:au
 .art-pill i{width:26px;height:26px;border-radius:50%;background:var(--ok);display:grid;place-items:center;color:#fff;font-style:normal;font-weight:800}
 .art-glow{position:absolute;right:-120px;top:20%;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(74,108,208,.45),transparent 65%)}
 
-@media (hover:none) and (pointer:coarse){.client-pick select,.top-pick select{font-size:16px!important}}
+@media (hover:none) and (pointer:coarse){.hdr-pick select{font-size:16px!important}}
 @media (max-width:1180px){.auth2-art h2{max-width:300px;font-size:32px}}
 @media (max-width:700px){.content{padding:14px 12px 40px}}
 @media (max-width:900px){.cols,.cols.eq{grid-template-columns:1fr}.auth2{grid-template-columns:1fr}.auth2-art{display:none}.g3{grid-template-columns:1fr 1fr}}
@@ -1293,19 +1291,25 @@ function siteStats(id){
     devices: devs.length, low: devs.filter(d=>d.labelsLeft<60).length, lastSync: last,
     online: devs.some(d=>d.lastSync&&Date.now()-new Date(d.lastSync)<6*3600e3) };
 }
-// Site picker under the logo: the same dropdown as Proview Bookings, Employee, Signage and WiFi.
-// "Viewing site" / "Master view" caption, then "All sites (N)" and every site A–Z.
-function pickerHtml(compact){
+// Site drop-down in the header, straight after the page title: the same box and wording as Proview WiFi.
+// Master: "All sites (N)" then every Business ▸ Site, grouped by business.
+// Everyone else: their own sites, with "All my sites (N)" (the business-wide view) when they have more than one;
+// one site only: the site name in the same box.
+function pickerHtml(){
   const a=allowedSiteIds(); const sites=P.live('sites').filter(s=>a.includes(s.id)).sort((x,y)=>String(x.name).localeCompare(String(y.name)));
   if(!sites.length) return '';
-  if(sites.length===1&&!isMaster()) return compact?'':`<div class="sp-title" title="${esc(sites[0].name)}">${esc(sites[0].name)}</div>`;
+  if(sites.length===1&&!isMaster()) return `<div class="hdr-one" title="${esc(sites[0].name)}">${esc(sites[0].name)}</div>`;
   const orgs=[...new Set(sites.map(s=>s.orgId))];
   const allVal=!isMaster()&&orgs.length===1?'org:'+orgs[0]:'all';
   const all=siteFilter===allVal;
-  const dup=(s)=>sites.filter(x=>x.name===s.name).length>1;
-  const opt=(s)=>`<option value="${esc(s.id)}" ${siteFilter===s.id?'selected':''}>${esc(s.name)}${dup(s)?' · '+esc(orgName(s.orgId)):''}</option>`;
   const orgOpt=siteFilter.startsWith('org:')&&!all?`<option value="${esc(siteFilter)}" selected>All ${esc(orgName(siteFilter.slice(4)))} sites</option>`:'';
-  return `${compact?'':`<label class="pv-viewing">${all&&isMaster()?'Master view':'Viewing site'}</label>`}<select id="sitePick" aria-label="Site" title="Switch site"><option value="${allVal}" ${all?'selected':''}>All sites (${sites.length})</option>${orgOpt}${sites.map(opt).join('')}</select>`;
+  const opt=(s,biz)=>`<option value="${esc(s.id)}" ${siteFilter===s.id?'selected':''}>${biz?esc(orgName(s.orgId))+' ▸ ':''}${esc(s.name)}</option>`;
+  let list;
+  if(isMaster()||orgs.length>1){ // grouped by business, A–Z
+    const groups=orgs.map(o=>({o,n:orgName(o)})).sort((x,y)=>String(x.n).localeCompare(String(y.n)));
+    list=groups.map(g=>`<optgroup label="${esc(g.n)}">${sites.filter(s=>s.orgId===g.o).map(s=>opt(s,true)).join('')}</optgroup>`).join('');
+  } else list=sites.map(s=>opt(s,false)).join('');
+  return `<select id="sitePick" aria-label="Site" title="${all&&isMaster()?'Master view: all sites':'Switch site'}"><option value="${allVal}" ${all?'selected':''}>${isMaster()?'All sites':'All my sites'} (${sites.length})</option>${orgOpt}${list}</select>`;
 }
 function scopeLabel(){ if(siteFilter==='all') return visibleOrgs().length>1?'all businesses':'all sites'; if(siteFilter.startsWith('org:')) return orgName(siteFilter.slice(4)); return siteName(siteFilter); }
 
@@ -1330,12 +1334,11 @@ function render(){
   $('#app').innerHTML=`<div class="app${col?' collapsed':''}">
     <aside class="side">
       <a class="brand" href="#${isMaster()?'sites':'overview'}" title="Proview Label"><div class="brand-mark"></div><div class="wordmark">PROVIEW<span>LABEL</span></div></a>
-      <div class="client-pick" id="orgPick">${pickerHtml()}</div>
       <nav class="nav">${NAV.map(([g,items])=>{ const vis=items.filter(([k])=>canView(k)); return vis.length?`<div class="nav-sep">${g}</div>`+vis.map(link).join(''):''; }).join('')}</nav>
       <div class="side-foot"><button class="sf-link" id="sfCollapse" title="${col?'Expand menu':'Collapse menu'}" aria-label="${col?'Expand menu':'Collapse menu'}">${ic('left',14)}<span class="lbl">COLLAPSE</span></button></div>
     </aside>
     <div class="main">
-      <header class="top" id="top"><h2>${esc(title)}</h2>${!CLOUD?'<span class="tag warn" title="Sample data in this browser only">Demo</span>':''}<div class="sp"></div><span class="top-pick">${pickerHtml(true).replace('id="sitePick"','id="sitePick2"')}</span></header>
+      <header class="top" id="top"><h2>${esc(title)}</h2>${(()=>{ const pk=pickerHtml(); return pk?`<div class="hdr-pick">${pk}</div>`:''; })()}${!CLOUD?'<span class="tag warn" title="Sample data in this browser only">Demo</span>':''}<div class="sp"></div></header>
       <div class="content" id="main"></div>
     </div></div>`;
   // header: tray (status, search, inbox, notifications), Proview dashboard, avatar and sign out
@@ -1345,7 +1348,6 @@ function render(){
   VIEWS[r]($('#main'));
   const tbn=trialBanner(); if(tbn&&r!=='sites') $('#main').insertAdjacentHTML('afterbegin',tbn);
   const sp=$('#sitePick'); if(sp) sp.onchange=e=>pickSite(e.target.value);
-  const sp2=$('#sitePick2'); if(sp2) sp2.onchange=e=>pickSite(e.target.value);
   $('#sfCollapse').onclick=toggleSide;
   $('#tbOut').onclick=()=>signOut();
   $('#tbMe').onclick=()=>{ const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open every business and site from All sites or the site picker.':'You can see '+allowedSiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
