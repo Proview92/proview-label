@@ -25,13 +25,15 @@ a{color:var(--pri)}
 .logo{width:36px;height:26px;flex:none;background:url(%%MARK_SM%%) center/contain no-repeat}
 .wordmark{letter-spacing:.04em;font-size:15px;white-space:nowrap;font-weight:500;color:#fff}
 .wordmark span{background:var(--grad-light);-webkit-background-clip:text;background-clip:text;color:transparent}
-.client-pick{margin:0 14px 12px}
-.client-pick select{width:100%;background:#23232a;color:#fff;border:1px solid #33333c;border-radius:9px;padding:9px 30px 9px 11px;font-size:14px;font-weight:500;appearance:none;-webkit-appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23fff' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;text-overflow:ellipsis}
-.client-pick select:hover{border-color:#4a4a55}
-.client-pick select:focus-visible{outline:2px solid var(--pri);outline-offset:1px}
-.client-pick select option,.client-pick select optgroup{background:#23232a;color:#fff}
-.client-pick .sp-title{color:#9a9aa4;font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:0 2px 6px;display:flex;justify-content:space-between}
-.client-pick .sp-title b{color:#62b0ec;font-weight:600}
+.client-pick{margin:0 14px 12px;position:relative}.client-pick:empty{display:none}
+/* site picker in the sidebar: same as Proview Bookings, Employee, Signage and WiFi */
+.side .pv-viewing{display:block;font-size:11px;line-height:15px;letter-spacing:.06em;text-transform:uppercase;color:#8b8b95;margin:0 2px 6px;font-weight:400}
+.side .client-pick select{width:100%;height:42px;border-radius:10px;border:1px solid #2c2c35;background-color:#1f1f25;color:#fff;font:inherit;font-size:14px;font-weight:600;padding:0 34px 0 12px;appearance:none;-webkit-appearance:none;cursor:pointer;text-overflow:ellipsis;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b4b4bd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:16px 16px}
+.side .client-pick select:hover{border-color:#4a4a55}
+.side .client-pick select:focus-visible{outline:2px solid #5a8dee;outline-offset:2px}
+.side .client-pick option{color:#141418;background:#fff;font-weight:400}
+.client-pick .sp-title{color:#9a9aa4;font-size:13px;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (hover:none) and (pointer:coarse){.client-pick select,.top .tpick select{font-size:16px!important}}
 .nav{flex:1;overflow:auto;padding:6px 10px}
 .nav-sec{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#6e6e78;padding:14px 10px 6px}
 .nav a{display:flex;align-items:center;gap:12px;width:100%;color:#c9c9d1;padding:9px 12px;border-radius:9px;text-decoration:none;font-weight:500;position:relative}
@@ -336,15 +338,19 @@ function siteStats(id){
     devices: devs.length, low: devs.filter(d=>d.labelsLeft<60).length, lastSync: last,
     online: devs.some(d=>d.lastSync&&Date.now()-new Date(d.lastSync)<6*3600e3) };
 }
-function pickerHtml(){
-  const a=allowedSiteIds(); const sites=P.live('sites').filter(s=>a.includes(s.id)).sort((x,y)=>x.name.localeCompare(y.name));
-  const orgs=visibleOrgs().filter(o=>sites.some(s=>s.orgId===o.id)||orgRole(o.id)!=='manager');
-  if(sites.length<2&&orgs.length<2) return '';
-  const opt=(s)=>{ const st=siteStats(s.id); return `<option value="${s.id}" ${siteFilter===s.id?'selected':''}>${esc(s.name)}${st.expired?'  ·  '+st.expired+' expired':''}</option>`; };
-  const body=orgs.length>1
-    ? orgs.map(o=>{ const os=sites.filter(s=>s.orgId===o.id); return `<optgroup label="${esc(o.name)}"><option value="org:${o.id}" ${siteFilter==='org:'+o.id?'selected':''}>All ${esc(o.name)} sites (${os.length})</option>${os.map(opt).join('')}</optgroup>`; }).join('')
-    : sites.map(opt).join('');
-  return `<div class="sp-title"><span>${isMaster()?'Master view':'Your sites'}</span><b>${orgs.length>1?orgs.length+' businesses':sites.length+' sites'}</b></div><select id="sitePick" aria-label="Site"><option value="all" ${siteFilter==='all'?'selected':''}>${orgs.length>1?'All businesses':'All sites'} (${sites.length} sites)</option>${body}</select>`;
+// Site picker under the logo: the same dropdown as Proview Bookings, Employee, Signage and WiFi.
+// "Viewing site" / "Master view" caption, then "All sites (N)" and every site A–Z.
+function pickerHtml(compact){
+  const a=allowedSiteIds(); const sites=P.live('sites').filter(s=>a.includes(s.id)).sort((x,y)=>String(x.name).localeCompare(String(y.name)));
+  if(!sites.length) return '';
+  if(sites.length===1&&!isMaster()) return compact?'':`<div class="sp-title" title="${esc(sites[0].name)}">${esc(sites[0].name)}</div>`;
+  const orgs=[...new Set(sites.map(s=>s.orgId))];
+  const allVal=!isMaster()&&orgs.length===1?'org:'+orgs[0]:'all';
+  const all=siteFilter===allVal;
+  const dup=(s)=>sites.filter(x=>x.name===s.name).length>1;
+  const opt=(s)=>`<option value="${esc(s.id)}" ${siteFilter===s.id?'selected':''}>${esc(s.name)}${dup(s)?' · '+esc(orgName(s.orgId)):''}</option>`;
+  const orgOpt=siteFilter.startsWith('org:')&&!all?`<option value="${esc(siteFilter)}" selected>All ${esc(orgName(siteFilter.slice(4)))} sites</option>`:'';
+  return `${compact?'':`<label class="pv-viewing">${all&&isMaster()?'Master view':'Viewing site'}</label>`}<select id="sitePick" aria-label="Site" title="Switch site"><option value="${allVal}" ${all?'selected':''}>All sites (${sites.length})</option>${orgOpt}${sites.map(opt).join('')}</select>`;
 }
 function scopeLabel(){ if(siteFilter==='all') return visibleOrgs().length>1?'all businesses':'all sites'; if(siteFilter.startsWith('org:')) return orgName(siteFilter.slice(4)); return siteName(siteFilter); }
 
@@ -371,7 +377,7 @@ function render(){
       <div class="top"><h2>${esc(title)}</h2>
         ${isMaster()?`<span class="mchip"><i></i>Master · ${esc(scopeLabel())}</span>`:''}
         ${!CLOUD?'<span class="tag warn" title="Sample data in this browser only">Demo</span>':''}
-        <span class="tpick">${pickerHtml().replace('id="sitePick"','id="sitePick2"').replace(/<div class="sp-title">.*?<\/div>/,'')}</span>
+        <span class="tpick">${pickerHtml(true).replace('id="sitePick"','id="sitePick2"')}</span>
         <div class="sp"></div>
         <button class="icon-btn" id="tbBell" title="Expired items">${ic('bell',19)}${expired?`<span class="badge">${expired}</span>`:''}</button>
         <button class="icon-btn" id="tbSync" title="Sync">${ic('sync',19)}</button>
