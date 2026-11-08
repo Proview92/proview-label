@@ -22,7 +22,7 @@ h1,h2,h3,h4{margin:0;font-weight:650;letter-spacing:-.01em}
 a{color:var(--pri)}
 /* ===== Proview app shell: the same menu, header tray and breakpoints as Proview Signage and Bookings =====
    desktop: 236px menu (COLLAPSE to a 72px icon rail) · 701-900px: 72px labelled rail · phones: 60px labelled rail
-   the site drop-down is always in the header, straight after the page title (as in Proview WiFi) */
+   the site drop-down is always in the header, straight after the page title (as in Proview WiFi); phones: own second header row */
 .app{display:grid;grid-template-columns:236px minmax(0,1fr);height:100vh;height:100dvh}
 .side{background:#141418;color:#c9c9d1;display:flex;flex-direction:column;overflow:hidden;min-height:0;font-size:15px}
 .side .brand{display:flex;align-items:center;gap:10px;padding:18px 10px 14px 14px;color:#fff;text-decoration:none;flex:none}
@@ -60,11 +60,13 @@ a{color:var(--pri)}
 .top h2{font-size:18px;font-weight:700;letter-spacing:-.015em;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .top .sp{flex:1}
 .top h2{flex:none;max-width:40%}
-/* site drop-down in the header, straight after the page title (same box as Proview WiFi): fills the free space up to 640px */
-.hdr-pick{flex:1 1 640px;max-width:640px;min-width:0;margin:0 0 0 6px}
-.hdr-pick select,.hdr-pick .hdr-one{display:block;width:100%;height:38px;border-radius:10px;border:1px solid var(--line);background-color:#fff;color:var(--ink);font:600 14px Inter,"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;padding:0 30px 0 12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hdr-pick .hdr-one{line-height:36px;padding-right:12px;cursor:default}
-.hdr-pick select:focus-visible{outline:2px solid #5a8dee;outline-offset:2px}
+/* Proview site dropdown, the one standard (PICKER_STANDARD.md; same .hdr-pick in WiFi, Signage, Bookings, Employee):
+   in the top header right after the page title; phones: its own full-width second header row */
+.top .hdr-pick{margin:0 0 0 6px;flex:0 1 auto;min-width:0;display:flex}
+.top .hdr-pick select{display:block;box-sizing:border-box;width:fit-content;height:38px;max-width:320px;min-width:170px;border-radius:10px;border:1px solid #dfe3ea;background-color:#fff;color:#1b2230;font:600 14px Inter,"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;line-height:normal;padding:0 34px 0 12px;cursor:pointer;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4.5l4 4 4-4' stroke='%231b2230' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:12px 12px}
+.top .hdr-pick select:focus{outline:none;border-color:#dfe3ea}
+.top .hdr-pick select:focus-visible{outline:2px solid #5a8dee;outline-offset:2px}
+.top .hdr-pick select:disabled{opacity:1;cursor:default;color:#5b6475;background-image:none;padding-right:12px}
 .hdr-pick+.tag{flex:none}
 .hdr-dot[role=button]{cursor:pointer}
 .icon-btn{position:relative;background:none;border:1px solid transparent;border-radius:10px;width:38px;height:38px;padding:0;display:grid;place-items:center;cursor:pointer;color:var(--ink)}
@@ -105,11 +107,11 @@ a{color:var(--pri)}
  .app .side .nav a svg{width:18px;height:18px}
  .app .side .nav .slbl{display:block;font-size:10px;line-height:12px;font-weight:500;letter-spacing:-.1px;text-align:center;white-space:nowrap;max-width:58px}
  .top{padding:8px 10px;gap:2px}
- .top h2{display:none}
- .hdr-pick{flex:1 1 auto;max-width:none;margin:0 2px 0 0}
- .hdr-pick select,.hdr-pick .hdr-one{height:36px;font-size:13px;padding-left:8px}
- .hdr-pick select{padding-right:20px;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23555' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center}
- .hdr-pick .hdr-one{line-height:34px}
+ .top h2{flex:1;max-width:none}
+ /* site dropdown: its own full-width second header row, 12px from each side (header padding 10px + 2px) */
+ .top{flex-wrap:wrap;row-gap:6px}
+ .top .hdr-pick{order:1;flex:0 0 calc(100% - 4px);margin:0 2px}
+ .top .hdr-pick select{width:100%;min-width:0;max-width:none}
  .top .sp,.top .tag{display:none}
  .top .top-me{margin-left:4px;gap:2px}
  .top-av{width:32px;height:32px;font-size:12px}
@@ -266,7 +268,6 @@ pre{background:#141418;color:#d6dcf5;padding:14px;border-radius:10px;overflow:au
 .art-pill i{width:26px;height:26px;border-radius:50%;background:var(--ok);display:grid;place-items:center;color:#fff;font-style:normal;font-weight:800}
 .art-glow{position:absolute;right:-120px;top:20%;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(74,108,208,.45),transparent 65%)}
 
-@media (hover:none) and (pointer:coarse){.hdr-pick select{font-size:16px!important}}
 @media (max-width:1180px){.auth2-art h2{max-width:300px;font-size:32px}}
 @media (max-width:700px){.content{padding:14px 12px 40px}}
 @media (max-width:900px){.cols,.cols.eq{grid-template-columns:1fr}.auth2{grid-template-columns:1fr}.auth2-art{display:none}.g3{grid-template-columns:1fr 1fr}}
@@ -333,7 +334,10 @@ function fixSite(){
   else if(siteFilter==='all'&&orgs.length===1&&a.length>1&&!isMaster()) siteFilter='org:'+orgs[0].id;
 }
 function setSite(id){ siteFilter=id; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),id); render(); }
-function pickSite(id){ if(id==='all'&&isMaster()&&location.hash!=='#sites'){ siteFilter='all'; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),'all'); location.hash='sites'; return; } setSite(id); }
+function pickSite(id){ if(id==='all'&&isMaster()&&location.hash!=='#sites'){ siteFilter='all'; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),'all'); location.hash='sites'; return; }
+  // stay on the same page if it exists for the new choice; the master All sites page doesn't, so go to its Dashboard
+  if(id!=='all'&&location.hash==='#sites'){ siteFilter=id; lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),id); location.hash='overview'; return; }
+  setSite(id); }
 // A business must be chosen before creating catalogue items, sites or staff
 function withOrg(cb){
   const o=curOrg(); if(o) return cb(o);
@@ -407,25 +411,24 @@ function siteStats(id){
     devices: devs.length, low: devs.filter(d=>d.labelsLeft<60).length, lastSync: last,
     online: devs.some(d=>d.lastSync&&Date.now()-new Date(d.lastSync)<6*3600e3) };
 }
-// Site drop-down in the header, straight after the page title: the same box and wording as Proview WiFi.
-// Master: "All sites (N)" then every Business ▸ Site, grouped by business.
-// Everyone else: their own sites, with "All my sites (N)" (the business-wide view) when they have more than one;
-// one site only: the site name in the same box.
+// Site dropdown in the header, straight after the page title: the one Proview standard (PICKER_STANDARD.md).
+// Master: "All sites (N)", then per business (A–Z) an optgroup with "Business ▸ All sites" and each "Business ▸ Site".
+// Owner/admin/manager with several sites: "All my sites (N)" and each site. Exactly one site: a disabled box with its name.
 function pickerHtml(){
-  const a=allowedSiteIds(); const sites=P.live('sites').filter(s=>a.includes(s.id)).sort((x,y)=>String(x.name).localeCompare(String(y.name)));
+  const byName=(x,y)=>String(x.name).localeCompare(String(y.name));
+  const a=allowedSiteIds(); const sites=P.live('sites').filter(s=>a.includes(s.id)).sort(byName);
+  const sel=(v)=>siteFilter===v?' selected':'';
+  if(isMaster()){
+    const orgs=visibleOrgs().slice().sort(byName);
+    const groups=orgs.map(o=>`<optgroup label="${esc(o.name)}"><option value="org:${esc(o.id)}"${sel('org:'+o.id)}>${esc(o.name)} ▸ All sites</option>${sites.filter(s=>s.orgId===o.id).map(s=>`<option value="${esc(s.id)}"${sel(s.id)}>${esc(o.name)} ▸ ${esc(s.name)}</option>`).join('')}</optgroup>`).join('');
+    return `<select id="sitePick" aria-label="Choose site"><option value="all"${sel('all')}>All sites (${sites.length})</option>${groups}</select>`;
+  }
   if(!sites.length) return '';
-  if(sites.length===1&&!isMaster()) return `<div class="hdr-one" title="${esc(sites[0].name)}">${esc(sites[0].name)}</div>`;
+  if(sites.length===1) return `<select id="sitePick" aria-label="Choose site" disabled><option>${esc(sites[0].name)}</option></select>`;
   const orgs=[...new Set(sites.map(s=>s.orgId))];
-  const allVal=!isMaster()&&orgs.length===1?'org:'+orgs[0]:'all';
-  const all=siteFilter===allVal;
-  const orgOpt=siteFilter.startsWith('org:')&&!all?`<option value="${esc(siteFilter)}" selected>All ${esc(orgName(siteFilter.slice(4)))} sites</option>`:'';
-  const opt=(s,biz)=>`<option value="${esc(s.id)}" ${siteFilter===s.id?'selected':''}>${biz?esc(orgName(s.orgId))+' ▸ ':''}${esc(s.name)}</option>`;
-  let list;
-  if(isMaster()||orgs.length>1){ // grouped by business, A–Z
-    const groups=orgs.map(o=>({o,n:orgName(o)})).sort((x,y)=>String(x.n).localeCompare(String(y.n)));
-    list=groups.map(g=>`<optgroup label="${esc(g.n)}">${sites.filter(s=>s.orgId===g.o).map(s=>opt(s,true)).join('')}</optgroup>`).join('');
-  } else list=sites.map(s=>opt(s,false)).join('');
-  return `<select id="sitePick" aria-label="Site" title="${all&&isMaster()?'Master view: all sites':'Switch site'}"><option value="${allVal}" ${all?'selected':''}>${isMaster()?'All sites':'All my sites'} (${sites.length})</option>${orgOpt}${list}</select>`;
+  const allVal=orgs.length===1?'org:'+orgs[0]:'all';
+  const orgOpt=siteFilter.startsWith('org:')&&siteFilter!==allVal?`<option value="${esc(siteFilter)}" selected>${esc(orgName(siteFilter.slice(4)))} ▸ All sites</option>`:'';
+  return `<select id="sitePick" aria-label="Choose site"><option value="${allVal}"${sel(allVal)}>All my sites (${sites.length})</option>${orgOpt}${sites.map(s=>`<option value="${esc(s.id)}"${sel(s.id)}>${esc(s.name)}</option>`).join('')}</select>`;
 }
 function scopeLabel(){ if(siteFilter==='all') return visibleOrgs().length>1?'all businesses':'all sites'; if(siteFilter.startsWith('org:')) return orgName(siteFilter.slice(4)); return siteName(siteFilter); }
 
@@ -463,7 +466,7 @@ function render(){
   top.insertAdjacentHTML('beforeend',`<div class="top-me"><button class="top-av" id="tbMe" title="${esc(u.name)} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}" aria-label="My account">${esc(P.initials(u.name))}</button><button class="icon-btn top-out" id="tbOut" title="Sign out" aria-label="Sign out">${ic('out',18)}</button></div>`);
   VIEWS[r]($('#main'));
   const tbn=trialBanner(); if(tbn&&r!=='sites') $('#main').insertAdjacentHTML('afterbegin',tbn);
-  const sp=$('#sitePick'); if(sp) sp.onchange=e=>pickSite(e.target.value);
+  const sp=$('#sitePick'); if(sp&&!sp.disabled) sp.onchange=e=>pickSite(e.target.value);
   $('#sfCollapse').onclick=toggleSide;
   $('#tbOut').onclick=()=>signOut();
   $('#tbMe').onclick=()=>{ const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open every business and site from All sites or the site picker.':'You can see '+allowedSiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
@@ -546,6 +549,7 @@ const deviceStore=()=>{ try{ const c=JSON.parse(lsGet('pvl-device')||'null'); re
 function forgetCaches(keep){ const dev=deviceStore(); (P.cloudStores?P.cloudStores():[]).forEach(k=>{ if(k!==keep&&k!==dev) P.forget(k); }); P.forget('signed-out'); }
 async function signOut(msg){
   TRIAL_SETUP=false;
+  lsSet('pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId),null); siteFilter='all'; // forget the site choice
   if(CLOUD){ await Cloud.signOut().catch(()=>{}); WHO=null; P.useStore('signed-out',{blank:true}); S=P.get();
     forgetCaches(null); LOGIN=typeof msg==='string'?{msg,kind:'bad',mode:'signin'}:{msg:'You’ve been signed out.',kind:'ok',mode:'signin'}; }
   else { lsSet(SKEY,null); sessionId=null; }
