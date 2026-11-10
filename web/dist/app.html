@@ -342,6 +342,7 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
 .pairscreen .langBtn{position:absolute;top:calc(14px + var(--safe-t));right:14px}
 .bulkBtn{flex:none;height:36px;padding:0 12px 0 10px;border-radius:18px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap}
 .bulkBtn:active{background:#26262e}
+.segcnt{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;margin-left:8px;border-radius:11px;background:var(--bad);color:#fff;font-size:12px;font-weight:700;letter-spacing:0;vertical-align:2px}
 /* ---------- language ---------- */
 .hdr{gap:6px}
 .langBtn{flex:none;width:36px;height:36px;border-radius:50%;overflow:hidden;padding:0;box-shadow:0 0 0 2px rgba(255,255,255,.55);background:#fff}
@@ -4121,7 +4122,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.4.4';
+const APP_VERSION = '1.4.5';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -4306,7 +4307,8 @@ function closeSheet(){ $('#sheet').classList.remove('on'); $('#scrim').classList
 const screens = {};
 function catsFor(type){ return L('categories').filter(c=>c.type===type); }
 function prodsFor(catId){ return L('products').filter(p=>p.categoryId===catId); }
-function segHTML(){ return `<div class="seg" id="seg"><button data-t="prep" class="${ui.tab==='prep'?'on':''}">Prep</button><button data-t="sale" class="${ui.tab==='sale'?'on':''}">Sale</button></div>`; }
+// cnt (optional): labels picked on each tab, shown as a badge (Bulk Print)
+function segHTML(cnt){ const b=(t)=>cnt&&cnt[t]?`<span class="segcnt">${cnt[t]}</span>`:''; return `<div class="seg" id="seg"><button data-t="prep" class="${ui.tab==='prep'?'on':''}">Prep${b('prep')}</button><button data-t="sale" class="${ui.tab==='sale'?'on':''}">Sale${b('sale')}</button></div>`; }
 function bindSeg(after){ $('#seg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ ui.tab=b.dataset.t; localStorageSet('pvl_tab',ui.tab); after?after():render(); }); }
 
 // ---------- Easy mode: categories → products → − 1 + → Print ----------
@@ -4443,7 +4445,9 @@ screens.wastage = () => {
 screens.bulk = () => {
   const cats=catsFor(ui.tab);
   const total=Object.values(ui.bulk).reduce((a,x)=>a+x.qty,0);
-  $('#main').innerHTML = segHTML() + `<div class="list">${cats.map(c=>{
+  // picks are kept across Prep and Sale, so one print can mix both
+  const perTab={prep:0,sale:0}; Object.values(ui.bulk).forEach(x=>{ const c=P.byId('categories',x.product.categoryId); perTab[c&&c.type==='sale'?'sale':'prep']+=x.qty; });
+  $('#main').innerHTML = segHTML(perTab) + `<div class="list">${cats.map(c=>{
       const ps=prodsFor(c.id).sort((a,b)=>a.name.localeCompare(b.name));
       const n=ps.reduce((a,p)=>a+((ui.bulk[p.id]||{}).qty||0),0);
       const open=ui.bulkOpen[c.id];
@@ -4451,7 +4455,7 @@ screens.bulk = () => {
       ${open?`<div class="ab">${ps.map(p=>`<div class="ar"><span style="font-size:16px">${esc(tn(p))}</span><div class="stepper"><div class="sv"><button data-dec="${p.id}">−</button><b>${(ui.bulk[p.id]||{}).qty||0}</b><button data-inc="${p.id}">+</button></div></div></div>`).join('')||'<p class="hint">No products found in this category.</p>'}</div>`:''}</div>`;
     }).join('')}</div>
     <div class="bottombar">${total?`<div style="text-align:center;font-weight:600">${total} label${total!==1?'s':''} selected</div>`:''}<div class="row"><button class="btn ghost" id="bReset" ${total?'':'disabled'}>Reset</button><button class="btn" id="bPrev" ${total?'':'disabled'}>Preview</button></div></div>`;
-  bindSeg(()=>{ ui.bulk={}; render(); });
+  bindSeg();
   $('#main').querySelectorAll('[data-acc]').forEach(b=>b.onclick=()=>{ ui.bulkOpen[b.dataset.acc]=!ui.bulkOpen[b.dataset.acc]; render(); });
   const setQ=(id,d)=>{ const p=P.byId('products',id); const q=Math.max(0,Math.min(50,((ui.bulk[id]||{}).qty||0)+d)); if(q) ui.bulk[id]={product:p,qty:q}; else delete ui.bulk[id]; const y=$('#main').scrollTop; render(); $('#main').scrollTop=y; };
   $('#main').querySelectorAll('[data-inc]').forEach(b=>b.onclick=()=>setQ(b.dataset.inc,1));
