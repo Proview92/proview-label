@@ -795,7 +795,7 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
       version: 3, orgs, company: { name: 'ProView Tech Group' }, currentSiteId: 'site_main', deviceId: 'dev_1', currentUserId: 'u_lt',
       sites, rules, categories: cats, products, users, devices, labels, wastage, orders, audit,
       settings: {
-        printer: { mode: 'preview', address: '', port: 9100, name: '' },
+        printer: { mode: 'builtin', address: '', port: 9100, name: '' },
         sync: { url: '', key: '', enabled: false, lastSync: null },
         stockLastOrdered: new Date(Date.now() - 6 * 864e5).toISOString(), labelsInStock: 134, avgWeekly: 250,
         support: { phone: '020 8935 5495', email: 'info@proviewtechgroup.co.uk', hours: 'Mon–Fri 9am–5pm' }
@@ -811,7 +811,7 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
   function blank() {
     return { version: 3, cloud: true, orgs: [], company: { name: '' }, currentSiteId: null, deviceId: null, currentUserId: null,
       sites: [], rules: [], categories: [], products: [], users: [], devices: [], labels: [], wastage: [], orders: [], audit: [],
-      settings: { printer: { mode: 'preview', address: '', port: 9100, name: '' }, sync: { url: '', key: '', enabled: true, lastSync: null },
+      settings: { printer: { mode: 'builtin', address: '', port: 9100, name: '' }, sync: { url: '', key: '', enabled: true, lastSync: null },
         stockLastOrdered: null, labelsInStock: 180, avgWeekly: 250, support: { phone: '020 8935 5495', email: 'info@proviewtechgroup.co.uk', hours: 'Mon–Fri 9am–5pm' } } };
   }
   function useStore(key, opts) { storeKey = key ? STORAGE_KEY + ':' + key : STORAGE_KEY; storeBlank = !!(opts && opts.blank); state = null; return load(); }
@@ -1454,6 +1454,7 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     'months': ['ay', 'luni', 'месеца'], 'month': ['ay', 'lună', 'месец'],
     'Create': ['Oluştur', 'Creează', 'Създай'],
     'Enter a name': ['Bir ad girin', 'Introdu un nume', 'Въведете име'],
+    'Only managers can do this. Ask a manager to change it in the back-office.': ['Bunu yalnızca müdürler yapabilir. Yönetim panelinden değiştirmesi için bir müdüre başvurun.', 'Doar managerii pot face asta. Roagă un manager să schimbe din back-office.', 'Само мениджъри могат да направят това. Помолете мениджър да го промени от бек офиса.'],
     'Manager access needed': ['Müdür yetkisi gerekli', 'Este nevoie de acces de manager', 'Нужен е достъп на мениджър'],
     'Only managers and admins can do this. Switch to a manager profile to continue.': ['Bunu yalnızca müdürler ve yöneticiler yapabilir. Devam etmek için bir müdür profiline geçin.', 'Doar managerii și administratorii pot face asta. Treci pe un profil de manager pentru a continua.', 'Само мениджъри и администратори могат да направят това. Превключете на профил на мениджър.'],
 
@@ -1836,7 +1837,7 @@ const LOCK_KEY = 'pvl-lock';
 let LOCK = null;   // { title, text } while this handheld's business is locked
 try { LOCK = connected() ? JSON.parse(localStorage.getItem(LOCK_KEY) || 'null') : null; } catch (e) { LOCK = null; }
 const ui = {
-  screen: 'home', stack: [], tab: localStorageGet('pvl_tab') || 'prep', mode: localStorageGet('pvl_mode') || 'detailed', ezCat: 'all', category: null, sort: 'alpha',
+  screen: 'home', stack: [], tab: localStorageGet('pvl_tab') || 'prep', mode: 'easy', ezCat: 'all', category: null, sort: 'alpha',
   ruleId: localStorageGet('pvl_rule') || 'r_fridge', queue: [], printing: false, syncing: false,
   bulk: {}, bulkOpen: {}, logFilter: 'all', search: ''
 };
@@ -1851,6 +1852,8 @@ const L = (coll) => P.live(coll).filter(x => !x.orgId || !ORG() || x.orgId === O
 const up = (coll, rec) => P.upsert(coll, { orgId: ORG(), ...rec });
 const orgSet = (k) => { const o=(S.orgs||[]).find(x=>x.id===ORG()); const v=o&&o.settings?o.settings[k]:undefined; return v!==undefined?v:S.settings[k]; };
 const rule = (id) => P.byId('rules', id) || L('rules').find(r=>r.name==='Fridge') || L('rules')[0] || { id:'_fridge', name:'Fridge', units:2, period:'days' };
+// Easy or Detailed is set per person in the back-office (Users & permissions → Device staff). Easy unless set.
+const modeFor = () => user().mode==='detailed' ? 'detailed' : 'easy';
 const canManage = () => ['admin','manager'].includes(user().role);
 const canEditProducts = () => canManage() || !!orgSet('staffCanEdit');
 const siteUsers = () => P.live('users').filter(u => (u.siteIds||[]).includes(S.currentSiteId));
@@ -1858,19 +1861,19 @@ const siteUsers = () => P.live('users').filter(u => (u.siteIds||[]).includes(S.c
 // ---------- helpers ----------
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),2400); }
 function go(screen, opts){ ui.stack.push({screen:ui.screen, category:ui.category}); ui.screen=screen; Object.assign(ui, opts||{}); closeDrawer(); render(); $('#main').scrollTop=0; }
-function back(){ const p=ui.stack.pop(); if(p){ ui.screen=p.screen; ui.category=p.category; } else ui.screen='home'; stopScanner(); render(); }
-function root(screen){ ui.stack=[]; ui.screen=screen; stopScanner(); closeDrawer(); render(); $('#main').scrollTop=0; }
+function back(){ const p=ui.stack.pop(); if(p){ ui.screen=p.screen; ui.category=p.category; } else ui.screen='home'; render(); }
+function root(screen){ ui.stack=[]; ui.screen=screen; closeDrawer(); render(); $('#main').scrollTop=0; }
 function rel(iso){ const m=Math.round((Date.now()-new Date(iso))/60000); if(m<1) return 'just now'; if(m<60) return m+' min ago'; const h=Math.round(m/60); if(h<24) return h+' hr ago'; return Math.round(h/24)+' days ago'; }
 function confirmBox(title, text, okLabel, cb, danger){
   $('#modal').innerHTML = `<div class="modal"><div class="box"><h3>${esc(title)}</h3><p class="hint" style="font-size:15px;color:#333">${esc(text)}</p><div class="row" style="margin-top:18px"><button class="btn ghost" data-x>Cancel</button><button class="btn ${danger?'red':'blue'}" data-ok>${esc(okLabel)}</button></div></div></div>`;
   $('#modal [data-x]').onclick=()=>$('#modal').innerHTML='';
   $('#modal [data-ok]').onclick=()=>{ $('#modal').innerHTML=''; cb(); };
 }
-function needManager(fn){ if(canManage()) return fn(); confirmBox('Manager access needed', 'Only managers and admins can do this. Switch to a manager profile to continue.', 'Switch profile', openSwitch); }
+function needManager(fn){ if(canManage()) return fn(); toast('Only managers can do this. Ask a manager to change it in the back-office.'); }
 
 // ---------- chrome ----------
-const TITLES = { home:'Categories', products:'Products', search:'Search', storage:'Storage Location', bulk:'Bulk Print', scan:'Scan to Print', logs:'Logs', 'log-expiry':'Expiry Report', 'log-print':'Print Log', 'log-waste':'Wastage Log', wastage:'Log Wastage', order:'Label Order', profiles:'Manage Profiles', about:'About Device', support:'Support', settings:'Settings' };
-const MENU_ROOTS = ['home','logs','bulk','scan','wastage','order','profiles','about','support','settings'];
+const TITLES = { home:'Categories', products:'Products', search:'Search', storage:'Storage Location', bulk:'Bulk Print', logs:'Logs', 'log-expiry':'Expiry Report', 'log-print':'Print Log', 'log-waste':'Wastage Log', wastage:'Log Wastage', order:'Label Order', profiles:'Manage Profiles', about:'About Device', support:'Support', settings:'Settings' };
+const MENU_ROOTS = ['home','logs','bulk','wastage','order','profiles','about','support','settings'];
 function renderHeader(){
   const isRoot = MENU_ROOTS.includes(ui.screen) && ui.stack.length===0 || ui.screen==='home';
   const title = (ui.screen==='products'||ui.screen==='ezprod') && ui.category ? ui.category.name : TITLES[ui.screen];
@@ -1880,13 +1883,10 @@ function renderHeader(){
     ${['home','products'].includes(ui.screen)&&ui.mode!=='easy'?`<button class="ic" id="hSearch" aria-label="Search">${I.search}</button>`:''}
     ${ui.mode!=='easy'?`<button class="ic" id="hSync" aria-label="Sync">${I.sync}</button>`:''}
     <button class="langBtn" id="hLang" aria-label="Language" data-notr>${T.FLAGS[T.lang()]}</button>
-    <button class="avatar" id="hUser" aria-label="Switch profile">${esc(P.initials(user().name))}</button>
-    <button class="modeTgl ${ui.mode==='easy'?'ez':''}" id="hMode" aria-label="Switch between Easy and Detailed mode" title="Switch mode"><i></i>${ui.mode==='easy'?'Easy':'Detailed'}</button>`;
+`;
   $('#hNav').onclick = isRoot ? openDrawer : back;
   const hs=$('#hSearch'); if(hs) hs.onclick=()=>go('search',{search:''});
   const hy=$('#hSync'); if(hy) hy.onclick = doSync;
-  $('#hMode').onclick = ()=>{ ui.mode = ui.mode==='easy'?'detailed':'easy'; localStorageSet('pvl_mode',ui.mode); toast(ui.mode==='easy'?'Easy mode: tap a product, then Print':'Detailed mode: all options'); root('home'); };
-  $('#hUser').onclick = openSwitch;
   $('#hLang').onclick = openLang;
   if(ui.syncing) $('#hSync svg').style.animation='sp 1s linear infinite';
 }
@@ -1926,10 +1926,10 @@ function renderFooter(){
 }
 function openDrawer(){
   const ez=ui.mode==='easy';
-  const items=ez?[['home','Print Screen',I.print],['scan','Scan to print mode',I.scan]]
-    :[['home','Print Screen',I.print],['logs','Logs',I.log],['bulk','Bulk Print',I.stack],['scan','Scan to print mode',I.scan],['wastage','Wastage',I.bin],['order','Label Order',I.box]];
-  const inv=ez?[['switch','Switch Profiles',I.swap],['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]]
-    :[['profiles','Manage Profiles',I.users],['switch','Switch Profiles',I.swap],['about','About Device',I.info],['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]];
+  const items=ez?[['home','Print Screen',I.print]]
+    :[['home','Print Screen',I.print],['logs','Logs',I.log],['bulk','Bulk Print',I.stack],['wastage','Wastage',I.bin],['order','Label Order',I.box]];
+  const inv=ez?[['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]]
+    :[['profiles','Manage Profiles',I.users],['about','About Device',I.info],['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]];
   $('#drawer').innerHTML = `<div class="dh"><div class="pv-logo"><div class="mk">PV</div><div class="wd">PROVIEW<span>LABEL</span><small>${esc(site().name.toUpperCase())}</small></div></div><button class="ic" id="dClose" style="color:#000">${I.close}</button></div>
     <div class="dl">${items.map(([k,l,ic])=>`<button class="mi ${ui.screen===k?'on':''}" data-k="${k}">${ic}${l}</button>`).join('')}
       <div class="divider" style="margin:10px 8px"></div>
@@ -1939,7 +1939,6 @@ function openDrawer(){
   $('#dClose').onclick=closeDrawer;
   $('#drawer').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
     const k=b.dataset.k; closeDrawer();
-    if(k==='switch') return openSwitch();
     if(k==='update') return checkUpdate(true);
     if(k==='profiles'||k==='settings') return needManager(()=>root(k));
     root(k);
@@ -2118,50 +2117,12 @@ screens.bulk = () => {
   };
 };
 
-// a scanned code: a Proview label code reprints it with today's date; a product barcode prints that product
-function handleScanCode(code){ code=String(code||'').trim(); if(!code) return;
-  const l=P.live('labels').find(x=>x.code.toUpperCase()===code.toUpperCase());
-  if(l) return reprintLabel(l, true);
-  const p=L('products').find(x=>x.barcode && x.barcode===code);
-  if(p) return enqueue(buildJob(p,{fromScan:true}));
-  toast('No label or product found for '+code);
-}
-// the handheld's own scanner (trigger / side keys). While someone is typing in a box, the scan just fills that box.
+// the handheld's own scanner (trigger / side keys) only types into the box being edited, e.g. product search or barcode
 function onHardwareScan(e){
   const code=e&&e.code; if(!code) return;
-  if(connected()&&LOCK) return applyLock();
   const a=document.activeElement, typing=a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable);
-  if(typing && a.id!=='code'){ // the scanner's keyboard mode usually types it in already; fill it only if it didn't
-    setTimeout(()=>{ if(!String(a.value||'').includes(code)){ a.value=code; a.dispatchEvent(new Event('input',{bubbles:true})); a.dispatchEvent(new Event('change',{bubbles:true})); } },200); return; }
-  if(a&&a.id==='code') setTimeout(()=>{ a.value=''; },50);
-  if(navigator.vibrate) navigator.vibrate(40);
-  handleScanCode(code);
+  if(typing) setTimeout(()=>{ if(!String(a.value||'').includes(code)){ a.value=code; a.dispatchEvent(new Event('input',{bubbles:true})); a.dispatchEvent(new Event('change',{bubbles:true})); } },200);
 }
-let scanStream=null, scanTimer=null;
-function stopScanner(){ if(scanTimer) clearInterval(scanTimer); scanTimer=null; if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; } }
-screens.scan = () => {
-  const recent=P.live('labels').filter(l=>l.siteId===S.currentSiteId).sort((a,b)=>new Date(b.printedAt)-new Date(a.printedAt)).slice(0,5);
-  $('#main').innerHTML = `<div style="padding:14px 14px 0"><p style="margin:0 0 8px;font-size:15px">All labels will be re-printed with a date of:</p><div class="selbox"><b>${P.fmtDay(new Date())} ${P.fmtDate(new Date())}</b><span class="pill blue">Today</span></div></div>
-    <div class="scanbox" id="scanbox"><div><div style="font-size:40px;line-height:1">${I.scan.replace('width="24" height="24"','width="56" height="56"')}</div><div style="margin:8px 0 12px">Point the camera at a label barcode</div><button class="btn blue sm" id="camOn" style="margin:auto">${I.cam} Start camera</button></div></div>
-    <div style="padding:0 14px"><div class="row"><input class="inp" id="code" placeholder="Or type / scan code (e.g. PV…)" autocomplete="off"><button class="btn blue sm" id="codeGo" style="min-height:50px">Print</button></div>
-    <p class="hint">Scan to print mode ignores any custom expiry date and storage location. Handheld scanners that type into the box work too.</p>
-    ${recent.length?`<div class="sect">Recent labels (tap to simulate a scan)</div>${recent.map(l=>`<button class="li" style="width:100%" data-code="${esc(l.code)}"><div class="t"><b>${esc(l.name)}</b><small>${esc(l.code)} · ${P.fmtDate(l.printedAt,true)}</small></div>${I.scan}</button>`).join('')}`:''}</div>`;
-  const handle=handleScanCode;
-  $('#codeGo').onclick=()=>{ handle($('#code').value); $('#code').value=''; };
-  $('#code').onkeydown=e=>{ if(e.key==='Enter'){ handle($('#code').value); $('#code').value=''; } };
-  $('#main').querySelectorAll('[data-code]').forEach(b=>b.onclick=()=>handle(b.dataset.code));
-  $('#camOn').onclick=async()=>{
-    if(!('BarcodeDetector' in window) || !navigator.mediaDevices){ toast('Camera scanning needs the Android app. Type the code instead.'); return; }
-    try{
-      scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
-      const v=document.createElement('video'); v.setAttribute('playsinline',''); v.muted=true; v.srcObject=scanStream; await v.play();
-      $('#scanbox').innerHTML=''; $('#scanbox').appendChild(v); $('#scanbox').insertAdjacentHTML('beforeend','<div class="laser"></div>');
-      const det=new BarcodeDetector({formats:['code_128','ean_13','ean_8','upc_a','qr_code','code_39']});
-      let last='', lastAt=0;
-      scanTimer=setInterval(async()=>{ try{ const r=await det.detect(v); if(r[0]){ const c=r[0].rawValue; if(c!==last||Date.now()-lastAt>3000){ last=c; lastAt=Date.now(); if(navigator.vibrate) navigator.vibrate(60); handle(c); } } }catch(e){} },350);
-    }catch(e){ toast('Camera unavailable: '+(e.message||e.name)); }
-  };
-};
 
 screens.order = () => {
   const st=S.settings; const o=ui.order || (ui.order={mode:'on-demand',labelType:'single',rolls:10,royal:false,freq:'Every 4 weeks'});
@@ -2245,11 +2206,10 @@ screens.settings = () => {
     <div class="sect" style="margin-top:0">Site</div>
     <div class="fld"><select class="inp" id="site">${(connected()?P.live('sites').filter(x=>x.orgId===ORG()):P.live('sites')).map(s=>`<option value="${s.id}" ${s.id===S.currentSiteId?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
     <div class="sect">Printer</div>
-    <div class="seg sm" id="pm" style="margin:0 0 12px"><button data-m="preview" class="${pr.mode==='preview'?'on':''}">Preview</button><button data-m="builtin" class="${pr.mode==='builtin'?'on':''}">Built-in</button><button data-m="bluetooth" class="${pr.mode==='bluetooth'?'on':''}">Bluetooth</button><button data-m="tcp" class="${pr.mode==='tcp'?'on':''}">Network</button></div>
+    <div class="seg sm" id="pm" style="margin:0 0 12px"><button data-m="builtin" class="${pr.mode==='builtin'?'on':''}">Built-in</button><button data-m="preview" class="${pr.mode==='preview'?'on':''}">Preview</button><button data-m="bluetooth" class="${pr.mode==='bluetooth'?'on':''}">Bluetooth</button><button data-m="tcp" class="${pr.mode==='tcp'?'on':''}">Network</button></div>
     ${pr.mode==='bluetooth'?`<div class="fld"><div class="lbl">Paired printer <button class="pill blue" id="bt">Find printers</button></div><select class="inp" id="btsel"><option value="">${pr.address?esc((pr.name||'')+' '+pr.address):'Tap “Find printers”'}</option></select></div>`:''}
     ${pr.mode==='tcp'?`<div class="row"><div class="fld" style="flex:2"><div class="lbl">Printer IP</div><input class="inp" id="ip" value="${esc(pr.address)}" placeholder="192.168.1.50" inputmode="decimal"></div><div class="fld" style="flex:1"><div class="lbl">Port</div><input class="inp" id="port" value="${esc(pr.port||9100)}" inputmode="numeric"></div></div>`:''}
-    ${pr.mode==='builtin'?`<div class="card" style="margin-bottom:10px"><b style="font-size:15px">${BUILTIN==null?'Checking for a built-in printer…':BUILTIN.available?'Built-in printer ready':'No built-in printer found'}</b><div class="hint">${BUILTIN&&BUILTIN.available?'Prints on this handheld (H10P / H10S), 57 mm roll'+(BUILTIN.version?' · service '+esc(BUILTIN.version):''):'Built-in printing works on Senraise handhelds such as the H10P and H10S. On other devices choose Bluetooth or Network.'}</div></div>
-      <label class="kv" style="cursor:pointer"><span>Simple text labels (faster, no £ sign)</span><input type="checkbox" id="btxt" ${pr.builtinText?'checked':''}></label>`:''}
+    ${pr.mode==='builtin'?`<div class="card" style="margin-bottom:10px"><b style="font-size:15px">${BUILTIN==null?'Checking for a built-in printer…':BUILTIN.available?'Built-in printer ready':'No built-in printer found'}</b><div class="hint">${BUILTIN&&BUILTIN.available?'Prints on this handheld (H10P / H10S), 57 mm roll'+(BUILTIN.version?' · service '+esc(BUILTIN.version):''):'Built-in printing works on Senraise handhelds such as the H10P and H10S. On other devices choose Bluetooth or Network.'}</div></div>`:''}
     <p class="hint">${pr.mode==='builtin'?'Labels are printed as a picture, exactly as they look on screen. Tear off at the dashed line.':pr.mode==='preview'?'Labels show on screen only. Choose Bluetooth or Network to print to an ESC/POS thermal label printer (any 58/80mm thermal printer). On a Senraise H10P / H10S choose Built-in..':'Uses ESC/POS commands. Works with most 58mm/80mm thermal printers.'}</p>
     <button class="btn ghost" id="test" style="width:100%">Print test label</button>
     <div class="sect" style="margin-top:22px">Proview Label cloud</div>
@@ -2257,13 +2217,9 @@ screens.settings = () => {
       <div class="row"><button class="btn blue sm" style="flex:1" id="synow">Sync now</button><button class="btn ghost sm" style="flex:1;color:#d92d20" id="disc">Disconnect</button></div>`
     :Cloud.enabled?`<p class="hint" style="margin-top:0">Sync this handheld with the back-office at label.proviewcrm.co.uk: products, staff and settings come down; labels, expiry and wastage go up.</p><button class="btn blue" id="conn" style="width:100%">Connect to Proview Label</button>`
     :`<p class="hint" style="margin-top:0">This preview runs on demo data. In the Android app, connect here to sync with the live back-office.</p>`}
-    <div class="sect" style="margin-top:22px">Data</div>
-    <div class="row"><button class="btn ghost sm" style="flex:1" id="exp">Export data</button><label class="btn ghost sm" style="flex:1">Import data<input type="file" id="imp" accept=".json,application/json" hidden></label></div>
-    ${connected()?'':'<button class="btn ghost sm" id="rst" style="width:100%;margin-top:10px;color:#D32F2F">Reset demo data</button>'}
   </div>`;
   $('#site').onchange=()=>{ S.currentSiteId=$('#site').value; P.save(); const u=user(); if(!(u.siteIds||[]).includes(S.currentSiteId)){ const su=siteUsers()[0]; if(su) S.currentUserId=su.id; P.save(); } toast('Site: '+site().name); render(); };
   $('#pm').querySelectorAll('button').forEach(b=>b.onclick=()=>{ pr.mode=b.dataset.m; pr.chosen=true; P.save(); render(); if(pr.mode==='builtin') checkBuiltin().then(()=>{ if(ui.screen==='settings') render(); }); });
-  const bx=$('#btxt'); if(bx) bx.onchange=()=>{ pr.builtinText=bx.checked; P.save(); };
   const ip=$('#ip'); if(ip){ ip.onchange=()=>{pr.address=ip.value.trim();P.save();}; $('#port').onchange=()=>{pr.port=+$('#port').value||9100;P.save();}; }
   const bt=$('#bt'); if(bt) bt.onclick=async()=>{
     const N=Native().LabelPrinter; if(!N){ toast('Bluetooth printing is available in the Android app'); return; }
@@ -2274,9 +2230,6 @@ screens.settings = () => {
   const cn=$('#conn'); if(cn) cn.onclick=connectSheet;
   const sn=$('#synow'); if(sn) sn.onclick=doSync;
   const dc=$('#disc'); if(dc) dc.onclick=disconnect;
-  $('#exp').onclick=exportData;
-  $('#imp').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ P.importJSON(rd.result); S=P.get(); toast('Data imported'); render(); }catch(err){ toast('Not a valid Proview export'); } }; rd.readAsText(f); };
-  const rs0=$('#rst'); if(rs0) rs0.onclick=()=>confirmBox('Reset demo data?','This deletes everything on this device and reloads the sample products and logs.','Reset',()=>{ S=P.reset(); ui.queue=[]; toast('Demo data restored'); root('home'); },true);
 };
 
 // ---------- forms ----------
@@ -2349,22 +2302,6 @@ function userForm(u){
   sh.querySelector('#uGo').onclick=()=>{ u.name=sh.querySelector('#un').value.trim(); u.pin=sh.querySelector('#up').value.trim(); if(!u.name) return toast('Enter a name'); if(!/^\d{4}$/.test(u.pin)) return toast('PIN must be 4 digits');
     up('users',u); P.audit(user().name,isNew?'created':'updated','Profile',u.name+' ('+P.ROLES[u.role]+')'); S=P.get(); closeSheet(); render(); };
   const del=sh.querySelector('#uDel'); if(del) del.onclick=()=>confirmBox('Remove '+u.name+'?','They will no longer be able to sign in on this site.','Remove',()=>{ P.remove('users',u.id); S=P.get(); closeSheet(); render(); },true);
-}
-
-function openSwitch(){
-  const us=siteUsers(); let sel=us.find(u=>u.id!==S.currentUserId)||us[0]; let pin='';
-  const draw=()=>{
-    $('#modal').innerHTML = `<div class="modal"><div class="box"><h3>Switch profile</h3><div class="users">${us.map(u=>`<button data-u="${u.id}" class="${sel&&sel.id===u.id?'on':''}"><span class="avatar">${esc(P.initials(u.name))}</span>${esc(u.name.split(' ')[0])}</button>`).join('')}</div>
-      <p class="hint" style="text-align:center;margin:10px 0 0">Enter PIN for <b>${esc(sel?sel.name:'')}</b><br><small>${connected()?'':'(demo PINs: Laura 1111, Jamal 2222, Priya 1234)'}</small></p>
-      <div class="pindots">${[0,1,2,3].map(i=>`<i class="${i<pin.length?'f':''}"></i>`).join('')}</div>
-      <div class="pinpad">${[1,2,3,4,5,6,7,8,9,'✕',0,'⌫'].map(k=>`<button data-k="${k}">${k}</button>`).join('')}</div></div></div>`;
-    $('#modal').querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>{ sel=P.byId('users',b.dataset.u); pin=''; draw(); });
-    $('#modal').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
-      const k=b.dataset.k; if(k==='✕'){ $('#modal').innerHTML=''; return; } if(k==='⌫'){ pin=pin.slice(0,-1); draw(); return; }
-      pin+=k; if(pin.length===4){ if(sel && pin===sel.pin){ S.currentUserId=sel.id; P.save(); $('#modal').innerHTML=''; toast('Signed in as '+sel.name); render(); } else { pin=''; draw(); toast('Wrong PIN'); if(navigator.vibrate) navigator.vibrate([60,40,60]); } } else draw();
-    });
-  };
-  draw();
 }
 
 function wasteForm(pre){
@@ -2498,10 +2435,9 @@ function logPrinted(j){
   if(S.settings.labelsInStock===50) toast('Label roll running low – order more from Label Order');
   if(!ui.queue.length || ui.queue.length===1 && ui.queue[0].qty<=1) trySync();
 }
-function reprintLabel(l, fromScan){
+function reprintLabel(l){
   if(!l) return;
   const p=l.productId?P.byId('products',l.productId):null;
-  if(fromScan && p){ const j=buildJob(p,{}); j.reprintOf=l.code; j.useFirst=l.useFirst; j.batch=l.batch; enqueue(j); toast('Reprinting '+l.name+' with today\'s date'); return; }
   const r=L('rules').find(x=>x.name===l.ruleName)||rule(ui.ruleId);
   enqueue({id:P.uid('j'),productId:l.productId,name:l.name,type:l.type,qty:1,expiry:l.expiry,ruleName:l.ruleName,rule:r,allergens:l.allergens||[],mayContain:p?p.mayContain:'',customAllergens:p?p.customAllergens:'',ingredients:p?p.ingredients:'',price:p?p.price:null,batch:l.batch,useFirst:l.useFirst,defrost:l.defrost,includeDate:true,code:l.code,barcode:p?p.barcode:'',reprintOf:l.code,dateType:p?p.dateType:'use-by'});
   toast('Identical copy queued');
@@ -2616,15 +2552,13 @@ let BUILTIN=null; // {available, version} once checked
 async function checkBuiltin(){
   const N=Native().LabelPrinter; if(!N||!N.builtinStatus) return BUILTIN={available:false};
   try{ BUILTIN=await N.builtinStatus(); }catch(e){ BUILTIN={available:false}; }
-  const pr=S.settings.printer;
-  if(BUILTIN.available && pr.mode==='preview' && !pr.chosen){ pr.mode='builtin'; P.save(); toast('Built-in printer found – labels will print on this handheld'); }
   return BUILTIN;
 }
 async function sendToPrinter(j){
   const pr=S.settings.printer; if(pr.mode==='preview') return;
-  const N=Native().LabelPrinter; if(!N) throw new Error('printing to hardware needs the Android app');
+  const N=Native().LabelPrinter;
+  if(!N){ if(pr.mode==='builtin') return; throw new Error('printing to hardware needs the Android app'); }   // web preview: on screen only
   if(pr.mode==='builtin'){
-    if(pr.builtinText){ const bytes=escpos({...j,qty:1}); let bin=''; bytes.forEach(b=>bin+=String.fromCharCode(b)); await N.printBuiltin({data:btoa(bin),feed:3}); return; }
     await N.printBuiltin({image:labelBitmap({...j,qty:1}),feed:3}); return;
   }
   if(!pr.address) throw new Error('no printer set – see Settings');
@@ -2716,7 +2650,7 @@ function connectSheet(){
       CONN={uid,email,orgId:s.orgId,siteId}; try{ localStorage.setItem(DEV_KEY,JSON.stringify(CONN)); }catch(e){}
       cd.disabled=true; cd.textContent='Saving…';
       try{ await Cloud.sync(P); S=P.get(); }catch(e){ toast(Cloud.friendly(e)); }
-      closeSheet(); root('home'); toast('Connected to '+s.name);
+      defaultPrinter(); closeSheet(); root('home'); toast('Connected to '+s.name);
     };
   };
   draw();
@@ -2725,22 +2659,16 @@ function disconnect(){
   confirmBox('Disconnect this handheld?','It stops syncing and goes back to demo data. Labels already sent stay in the back-office.','Disconnect',async()=>{
     try{ touchDevice(); await Cloud.sync(P); }catch(e){}
     await Cloud.signOut().catch(()=>{}); try{ localStorage.removeItem(DEV_KEY); localStorage.removeItem(LOCK_KEY); }catch(e){} CONN=null; LOCK=null; applyLock();
-    S=P.useStore(null); root('home'); toast('Disconnected');
+    S=P.useStore(null); defaultPrinter(); root('home'); toast('Disconnected');
   },true);
 }
 
-async function exportData(){
-  const data=P.exportJSON(); const name='proview-label-'+P.fmtDate(new Date()).replace(/\//g,'-')+'.json';
-  const FS=Native().Filesystem, SH=Native().Share;
-  if(FS&&SH){ try{ const r=await FS.writeFile({path:name,data,directory:'CACHE',encoding:'utf8'}); await SH.share({title:name,url:r.uri}); return; }catch(e){ toast(e.message||'Export failed'); return; } }
-  $('#modal').innerHTML=`<div class="modal"><div class="box"><h3>Export data</h3><p class="hint">Copy this and paste it into the back-office (Devices → Import from device).</p><textarea class="inp" style="min-height:160px;font-size:11px" readonly>${esc(data)}</textarea><div class="row" style="margin-top:12px"><button class="btn ghost" id="ec">Close</button><button class="btn blue" id="ecp">Copy</button></div></div></div>`;
-  $('#ec').onclick=()=>$('#modal').innerHTML='';
-  $('#ecp').onclick=()=>{ const t=$('#modal textarea'); t.select(); (navigator.clipboard?navigator.clipboard.writeText(data):Promise.reject()).then(()=>toast('Copied')).catch(()=>{ try{document.execCommand('copy');toast('Copied');}catch(e){toast('Select and copy the text');} }); };
-}
-
+// the built-in printer is the default every time the app opens; Settings can change it until the app is closed
+function defaultPrinter(){ const pr=S.settings.printer; if(pr.mode!=='builtin'){ pr.mode='builtin'; P.save(); } pr.builtinText=false; }
 // ---------- render ----------
 function render(){
   S=P.get();
+  const m=modeFor(); if(m!==ui.mode){ ui.mode=m; ui.stack=[]; ui.screen='home'; closeDrawer(); }
   $('#main').classList.remove('grey');
   renderHeader(); renderStatus(); renderFooter();
   (screens[ui.screen]||screens.home)();
@@ -2784,10 +2712,11 @@ if(isNative){ setTimeout(()=>checkUpdate(false),4000); setInterval(()=>checkUpda
 if(Native().LabelPrinter && Native().LabelPrinter.addListener){ try{ Native().LabelPrinter.addListener('scan', onHardwareScan); }catch(e){} checkBuiltin(); }
 if(Native().App && Native().App.addListener) Native().App.addListener('backButton',()=>{ if(connected()&&LOCK&&!$('#modal').innerHTML){ Native().App.exitApp(); return; } if($('#modal').innerHTML) $('#modal').innerHTML=''; else if($('#sheet').classList.contains('on')) closeSheet(); else if($('#drawer').classList.contains('on')) closeDrawer(); else if(ui.screen!=='home') back(); else Native().App.exitApp(); });
 T.start($('#device'));
+defaultPrinter();
 render();
 setInterval(renderStatus, 60000);
 if(connected()){ if(LOCK) renderStatus(); checkLock().then(l=>{ if(!l) trySync(); }); }
-window.__pvl={ui,render,go,root,escpos,buildJob,checkLock,showLock,enqueue};
+window.__pvl={ui,render,go,root,escpos,buildJob,checkLock,showLock,enqueue,sendToPrinter};
 })();
 </script>
 </body>

@@ -268,6 +268,7 @@
     'months': ['ay', 'luni', 'месеца'], 'month': ['ay', 'lună', 'месец'],
     'Create': ['Oluştur', 'Creează', 'Създай'],
     'Enter a name': ['Bir ad girin', 'Introdu un nume', 'Въведете име'],
+    'Only managers can do this. Ask a manager to change it in the back-office.': ['Bunu yalnızca müdürler yapabilir. Yönetim panelinden değiştirmesi için bir müdüre başvurun.', 'Doar managerii pot face asta. Roagă un manager să schimbe din back-office.', 'Само мениджъри могат да направят това. Помолете мениджър да го промени от бек офиса.'],
     'Manager access needed': ['Müdür yetkisi gerekli', 'Este nevoie de acces de manager', 'Нужен е достъп на мениджър'],
     'Only managers and admins can do this. Switch to a manager profile to continue.': ['Bunu yalnızca müdürler ve yöneticiler yapabilir. Devam etmek için bir müdür profiline geçin.', 'Doar managerii și administratorii pot face asta. Treci pe un profil de manager pentru a continua.', 'Само мениджъри и администратори могат да направят това. Превключете на профил на мениджър.'],
 

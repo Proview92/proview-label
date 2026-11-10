@@ -403,7 +403,7 @@
       version: 3, orgs, company: { name: 'ProView Tech Group' }, currentSiteId: 'site_main', deviceId: 'dev_1', currentUserId: 'u_lt',
       sites, rules, categories: cats, products, users, devices, labels, wastage, orders, audit,
       settings: {
-        printer: { mode: 'preview', address: '', port: 9100, name: '' },
+        printer: { mode: 'builtin', address: '', port: 9100, name: '' },
         sync: { url: '', key: '', enabled: false, lastSync: null },
         stockLastOrdered: new Date(Date.now() - 6 * 864e5).toISOString(), labelsInStock: 134, avgWeekly: 250,
         support: { phone: '020 8935 5495', email: 'info@proviewtechgroup.co.uk', hours: 'Mon–Fri 9am–5pm' }
@@ -419,7 +419,7 @@
   function blank() {
     return { version: 3, cloud: true, orgs: [], company: { name: '' }, currentSiteId: null, deviceId: null, currentUserId: null,
       sites: [], rules: [], categories: [], products: [], users: [], devices: [], labels: [], wastage: [], orders: [], audit: [],
-      settings: { printer: { mode: 'preview', address: '', port: 9100, name: '' }, sync: { url: '', key: '', enabled: true, lastSync: null },
+      settings: { printer: { mode: 'builtin', address: '', port: 9100, name: '' }, sync: { url: '', key: '', enabled: true, lastSync: null },
         stockLastOrdered: null, labelsInStock: 180, avgWeekly: 250, support: { phone: '020 8935 5495', email: 'info@proviewtechgroup.co.uk', hours: 'Mon–Fri 9am–5pm' } } };
   }
   function useStore(key, opts) { storeKey = key ? STORAGE_KEY + ':' + key : STORAGE_KEY; storeBlank = !!(opts && opts.blank); state = null; return load(); }
