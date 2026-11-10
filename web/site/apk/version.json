@@ -1,5 +1,5 @@
 {
-  "version": "1.3.9",
+  "version": "1.4.0",
   "url": "https://label.proviewcrm.co.uk/ProviewLabel.apk",
-  "notes": "Fixed-length prep labels and automatic app updates."
+  "notes": "Pair the handheld with a code from the back-office. Language picker, Easy mode by default, built-in printer by default."
 }
