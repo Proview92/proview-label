@@ -548,8 +548,8 @@ function openDrawer(){
   const ez=ui.mode==='easy';
   const items=ez?[['home','Print Screen',I.print]]
     :[['home','Print Screen',I.print],['logs','Logs',I.log],['bulk','Bulk Print',I.stack],['wastage','Wastage',I.bin],['order','Label Order',I.box]];
-  const inv=ez?[['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]]
-    :[['about','About Device',I.info],['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]];
+  const inv=ez?[['syncnow','Sync now',I.sync],['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]]
+    :[['syncnow','Sync now',I.sync],['about','About Device',I.info],['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]];
   $('#drawer').innerHTML = `<div class="dh"><div class="pv-logo"><div class="mk">PV</div><div class="wd">PROVIEW<span>LABEL</span><small>${esc(site().name.toUpperCase())}</small></div></div><button class="ic" id="dClose" style="color:#000">${I.close}</button></div>
     <div class="dl">${items.map(([k,l,ic])=>`<button class="mi ${ui.screen===k?'on':''}" data-k="${k}">${ic}${l}</button>`).join('')}
       <div class="divider" style="margin:10px 8px"></div>
@@ -559,6 +559,7 @@ function openDrawer(){
   $('#dClose').onclick=closeDrawer;
   $('#drawer').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
     const k=b.dataset.k; closeDrawer();
+    if(k==='syncnow') return doSync();
     if(k==='update') return checkUpdate(true);
     if(k==='settings') return needManager(()=>root(k));
     root(k);
@@ -1053,7 +1054,6 @@ function logPrinted(j){
   const d=P.byId('devices',S.deviceId); if(d){ d.labelsLeft=S.settings.labelsInStock; d._dirty=true; d.updatedAt=P.now(); }
   P.save(); S=P.get();
   if(S.settings.labelsInStock===50) toast('Label roll running low – order more from Label Order');
-  if(!ui.queue.length || ui.queue.length===1 && ui.queue[0].qty<=1) trySync();
 }
 function reprintLabel(l){
   if(!l) return;
@@ -1235,19 +1235,22 @@ async function doSync(){
 let syncT=null;
 function trySync(){ if(!connected()||LOCK) return; clearTimeout(syncT); syncT=setTimeout(()=>{ Cloud.sync(P).then(()=>{ S=P.get(); renderStatus(); }).catch(()=>{ checkLock(); }); },1500); }
 if(navigator.getBattery) navigator.getBattery().then(b=>{ ui.battery=Math.round(b.level*100); }).catch(()=>{});
-let syncTick=0, syncBusy=false;
+// Talks to the server every 15 minutes (and on Sync now, on opening, and when the internet comes back):
+// sends printed labels, wastage etc., brings down menu changes, and checks pairing, licence and Easy/Detailed.
+const SYNC_EVERY=15*60*1000;
+let syncBusy=false;
 setInterval(async()=>{
   if(!connected()||!navigator.onLine||ui.printing||syncBusy||ui.syncing) return;
-  syncBusy=true; const n=syncTick++;
+  syncBusy=true;
   try{
-    if(LOCK||n%3===0){ if(await checkLock()||!connected()) return; }
-    if(n%12===0) touchDevice();
+    if(await checkLock()||!connected()) return;
+    touchDevice();
     const r=await Cloud.sync(P); S=P.get();
     const quiet=$('#sheet').classList.contains('on')||$('#modal').innerHTML;
     if(r&&r.pulled&&!quiet) render(); else renderStatus();
-  }catch(e){ /* offline or a blip: try again in 5 s */ }
+  }catch(e){ /* offline or a blip: try again next time */ }
   finally{ syncBusy=false; }
-},5000);
+},SYNC_EVERY);
 window.addEventListener('online',()=>{ if(connected()) trySync(); });
 
 // ---------- pairing (first open, or after being removed / unpaired) ----------
