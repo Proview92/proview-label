@@ -78,7 +78,107 @@
     }
     return found;
   }
+
+  // Built-in dish knowledge: what common UK menu dishes and components usually contain (UK 14 allergens).
+  // Used to SUGGEST allergens from a product's name/description; staff must confirm against the recipe.
+  const C='Cereals',M='Milk',E='Eggs',F='Fish',CR='Crustaceans',MO='Molluscs',CE='Celery',MU='Mustard',S='Sesame',SO='Soybeans',SU='Sulphites',N='Nuts',P='Peanuts',L='Lupin';
+  const DISHES = [
+    // bakery & breakfast
+    [['croissant','pain au chocolat','danish','brioche','muffin','cupcake','doughnut','donut','waffle','pancake','crepe','crêpe','scone','teacake','crumpet','french toast','eggy bread'],[C,M,E]],
+    [['toast','bagel','sandwich','sarnie','wrap','panini','toastie','baguette','sub','roll','bap','bun','burger bun','pitta','naan','flatbread','focaccia','ciabatta','sourdough','bloomer'],[C]],
+    [['full english','english breakfast','fry up','fry-up'],[C,E,M,SU,CE]],
+    [['eggs benedict','benedict','hollandaise','eggs royale','eggs florentine'],[C,E,M]],
+    [['omelette','omelet','frittata','scrambled egg','fried egg','poached egg','boiled egg','egg mayo','shakshuka'],[E]],
+    [['granola','porridge','muesli','overnight oats'],[C,M]],
+    [['sausage roll','pasty','pastie','pie','quiche','tart','vol au vent','pithivier','wellington'],[C,M,E]],
+    // pasta, pizza & italian
+    [['lasagne','lasagna','cannelloni','moussaka'],[C,M,E,CE]],
+    [['spaghetti','pasta','penne','linguine','fettuccine','tagliatelle','rigatoni','fusilli','macaroni','ravioli','tortellini','gnocchi'],[C,E]],
+    [['bolognese','ragu','ragù'],[CE,SU]],
+    [['carbonara'],[C,E,M]],
+    [['mac and cheese','mac n cheese','macaroni cheese','cauliflower cheese'],[C,M,MU]],
+    [['pizza','calzone','garlic bread'],[C,M]],
+    [['pesto'],[M,N]],
+    [['risotto'],[M,CE,SU]],
+    [['tiramisu'],[C,M,E,SU]],
+    [['arancini'],[C,M,E]],
+    [['caesar'],[C,E,F,M,MU]],
+    // british & pub
+    [['fish and chips','fish & chips','fish n chips','battered cod','battered haddock','scampi'],[C,F]],
+    [['fish cake','fishcake','fish pie','fish finger'],[C,F,M,E]],
+    [['kedgeree'],[F,E,M]],
+    [['shepherd','cottage pie'],[M,CE,SU]],
+    [['steak and ale','steak & ale','steak pie','chicken pie'],[C,M,E,CE,SU]],
+    [['toad in the hole','yorkshire pudding','yorkshire'],[C,M,E]],
+    [['sunday roast','roast dinner','gravy'],[C,CE,SU]],
+    [['bangers','sausage','sausages','hot dog'],[C,SU]],
+    [['scotch egg'],[C,E,MU]],
+    [['ploughman'],[C,M,SU,MU,CE]],
+    [['welsh rarebit','rarebit','cheese on toast'],[C,M,MU]],
+    [['chicken kiev','kiev','schnitzel','escalope','goujon','goujons','nugget','nuggets','breaded','katsu','tempura','popcorn chicken'],[C,E,M]],
+    [['coleslaw','slaw','mayo','mayonnaise','aioli','tartare','tartar sauce','marie rose','prawn cocktail'],[E,MU]],
+    [['onion ring','onion rings','beer battered','beer-battered'],[C]],
+    // burgers & american
+    [['burger','cheeseburger','beef burger','chicken burger'],[C,M,E,MU]],
+    [['bbq','barbecue','pulled pork','ribs','brisket'],[MU,SU,CE]],
+    [['buffalo wings','hot wings','chicken wings'],[M,CE]],
+    [['nachos','quesadilla','burrito','fajita','taco','enchilada'],[C,M]],
+    // asian
+    [['pad thai'],[P,E,F,CR,SO]],
+    [['satay'],[P,SO]],
+    [['thai green curry','green curry','red curry','massaman','panang','tom yum','tom kha'],[F,CR,CE]],
+    [['massaman'],[P]],
+    [['stir fry','stir-fry','chow mein','lo mein','fried rice','egg fried rice','teriyaki','sweet and sour','sweet & sour','black bean','kung pao','szechuan','hoisin'],[SO,C,E]],
+    [['kung pao'],[P]],
+    [['noodle','noodles','ramen','udon','soba','pho'],[C,E,SO]],
+    [['dumpling','dumplings','gyoza','dim sum','bao','wonton','spring roll','spring rolls','samosa','pakora','bhaji','onion bhaji'],[C,SO]],
+    [['sushi','sashimi','maki','nigiri','poke'],[F,SO,S,C]],
+    [['katsu curry'],[C,E,SO]],
+    [['korma','pasanda','tikka masala','butter chicken','makhani'],[M,N]],
+    [['curry','bhuna','jalfrezi','madras','vindaloo','rogan josh','balti','dopiaza','dhansak','biryani','dal','dhal','daal'],[M,MU,CE]],
+    [['naan','peshwari','paratha','chapati','roti'],[C,M]],
+    [['raita','lassi','paneer'],[M]],
+    [['miso'],[SO]],
+    [['tofu','edamame'],[SO]],
+    [['kimchi'],[F,CR]],
+    // middle eastern & mediterranean
+    [['houmous','hummus','houmus','tahini','baba ganoush','falafel','halloumi'],[S]],
+    [['halloumi','feta','tzatziki','moussaka','spanakopita','saganaki'],[M]],
+    [['shawarma','kebab','doner','gyros','souvlaki'],[C,M,S,MU]],
+    [['tabbouleh','tabouleh','couscous','bulgur'],[C]],
+    [['baklava'],[C,N,M]],
+    [['paella'],[CR,MO,F,CE]],
+    [['moules','mussels','clams','calamari','squid','octopus','scallop','scallops','oysters'],[MO]],
+    [['calamari'],[C]],
+    [['fish soup','bouillabaisse','seafood'],[F,CR,MO,CE]],
+    [['anchovy','anchovies','worcestershire'],[F]],
+    // soups, salads, sauces
+    [['soup','broth','stock','bisque','chowder','consommé','consomme'],[CE]],
+    [['chowder','bisque'],[M,CR,F]],
+    [['cream of','creamy','béchamel','bechamel','cheese sauce','white sauce','alfredo','gratin','dauphinoise'],[M,C]],
+    [['waldorf'],[N,CE,E]],
+    [['salad dressing','vinaigrette','honey mustard','french dressing','dijon'],[MU,SU]],
+    [['wine','red wine','white wine','port','sherry','vinegar','pickle','pickled','chutney','dried fruit','raisin','sultana','apricot'],[SU]],
+    // desserts & sweets
+    [['cheesecake','sticky toffee','sponge','cake','brownie','blondie','cookie','biscuit','shortbread','flapjack','crumble','trifle','eton mess','pavlova','meringue','profiterole','eclair','éclair','choux','tart','torte','gateau','gâteau','roulade','bread and butter pudding','bread & butter pudding','swiss roll','victoria','carrot cake','banana bread','lemon drizzle'],[C,M,E]],
+    [['carrot cake','banana bread','bakewell','frangipane','macaron','macaroon','praline','nutella','hazelnut','pistachio','walnut','pecan','almond','marzipan'],[N]],
+    [['ice cream','gelato','custard','panna cotta','crème brûlée','creme brulee','mousse','fudge','toffee','caramel','chocolate','milkshake','latte','cappuccino','flat white','mocha','hot chocolate','yoghurt','yogurt','cheese','butter','cream'],[M]],
+    [['mousse','custard','crème brûlée','creme brulee','meringue','pavlova','eton mess','eggnog','mayonnaise'],[E]],
+    [['peanut','satay','pad thai','peanut butter','snickers','reeses','reese'],[P]],
+    [['sesame','tahini','burger bun','bagel','sushi'],[S]],
+  ];
   function detectAllergens(text) { return _scan(text); }
+  /** Suggest allergens for a product from its name, description and ingredients.
+   *  Returns { allergens: [...], why: { Allergen: ['lasagne', 'wheat', …] } }. A suggestion only: always confirm against the recipe. */
+  function suggestAllergens(name, description, ingredients) {
+    const text = ' ' + [name, description, stripHtml(ingredients || '')].filter(Boolean).join(' ').toLowerCase().replace(/[^a-z0-9à-ÿ&'\- ]+/g, ' ').replace(/\s+/g, ' ') + ' ';
+    const why = {};
+    const add = (a, w) => { (why[a] = why[a] || []); if (!why[a].includes(w)) why[a].push(w); };
+    DISHES.forEach(([words, al]) => words.forEach((w) => { if (text.includes(' ' + w + ' ') || text.includes(' ' + w + 's ') || text.includes(' ' + w + 'es ')) al.forEach((a) => add(a, w)); }));
+    ALLERGENS.forEach((a) => ALLERGEN_WORDS[a].forEach((w) => { if (new RegExp('(^|[^a-zà-ÿ])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=$|[^a-zà-ÿ])', 'i').test(text)) add(a, w); }));
+    return { allergens: ALLERGENS.filter((a) => why[a]), why };
+  }
+
 
   /** Bold every allergen word in plain/HTML ingredient text (existing <b> kept). */
   function boldAllergens(text) {
@@ -391,7 +491,7 @@
       name = name.replace(/[.·]+$/, '').trim();
       if (!name) continue;
       // no description and no price: probably a title or heading, so it starts unticked
-      out.push({ name, description: desc, price, allergens: detectAllergens(name + ' ' + desc), inc: !(price == null && !desc) });
+      out.push({ name, description: desc, price, allergens: suggestAllergens(name, desc).allergens, inc: !(price == null && !desc) });
     }
     return out;
   }
@@ -560,7 +660,7 @@
   global.PVL = {
     ALLERGENS, ALLERGEN_LABEL, ALLERGEN_WORDS, CATEGORY_COLOURS, LABEL_TYPES, WASTE_REASONS, ROLES, COLLECTIONS,
     uid, now, fmtDate, fmtDay, fmtTime, esc, money, initials, stripHtml,
-    detectAllergens, boldAllergens, productAllergens, computeExpiry, expiryStatus, ruleText, customRule, labelCode,
+    detectAllergens, suggestAllergens, boldAllergens, productAllergens, computeExpiry, expiryStatus, ruleText, customRule, labelCode,
     seed, blank, useStore, forget, load, save, reset, get, on, upsert, remove, live, byId, audit,
     toCSV, parseCSV, analyseMenu, sync, prune, cloudStores, exportJSON, importJSON, ensureRules, DEFAULT_RULES, photoFromFile
   };

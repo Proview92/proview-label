@@ -924,7 +924,8 @@ function productModal(p,orgId){
     <div class="fld"><label>Category</label><select class="inp" id="c">${cats.map(c=>`<option value="${c.id}" ${c.id===p.categoryId?'selected':''}>${esc(c.name)} · ${c.type==='sale'?'Sale':'Prep'}</option>`).join('')}</select></div></div>
     <div class="fld"><label>Description <span class="hint">optional · shown under the name on handheld buttons</span></label><input class="inp" id="dsc" value="${esc(p.description||'')}" maxlength="60" placeholder="e.g. 6oz, served in a brioche bun"></div>
     <div class="fld"><label style="display:flex;justify-content:space-between">Ingredients <span class="hint">Required for sale (PPDS) labels · <button class="btn ghost sm" id="bb" type="button"><b>B</b></button> <button class="btn ghost sm" id="ab" type="button">Auto-bold allergens</button></span></label><div class="inp rte" id="ing" contenteditable="true">${p.ingredients||''}</div><div class="hint" id="det" style="margin-top:4px"></div></div>
-    <div class="lb">Allergens (ticked automatically from ingredients, add any others)</div>
+    <div class="lb" style="display:flex;align-items:center;justify-content:space-between;gap:10px">Allergens (ticked automatically, add any others)<button class="btn ghost sm" id="sug" type="button" title="Suggest allergens from the product name, description and ingredients">✨ Suggest allergens</button></div>
+    <div class="hint" id="sugWhy" style="margin:-4px 0 8px"></div>
     <div class="algrid" id="al">${P.ALLERGENS.map(a=>`<label class="${p.allergens.includes(a)?'on':''}"><input type="checkbox" value="${a}" ${p.allergens.includes(a)?'checked':''}> ${esc(P.ALLERGEN_LABEL[a]||a)}</label>`).join('')}</div>
     <div class="g2" style="margin-top:14px"><div class="fld"><label>May contain</label><input class="inp" id="mc" value="${esc(p.mayContain)}"></div><div class="fld"><label>Custom allergens</label><input class="inp" id="ca" value="${esc(p.customAllergens)}"></div></div>
     <div class="g3"><div class="fld"><label>Price (£)</label><input class="inp" id="pr" value="${p.price!=null?p.price:''}" inputmode="decimal"></div><div class="fld"><label>Barcode</label><input class="inp" id="bc" value="${esc(p.barcode)}"></div><div class="fld"><label>Date type</label><select class="inp" id="dt"><option value="use-by">Use by</option><option value="best-before" ${p.dateType==='best-before'?'selected':''}>Best before</option></select></div></div>
@@ -939,6 +940,15 @@ function productModal(p,orgId){
   const cxVal=()=>Math.max(1,Math.min(999,parseInt(m.querySelector('#cxn').value,10)||1));
   m.querySelector('#cxm').onclick=()=>{ m.querySelector('#cxn').value=Math.max(1,cxVal()-1); };
   m.querySelector('#cxp').onclick=()=>{ m.querySelector('#cxn').value=Math.min(999,cxVal()+1); };
+  // suggest allergens from dish knowledge + ingredient keywords (adds ticks, never removes)
+  const suggest=(quiet)=>{ const r=P.suggestAllergens(m.querySelector('#n').value, m.querySelector('#dsc').value, ing.innerHTML);
+    const added=[]; r.allergens.forEach(a=>{ const cb=m.querySelector(`#al input[value="${a}"]`); if(cb&&!cb.checked){ cb.checked=true; cb.parentElement.classList.add('on'); added.push(a); } });
+    const w=m.querySelector('#sugWhy');
+    if(!r.allergens.length){ if(!quiet) w.innerHTML='No likely allergens found from the name or ingredients. Check the recipe.'; return; }
+    w.innerHTML='Suggested: '+r.allergens.map(a=>`<b>${esc(P.ALLERGEN_LABEL[a]||a)}</b> <span style="opacity:.75">(${esc(r.why[a].slice(0,2).join(', '))})</span>`).join(' · ')+' · <i>always check against the recipe</i>';
+    if(!quiet) toast(added.length?`Ticked ${added.length} suggested allergen${added.length>1?'s':''}`:'Suggested allergens are already ticked'); };
+  m.querySelector('#sug').onclick=()=>suggest(false);
+  if(isNew){ const nm=m.querySelector('#n'); nm.addEventListener('change',()=>{ if(!m.querySelectorAll('#al input:checked').length) suggest(true); }); }
   let img=p.image||null;
   m.querySelector('#pPic').onchange=async e=>{ try{ img=await P.photoFromFile(e.target.files[0]); const im=m.querySelector('#pImg'); im.src=img; im.style.display=''; m.querySelector('#pPicX').style.display=''; }catch(err){ toast(err.message); } };
   m.querySelector('#pPicX').onclick=()=>{ img=null; m.querySelector('#pImg').style.display='none'; m.querySelector('#pPicX').style.display='none'; };
