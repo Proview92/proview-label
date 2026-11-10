@@ -492,7 +492,11 @@ function pickerHtml(){
   const curOrg=siteFilter.startsWith('org:')?`<option value="${esc(siteFilter)}" selected hidden>${esc(orgName(siteFilter.slice(4)))} (all locations)</option>`:'';
   if(isMaster()){
     const dup=(x)=>sites.some(y=>y!==x&&y.name===x.name);
-    return `<select id="sitePick" aria-label="Choose location"><option value="all"${sel('all')}>All locations (${sites.length})</option>${curOrg}${sites.map(x=>`<option value="${esc(x.id)}"${sel(x.id)}>${esc(x.name)}${dup(x)?' · '+esc(orgName(x.orgId)):''}</option>`).join('')}</select>`;
+    // a business with no location yet must still be reachable, to add its first location
+    const empty=(S.orgs||[]).filter(o=>!sites.some(x=>x.orgId===o.id)).sort(byName);
+    const emptyOpt=empty.map(o=>`<option value="org:${esc(o.id)}"${sel('org:'+o.id)}>${esc(o.name)} (no locations yet)</option>`).join('');
+    const cur=empty.some(o=>siteFilter==='org:'+o.id)?'':curOrg;
+    return `<select id="sitePick" aria-label="Choose location"><option value="all"${sel('all')}>All locations (${sites.length})</option>${cur}${sites.map(x=>`<option value="${esc(x.id)}"${sel(x.id)}>${esc(x.name)}${dup(x)?' · '+esc(orgName(x.orgId)):''}</option>`).join('')}${emptyOpt}</select>`;
   }
   if(!sites.length) return '';
   if(sites.length===1) return `<select id="sitePick" aria-label="Choose location" disabled><option>${esc(sites[0].name)}</option></select>`;
