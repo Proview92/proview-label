@@ -3,6 +3,8 @@ on:
   push: { branches: [main], paths: ["web/**"] }
   workflow_dispatch:
 permissions: { contents: read, pages: write, id-token: write }
+# one deploy at a time; a newer push waits for the current one instead of failing
+concurrency: { group: pages, cancel-in-progress: false }
 jobs:
   deploy:
     runs-on: ubuntu-24.04
