@@ -319,6 +319,8 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
 .ptile.hasimg{padding:6px 6px 8px;justify-content:flex-start;gap:6px}
 .ptile .pimg{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block;background:#f4f3ef}
 .ezgrid .ptile .pimg{border-radius:10px}
+.ptile .pdesc{font-size:12.5px;font-weight:500;color:#6b6b75;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ezgrid .ptile .pdesc{font-size:14px}
 .ezpic{display:block;width:160px;height:160px;object-fit:cover;border-radius:14px;margin:4px auto 0}
 .ezq{display:flex;align-items:center;justify-content:center;gap:22px;margin:18px 0 6px}
 .ezq button{width:64px;height:64px;border-radius:50%;font-size:32px;font-weight:700;background:#fff;border:1px solid var(--line);color:#141418}
@@ -1249,7 +1251,7 @@ screens.home = () => {
   $('#addCat').onclick=()=>needManager(newCategory);
 };
 
-function productTile(p,big){ const al=P.productAllergens(p); return `<button class="ptile${p.image?' hasimg':''}" data-p="${p.id}">${p.image?`<img src="${p.image}" alt="" class="pimg">`:''}<span class="pn">${esc(p.name)}</span>${al.length?`<span class="chips">${al.slice(0,3).map(a=>`<span class="chip">${esc(a)}</span>`).join('')}${al.length>3?`<span class="chip">+${al.length-3}</span>`:''}</span>`:''}${p.price!=null&&ui.tab==='sale'?`<span class="hint">${P.money(p.price)}</span>`:''}</button>`; }
+function productTile(p,big){ return `<button class="ptile${p.image?' hasimg':''}" data-p="${p.id}">${p.image?`<img src="${p.image}" alt="" class="pimg">`:''}<span class="pn">${esc(p.name)}</span>${p.description?`<span class="pdesc">${esc(p.description)}</span>`:''}${p.price!=null&&ui.tab==='sale'&&ui.mode!=='easy'?`<span class="hint">${P.money(p.price)}</span>`:''}</button>`; }
 screens.products = () => {
   const c=ui.category; if(!c) return root('home');
   let ps=prodsFor(c.id);
@@ -1548,6 +1550,7 @@ function productForm(p, cat){
   const rs=L('rules');
   const body = `<div class="fld"><div class="lbl">Picture <span class="hint" style="font-weight:400">shown on the product button</span></div><div class="row" style="align-items:center;gap:12px"><img id="pImg" alt="" style="width:72px;height:72px;border-radius:10px;object-fit:cover;background:#f4f3ef;${p.image?'':'display:none'}" src="${p.image||''}"><label class="btn ghost sm" style="flex:1">${p.image?'Change picture':'Add picture'}<input type="file" id="pPic" accept="image/*" hidden></label>${p.image?'<button class="btn ghost sm" id="pPicX" type="button" style="color:#d92d20">Remove</button>':''}</div></div>
     <div class="fld"><div class="lbl">Product Name</div><input class="inp" id="pn" maxlength="50" value="${esc(p.name)}"></div>
+    <div class="fld"><div class="lbl">Description <span class="hint" style="font-weight:400">optional · shown on the button</span></div><input class="inp" id="pdsc" maxlength="60" value="${esc(p.description||'')}" placeholder="e.g. 6oz, served in a brioche bun"></div>
     ${sale?`<div class="fld"><div class="lbl">Ingredients <span><button class="pill" id="boldB" type="button"><b>B</b></button> <button class="pill blue" id="autoB" type="button">Auto-bold allergens</button></span></div><div class="inp rte" id="ing" contenteditable="true">${p.ingredients||''}</div><div class="hint" id="detected"></div></div>
       <div class="row"><div class="fld" style="flex:1"><div class="lbl">Price (£)</div><input class="inp" id="pr" inputmode="decimal" value="${p.price!=null?p.price:''}"></div><div class="fld" style="flex:1"><div class="lbl">Date type</div><select class="inp" id="dt"><option value="use-by" ${p.dateType==='use-by'?'selected':''}>Use by</option><option value="best-before" ${p.dateType==='best-before'?'selected':''}>Best before</option></select></div></div>`:''}
     <div class="fld"><div class="lbl">Custom Expiry Rule</div><select class="inp" id="pr2"><option value="">Use storage location</option>${rs.map(r=>`<option value="${r.id}" ${p.ruleId===r.id?'selected':''}>${esc(r.name)} (${P.ruleText(r)})</option>`).join('')}</select></div>
@@ -1568,7 +1571,7 @@ function productForm(p, cat){
   const px=sh.querySelector('#pPicX'); if(px) px.onclick=()=>{ img=null; sh.querySelector('#pImg').style.display='none'; px.remove(); };
   sh.querySelector('#pGo').onclick=()=>{
     const name=sh.querySelector('#pn').value.trim(); if(!name) return toast('Enter a product name');
-    p.image=img||null;
+    p.image=img||null; p.description=sh.querySelector('#pdsc').value.trim();
     p.name=name; p.mayContain=sh.querySelector('#mc').value.trim(); p.customAllergens=sh.querySelector('#ca').value.trim(); p.barcode=sh.querySelector('#bc').value.trim(); p.ruleId=sh.querySelector('#pr2').value||null;
     if(sale){ p.ingredients=P.boldAllergens(ing.innerHTML); p.allergens=P.detectAllergens(p.ingredients); const pr=parseFloat(sh.querySelector('#pr').value); p.price=isNaN(pr)?null:pr; p.dateType=sh.querySelector('#dt').value; }
     else p.prepGuide=sh.querySelector('#pg').value.trim();
