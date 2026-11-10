@@ -4342,7 +4342,7 @@ function easyPrint(p){
   const upd=()=>{ sh.querySelector('#qv').textContent=qty; };
   sh.querySelector('#qm').onclick=()=>{ qty=Math.max(1,qty-1); upd(); };
   sh.querySelector('#qp').onclick=()=>{ qty=Math.min(99,qty+1); upd(); };
-  sh.querySelector('#ezGo').onclick=()=>{ enqueue({...buildJob(p,{}),qty}); closeSheet(); toast(`Printing ${qty} × ${tn(p)}`); };
+  sh.querySelector('#ezGo').onclick=()=>{ enqueue({...buildJob(p,{}),qty}); closeSheet(); toast(`Printing ${qty} × ${p.name}`); };
 }
 
 screens.home = () => {
@@ -4759,7 +4759,6 @@ function labelHTML(j){
 }
 function renderBarcodes(root){ if(!window.JsBarcode) return; root.querySelectorAll('svg[data-bc]').forEach(s=>{ try{ JsBarcode(s, s.dataset.bc, {format:'CODE128',displayValue:true,fontSize:11,height:34,margin:0,width:1.3,textMargin:0}); }catch(e){} }); }
 
-const jobName=(j)=>{ const p=j.productId&&P.byId('products',j.productId); return p?tn(p):j.name; };
 function enqueue(job){
   if(connected()&&LOCK){ applyLock(); return; }
   ui.queue.push(job); renderFooter();
@@ -4770,7 +4769,7 @@ async function processQueue(){
   if(!ui.queue.length){ ui.printing=false; $('#printout').innerHTML=''; renderFooter(); return; }
   ui.printing=true; const j=ui.queue[0];
   const n=ui.queue.reduce((a,x)=>a+x.qty,0);
-  $('#printout').innerHTML=`<div class="slot"></div><div class="paper"><img alt="Label preview" style="display:block;width:100%;image-rendering:auto" src="data:image/png;base64,${labelBitmap({...j,qty:1})}"></div><div class="pq"><span class="spin"></span>${n} label${n!==1?'s':''} in queue · ${esc(jobName(j))}</div>`;
+  $('#printout').innerHTML=`<div class="slot"></div><div class="paper"><img alt="Label preview" style="display:block;width:100%;image-rendering:auto" src="data:image/png;base64,${labelBitmap({...j,qty:1})}"></div><div class="pq"><span class="spin"></span>${n} label${n!==1?'s':''} in queue · ${esc(j.name)}</div>`;
   renderBarcodes($('#printout'));
   try { await Promise.race([sendToPrinter(j), new Promise((_,no)=>setTimeout(()=>no(new Error('no answer from the printer')),20000))]); } catch(e){ toast('Printer: '+(e.message||e)); }
   await new Promise(r=>setTimeout(r, 1500));
@@ -4798,7 +4797,7 @@ function reprintLabel(l){
   toast('Identical copy queued');
 }
 function showQueue(){
-  $('#modal').innerHTML=`<div class="modal" id="qModal"><div class="box"><h3>Print Queue</h3>${ui.queue.map((j,i)=>`<div class="kv"><span><b style="color:#000">${j.qty} ×</b> ${esc(jobName(j))}</span>${i===0?'<span class="spin"></span>':'<span class="hint">waiting</span>'}</div>`).join('')||'<p class="hint">Queue is empty.</p>'}<div class="row" style="margin-top:16px"><button class="btn ghost" id="qc">Close</button>${ui.queue.length>1?'<button class="btn red" id="qx">Cancel waiting</button>':''}</div></div></div>`;
+  $('#modal').innerHTML=`<div class="modal" id="qModal"><div class="box"><h3>Print Queue</h3>${ui.queue.map((j,i)=>`<div class="kv"><span><b style="color:#000">${j.qty} ×</b> ${esc(j.name)}</span>${i===0?'<span class="spin"></span>':'<span class="hint">waiting</span>'}</div>`).join('')||'<p class="hint">Queue is empty.</p>'}<div class="row" style="margin-top:16px"><button class="btn ghost" id="qc">Close</button>${ui.queue.length>1?'<button class="btn red" id="qx">Cancel waiting</button>':''}</div></div></div>`;
   $('#qc').onclick=()=>$('#modal').innerHTML='';
   const x=$('#qx'); if(x) x.onclick=()=>{ ui.queue=ui.queue.slice(0,1); $('#modal').innerHTML=''; renderFooter(); };
 }
@@ -4930,8 +4929,12 @@ function touchDevice(){
 // Ask the server whether this handheld's business is still open. Returns the lock (or null). Never throws.
 async function checkLock(){
   if(!connected()||!Cloud.whoami) return LOCK;
-  if(navigator.onLine){ let ses; try{ ses=await Cloud.session(); }catch(e){ ses=undefined; } if(ses===null){ unpair(true); return null; } }   // its login is gone: pair again
-  let w=null; try{ w=await Cloud.whoami(); }catch(e){ return LOCK; }   // offline: keep the last answer
+  let w=null;
+  try{ w=await Cloud.whoami(); }
+  catch(e){   // no internet (or the server is down): keep working on what's saved here
+    const m=String((e&&(e.code||''))+' '+(e&&e.message||''));
+    if(/42501|permission denied|JWT|not authenticated/i.test(m)&&!(await Cloud.session().catch(()=>undefined))){ unpair(true); return null; }   // server reached, but this handheld's login is gone
+    return LOCK; }
   if(!w) return LOCK;
   if(!w.device){ unpair(true); return null; }   // removed in the back-office: pair again
   { const d=w.device; if(d.name!==CONN.name||d.mode!==CONN.mode||d.site_id!==CONN.siteId){   // renamed, moved or Easy/Detailed changed in the back-office
@@ -4966,8 +4969,20 @@ async function doSync(){
 let syncT=null;
 function trySync(){ if(!connected()||LOCK) return; clearTimeout(syncT); syncT=setTimeout(()=>{ Cloud.sync(P).then(()=>{ S=P.get(); renderStatus(); }).catch(()=>{ checkLock(); }); },1500); }
 if(navigator.getBattery) navigator.getBattery().then(b=>{ ui.battery=Math.round(b.level*100); }).catch(()=>{});
-let lockTick=0;
-setInterval(async()=>{ if(connected()&&navigator.onLine&&!ui.printing){ if(await checkLock()||!connected()) return; touchDevice(); Cloud.sync(P).then(()=>{ S=P.get(); if(!$('#sheet').classList.contains('on')&&!$('#modal').innerHTML) render(); else renderStatus(); }).catch(()=>{ checkLock(); }); } },60000);
+let syncTick=0, syncBusy=false;
+setInterval(async()=>{
+  if(!connected()||!navigator.onLine||ui.printing||syncBusy||ui.syncing) return;
+  syncBusy=true; const n=syncTick++;
+  try{
+    if(LOCK||n%3===0){ if(await checkLock()||!connected()) return; }
+    if(n%12===0) touchDevice();
+    const r=await Cloud.sync(P); S=P.get();
+    const quiet=$('#sheet').classList.contains('on')||$('#modal').innerHTML;
+    if(r&&r.pulled&&!quiet) render(); else renderStatus();
+  }catch(e){ /* offline or a blip: try again in 5 s */ }
+  finally{ syncBusy=false; }
+},5000);
+window.addEventListener('online',()=>{ if(connected()) trySync(); });
 
 // ---------- pairing (first open, or after being removed / unpaired) ----------
 // The handheld shows a 6-character code and a QR code. In the back-office: Locations & devices → Pair handheld.
