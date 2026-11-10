@@ -1,5 +1,5 @@
 {
-  "version": "1.4.3",
+  "version": "1.4.4",
   "url": "https://label.proviewcrm.co.uk/ProviewLabel.apk",
-  "notes": "Fixes \"Syncing…\" staying on screen after Sync now."
+  "notes": "Check for app updates is now in Settings."
 }
