@@ -56,7 +56,7 @@ body.framed .hdr{padding-top:24px}
 .seg.sm button{font-size:14px;text-transform:none;letter-spacing:0;padding:9px 6px}
 .seg.blue button.on{background:var(--blue);color:#fff}
 /* grids & tiles */
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:14px}
 .grid.two{grid-template-columns:repeat(2,1fr)}
 .pgrid .ptile{min-height:96px;font-size:17px}
 .tile{min-height:96px;border-radius:10px;color:#fff;background:#546E7A;font-weight:600;font-size:17px;padding:8px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;word-break:break-word;box-shadow:0 2px 0 rgba(0,0,0,.12)}
@@ -1164,7 +1164,7 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
 const P = window.PVL;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.3.3';
+const APP_VERSION = '1.3.4';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
