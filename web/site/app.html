@@ -1178,7 +1178,7 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
 const P = window.PVL;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.3.8';
+const APP_VERSION = '1.3.9';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -1309,8 +1309,8 @@ function openDrawer(){
   const ez=ui.mode==='easy';
   const items=ez?[['home','Print Screen',I.print],['scan','Scan to print mode',I.scan]]
     :[['home','Print Screen',I.print],['logs','Logs',I.log],['bulk','Bulk Print',I.stack],['scan','Scan to print mode',I.scan],['wastage','Wastage',I.bin],['order','Label Order',I.box]];
-  const inv=ez?[['switch','Switch Profiles',I.swap],['support','Support',I.help],['settings','Settings',I.gear]]
-    :[['profiles','Manage Profiles',I.users],['switch','Switch Profiles',I.swap],['about','About Device',I.info],['support','Support',I.help],['settings','Settings',I.gear]];
+  const inv=ez?[['switch','Switch Profiles',I.swap],['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]]
+    :[['profiles','Manage Profiles',I.users],['switch','Switch Profiles',I.swap],['about','About Device',I.info],['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]];
   $('#drawer').innerHTML = `<div class="dh"><div class="pv-logo"><div class="mk">PV</div><div class="wd">PROVIEW<span>LABEL</span><small>${esc(site().name.toUpperCase())}</small></div></div><button class="ic" id="dClose" style="color:#000">${I.close}</button></div>
     <div class="dl">${items.map(([k,l,ic])=>`<button class="mi ${ui.screen===k?'on':''}" data-k="${k}">${ic}${l}</button>`).join('')}
       <div class="divider" style="margin:10px 8px"></div>
@@ -1321,6 +1321,7 @@ function openDrawer(){
   $('#drawer').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
     const k=b.dataset.k; closeDrawer();
     if(k==='switch') return openSwitch();
+    if(k==='update') return checkUpdate(true);
     if(k==='profiles'||k==='settings') return needManager(()=>root(k));
     root(k);
   });
@@ -2130,6 +2131,37 @@ window.addEventListener('online',renderStatus); window.addEventListener('offline
 // Android hardware back button
 document.addEventListener('ionBackButton', ev=>{ ev.detail && ev.detail.register && ev.detail.register(10,()=>{ if(connected()&&LOCK&&!$('#modal').innerHTML){ if(Native().App) Native().App.exitApp(); return; } if($('#modal').innerHTML) $('#modal').innerHTML=''; else if($('#sheet').classList.contains('on')) closeSheet(); else if($('#drawer').classList.contains('on')) closeDrawer(); else if(ui.screen!=='home') back(); else if(Native().App) Native().App.exitApp(); }); });
 // handheld hardware: built-in printer + barcode scanner (Android app only)
+// ---------- app updates ----------
+// The latest version is described at label.proviewcrm.co.uk/apk/version.json. The app checks when it opens,
+// every few hours, and from "Check for updates" in the side menu. Installing downloads the APK and opens
+// Android's installer (staff tap Install; Android doesn't allow a silent update).
+const UPDATE_URL='https://label.proviewcrm.co.uk/apk/version.json';
+const vnum=v=>String(v||'0').split('.').slice(0,3).reduce((a,n)=>a*1000+(parseInt(n,10)||0),0)*(String(v||'').split('.').length<3?1000:1);
+let UPDATE_SKIP='';
+async function checkUpdate(manual){
+  if(manual) toast('Checking for updates…');
+  let info=null;
+  try{ const r=await fetch(UPDATE_URL+'?t='+Date.now(),{cache:'no-store'}); if(!r.ok) throw new Error(r.status); info=await r.json(); }
+  catch(e){ if(manual) toast('Couldn\'t check for updates. Check the internet connection.'); return; }
+  if(!info||!info.version||vnum(info.version)<=vnum(APP_VERSION)){ if(manual) toast('You have the latest version (v'+APP_VERSION+')'); return; }
+  if(!manual && (UPDATE_SKIP===info.version || $('#modal').innerHTML || ui.printing)) return;
+  $('#modal').innerHTML=`<div class="modal"><div class="box"><h3>Update available</h3><p class="hint" style="font-size:15px;color:#333">Version ${esc(info.version)} is ready (you have ${esc(APP_VERSION)}).${info.notes?'<br><br>'+esc(info.notes):''}</p><div class="row" style="margin-top:18px"><button class="btn ghost" data-x>Later</button><button class="btn blue" data-ok>Install now</button></div></div></div>`;
+  $('#modal [data-x]').onclick=()=>{ UPDATE_SKIP=info.version; $('#modal').innerHTML=''; };
+  $('#modal [data-ok]').onclick=()=>{ $('#modal').innerHTML=''; installUpdate(info); };
+}
+async function installUpdate(info){
+  const url=info.url||'https://label.proviewcrm.co.uk/ProviewLabel.apk';
+  const N=Native().LabelPrinter;
+  if(!isNative||!N||!N.installUpdate){ window.open(url,'_blank'); return; }
+  toast('Downloading update…');
+  try{ await N.installUpdate({url}); }
+  catch(e){
+    if(e&&e.code==='PERMISSION') toast('Allow "Install unknown apps" for Proview Label, then tap Check for updates again');
+    else toast('Update failed: '+((e&&e.message)||e));
+  }
+}
+if(isNative){ setTimeout(()=>checkUpdate(false),4000); setInterval(()=>checkUpdate(false),4*60*60*1000); }
+
 if(Native().LabelPrinter && Native().LabelPrinter.addListener){ try{ Native().LabelPrinter.addListener('scan', onHardwareScan); }catch(e){} checkBuiltin(); }
 if(Native().App && Native().App.addListener) Native().App.addListener('backButton',()=>{ if(connected()&&LOCK&&!$('#modal').innerHTML){ Native().App.exitApp(); return; } if($('#modal').innerHTML) $('#modal').innerHTML=''; else if($('#sheet').classList.contains('on')) closeSheet(); else if($('#drawer').classList.contains('on')) closeDrawer(); else if(ui.screen!=='home') back(); else Native().App.exitApp(); });
 render();

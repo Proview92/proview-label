@@ -13,6 +13,14 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.graphics.Bitmap;
+import android.net.Uri;
+import android.provider.Settings;
+import androidx.core.content.FileProvider;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.IBinder;
@@ -268,5 +276,44 @@ public class LabelPrinterPlugin extends Plugin {
         } finally {
             if (sock != null) try { sock.close(); } catch (Exception ignored) {}
         }
+    }
+
+    /** Download a newer APK and open Android's installer. Rejects with code PERMISSION when
+     *  "Install unknown apps" isn't allowed yet (and opens that setting for the user). */
+    @PluginMethod
+    public void installUpdate(PluginCall call) {
+        final String url = call.getString("url", null);
+        if (url == null || !url.startsWith("https://")) { call.reject("bad update address"); return; }
+        final Context ctx = getContext();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !ctx.getPackageManager().canRequestPackageInstalls()) {
+            Intent s = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + ctx.getPackageName()));
+            s.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try { ctx.startActivity(s); } catch (Exception ignored) {}
+            call.reject("Allow installs from Proview Label first", "PERMISSION");
+            return;
+        }
+        new Thread(() -> {
+            HttpURLConnection c = null;
+            try {
+                File dir = new File(ctx.getCacheDir(), "update"); dir.mkdirs();
+                File apk = new File(dir, "ProviewLabel.apk"); if (apk.exists()) apk.delete();
+                c = (HttpURLConnection) new URL(url).openConnection();
+                c.setConnectTimeout(15000); c.setReadTimeout(60000); c.setInstanceFollowRedirects(true);
+                c.setRequestProperty("Cache-Control", "no-cache");
+                if (c.getResponseCode() != 200) throw new Exception("download failed (" + c.getResponseCode() + ")");
+                try (InputStream in = c.getInputStream(); FileOutputStream out = new FileOutputStream(apk)) {
+                    byte[] buf = new byte[65536]; int n; while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                }
+                if (apk.length() < 100000) throw new Exception("download incomplete");
+                Uri uri = FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", apk);
+                Intent i = new Intent(Intent.ACTION_VIEW);
+                i.setDataAndType(uri, "application/vnd.android.package-archive");
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i);
+                call.resolve();
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "update failed", e);
+            } finally { if (c != null) c.disconnect(); }
+        }).start();
     }
 }

@@ -7,8 +7,8 @@ android {
         applicationId "uk.co.proviewtech.label"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 12
-        versionName "1.3.8"
+        versionCode 13
+        versionName "1.3.9"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -19,8 +19,25 @@ android {
     buildFeatures {
         aidl true
     }
+    // One permanent key for every build, so updates install over the top.
+    // CI writes the key from the LABEL_KEYSTORE_* repository secrets; without them Android's temporary debug key is used.
+    def ks = System.getenv('LABEL_KEYSTORE')
+    signingConfigs {
+        proview {
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('LABEL_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('LABEL_KEY_ALIAS') ?: 'proviewlabel'
+                keyPassword System.getenv('LABEL_KEYSTORE_PASSWORD')
+            }
+        }
+    }
     buildTypes {
+        debug {
+            if (ks) signingConfig signingConfigs.proview
+        }
         release {
+            if (ks) signingConfig signingConfigs.proview
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

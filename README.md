@@ -49,4 +49,10 @@ Build everything with `cd web && npm install && npm run build`. Then build the A
 Email and password sign-in works as soon as step 1 is done. "Sign in with Proview account" also needs steps 2 and 3.
 
 ## APK
+### Updates
+- The app checks `label.proviewcrm.co.uk/apk/version.json` when it opens and every 4 hours. Staff can also tap **Menu → Check for updates**.
+- When a newer version is out, it downloads the APK and opens Android's installer. Staff tap **Install**.
+- To publish a version: copy the CI APK to `web/site/ProviewLabel.apk` and set `version` in `web/site/apk/version.json`.
+- Every build must be signed with the Proview Label key, or updates won't install over the top. The key is stored in the repository secrets `LABEL_KEYSTORE_B64`, `LABEL_KEYSTORE_PASSWORD` and `LABEL_KEY_ALIAS`. Keep a copy of the key safe: if it's lost, every handheld has to uninstall and reinstall once.
+
 `ProView-Label-debug.apk` is a debug-signed build (version 1.1.0) for testing and sideloading. For the Play Store, sign a release build with your own key.
