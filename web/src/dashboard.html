@@ -216,6 +216,14 @@ tbody tr:hover td{background:#faf9f6}
 textarea.inp{min-height:76px;resize:vertical}
 .rte{min-height:110px;line-height:1.5}.rte b{font-weight:800}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.ab-cap{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:4px 0 10px}
+.ab-g2{gap:0 14px}.ab-pwrow{display:flex;gap:6px;align-items:center}.ab-pwrow .pw-wrap{flex:1;min-width:0}
+.pw-wrap{position:relative}.pw-wrap .inp{padding-right:44px}
+.pw-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:36px;height:32px;border:0;background:transparent;color:var(--mut);border-radius:8px;cursor:pointer;display:grid;place-items:center}
+.pw-eye:hover{color:var(--ink);background:rgba(0,0,0,.05)}.pw-eye svg{width:18px;height:18px}
+.ab-login{display:grid;gap:8px;background:#eef3ff;border:1px solid #cfdcff;color:#213a87;padding:10px 14px;border-radius:10px;font-size:14px}
+.ab-login>div{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.ab-login span{color:var(--mut)}.ab-login b{font-family:ui-monospace,monospace;word-break:break-all}
+@media (max-width:640px){.ab-g2{grid-template-columns:1fr}}
 .algrid{display:flex;flex-wrap:wrap;gap:6px}
 .algrid label{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);background:var(--card);border-radius:20px;padding:5px 11px;font-size:12.5px;margin:0;cursor:pointer;color:var(--ink);font-weight:500}
 .algrid label input{display:none}
@@ -498,6 +506,9 @@ const ICON={
   pvloc:'<path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M9 13h1M9 17h1M14 9h1M14 13h1M14 17h1"/>',
   left:'<path d="M15 18l-6-6 6-6"/>',
   check:'<path d="M20 6 9 17l-5-5"/>',
+  eye:'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  eyeoff:'<path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6A17.4 17.4 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M2 2l20 20"/>',
+  copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
   refresh:'<path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/>'
 };
@@ -1293,11 +1304,49 @@ function trialForm(orgId){ const o=(S.orgs||[]).find(x=>x.id===orgId); if(!o) re
   m.querySelector('#tsv').onclick=()=>{ const v=m.querySelector('#te').value; if(!v) return toast('Pick a date'); const d=new Date(v+'T23:59:59'); if(isNaN(d)) return toast('Pick a date'); save(d.toISOString()); };
   const c=m.querySelector('#tclr'); if(c) c.onclick=()=>save(null);
 }
-// Master: create a customer business (and optionally invite its owner). Used by All sites and Sites & devices.
-function addBusiness(after){ const m=modal('Add business',`<div class="fld"><label>Business name</label><input class="inp" id="bn" placeholder="e.g. Pepe's Piri Piri"></div><div class="g2"><div class="fld"><label>Owner's name</label><input class="inp" id="on"></div><div class="fld"><label>Owner's email</label><input class="inp" id="oe" type="email" placeholder="They sign in with this"></div></div><p class="hint">The owner signs in with “Sign in with Proview account” or “Create a login” using that email. They can then add their locations, staff and menu.</p>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Add business</button>`);
-    m.querySelector('#sv').onclick=async()=>{ const n=m.querySelector('#bn').value.trim(), oe=m.querySelector('#oe').value.trim().toLowerCase(), on=m.querySelector('#on').value.trim(); if(!n) return toast('Enter the business name'); if(oe&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(oe)) return toast('Check the owner’s email');
-      try{ let id; if(CLOUD){ id=await Cloud.createOrg(n,oe,on); await refreshWho(); } else { id='org_'+P.uid(''); S.orgs.push({id,name:n,settings:{}}); if(oe) P.upsert('users',{id:P.uid('u_'),orgId:id,name:on||oe,email:oe,password:'demo',role:'admin',pin:'0000',siteIds:[]}); P.save(); }
-        P.ensureRules(id); closeModal(); toast(n+' added'); if(after) after(id); else setSite('org:'+id); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } }; }
+// Master: add a business together with its Owner / Admin login (no invite email: they just sign in). Same as Proview Signage.
+function addBusiness(after){
+  const req=(t)=>`${t}<span style="color:#d92d20"> *</span>`;
+  const m=modal('Add business',`<div class="fld"><label for="bn">${req('Business name')}</label><input class="inp" id="bn" type="text" placeholder="e.g. Tolians" autocomplete="off"></div>
+    <div class="ab-cap">Owner login</div>
+    <div class="g2 ab-g2"><div class="fld"><label for="on">${req('Name')}</label><input class="inp" id="on" type="text" placeholder="e.g. Sam Taylor" autocomplete="off"></div>
+      <div class="fld"><label for="om">Mobile</label><input class="inp" id="om" type="tel" placeholder="Optional" autocomplete="off"></div>
+      <div class="fld"><label for="oe">${req('Email (they sign in with this)')}</label><input class="inp" id="oe" type="email" placeholder="name@company.com" autocomplete="off"></div>
+      <div class="fld"><label for="op">${req('Password')}</label><div class="ab-pwrow"><div class="pw-wrap"><input class="inp" id="op" type="password" placeholder="At least 6 characters" autocomplete="new-password"><button class="pw-eye" id="opEye" type="button" tabindex="-1" aria-label="Show password" title="Show password">${ic('eye')}</button></div><button class="btn ghost sm" id="opSug" type="button">Suggest</button></div></div></div>
+    <p class="hint" style="margin:0">The business gets a location with the same name. This person becomes its Owner / Admin. No email is sent.</p>`,
+    `<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Add business</button>`,true);
+  const f=(id)=>m.querySelector('#'+id), pass=f('op'), eye=f('opEye');
+  const showPw=(on)=>{ pass.type=on?'text':'password'; eye.innerHTML=ic(on?'eyeoff':'eye'); eye.title=on?'Hide password':'Show password'; eye.setAttribute('aria-label',eye.title); };
+  eye.onclick=()=>{ showPw(pass.type==='password'); pass.focus(); };
+  f('opSug').onclick=()=>{ const a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const r=crypto.getRandomValues(new Uint32Array(10)); pass.value=[...r].map(n=>a[n%a.length]).join(''); showPw(true); };
+  const need=(input,msg)=>{ toast(msg); input.focus(); };
+  f('sv').onclick=async()=>{ const bn=f('bn').value.trim(), on=f('on').value.trim(), mob=f('om').value.trim(), e=f('oe').value.trim().toLowerCase(), pw=pass.value;
+    if(bn.length<2) return need(f('bn'),'Enter the business name');
+    if(on.length<2) return need(f('on'),'Enter the owner’s name');
+    if(!/^\S+@\S+\.\S+$/.test(e)) return need(f('oe'),'Enter a valid email address');
+    if(pw.length<6) return need(pass,'The password needs at least 6 characters');
+    const btn=f('sv'); btn.disabled=true; let r;
+    try{
+      if(CLOUD){ r=await Cloud.addBusiness(bn,on,e,mob,pw); if(await checkAccess()){ applyScope(); try{ await Cloud.sync(P,{full:true}); }catch(x){} S=P.get(); } }
+      else { // demo: same result as the server
+        const id='org_'+P.uid(''), sid='site_'+P.uid(''), old=P.live('users').find(u=>String(u.email||'').toLowerCase()===e);
+        S.orgs.push({id,name:bn,settings:{}}); P.upsert('sites',{id:sid,orgId:id,name:bn,address:'',region:''});
+        P.upsert('users',{id:P.uid('u_'),orgId:id,name:on,email:e,mobile:mob,password:old?old.password:pw,role:'admin',pin:'0000',siteIds:[]}); P.save();
+        r={org_id:id,site_id:sid,email:e,existing:!!old}; }
+    }catch(x){ btn.disabled=false; return toast(Cloud.friendly?Cloud.friendly(x):x.message); }
+    P.ensureRules(r.org_id); closeModal(); if(after) after(r.org_id); else render();
+    const site=location.origin+location.pathname, details=`PROVIEW LABEL login\n${site}\nEmail: ${e}\nPassword: ${pw}`;
+    const d=modal(bn+' added', r.existing
+      ? `<p style="margin:0">${esc(e)} already had a PROVIEW LABEL login, so they were made Owner / Admin of this business and keep the password they already use. The password you typed was not applied.</p>`
+      : `<p class="hint" style="margin:0 0 12px;font-size:14px">The owner can sign in now. No email was sent, so pass these on yourself:</p>
+        <div class="ab-login"><div><span>Sign in at</span><b>${esc(site.replace(/^https?:\/\//,''))}</b></div><div><span>Email</span><b>${esc(e)}</b></div><div><span>Password</span><b>${esc(pw)}</b></div></div>
+        <button class="btn ghost" id="abCopy" type="button" style="margin-top:12px">${ic('copy',16)}Copy login details</button>`,
+      `<button class="btn ghost" data-x>Stay here</button><button class="btn" id="abOpen">Open business</button>`);
+    const c=d.querySelector('#abCopy'); if(c) c.onclick=()=>(navigator.clipboard?navigator.clipboard.writeText(details):Promise.reject()).then(()=>toast('Copied')).catch(()=>{ window.prompt('Copy this:',details); });
+    d.querySelector('#abOpen').onclick=()=>{ closeModal(); const has=P.live('sites').some(x=>x.id===r.site_id); setSite(has?r.site_id:'org:'+r.org_id); location.hash=has?'overview':'devices'; };
+  };
+  f('bn').focus();
+}
 VIEWS.devices=(el)=>{
   const ss=P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(siteFilter==='all'||x.id===siteFilter||siteFilter==='org:'+x.orgId)), ds=bySite(P.live('devices'));
   const canAddSite=scopeOrgIds().some(o=>['master','owner','admin'].includes(orgRole(o)));
