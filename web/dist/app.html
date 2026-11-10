@@ -4955,9 +4955,9 @@ async function doSync(){
 let syncT=null;
 function trySync(){ if(!connected()||LOCK) return; clearTimeout(syncT); syncT=setTimeout(()=>{ Cloud.sync(P).then(()=>{ S=P.get(); renderStatus(); }).catch(()=>{ checkLock(); }); },1500); }
 if(navigator.getBattery) navigator.getBattery().then(b=>{ ui.battery=Math.round(b.level*100); }).catch(()=>{});
-// Talks to the server every 15 minutes (and on Sync now, on opening, and when the internet comes back):
+// Talks to the server every minute (and on Sync now, on opening, and when the internet comes back):
 // sends printed labels, wastage etc., brings down menu changes, and checks pairing, licence and Easy/Detailed.
-const SYNC_EVERY=15*60*1000;
+const SYNC_EVERY=60*1000;
 let syncBusy=false;
 setInterval(async()=>{
   if(!connected()||!navigator.onLine||ui.printing||syncBusy||ui.syncing) return;
