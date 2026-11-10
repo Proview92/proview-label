@@ -875,7 +875,7 @@ function productForm(p, cat){
     <div class="fld"><div class="lbl">Description <span class="hint" style="font-weight:400">optional · shown on the button</span></div><input class="inp" id="pdsc" maxlength="60" value="${esc(p.description||'')}" placeholder="e.g. 6oz, served in a brioche bun"></div>
     ${sale?`<div class="fld"><div class="lbl">Ingredients <span><button class="pill" id="boldB" type="button"><b>B</b></button> <button class="pill blue" id="autoB" type="button">Auto-bold allergens</button></span></div><div class="inp rte" id="ing" contenteditable="true">${p.ingredients||''}</div><div class="hint" id="detected"></div></div>
       <div class="row"><div class="fld" style="flex:1"><div class="lbl">Price (£)</div><input class="inp" id="pr" inputmode="decimal" value="${p.price!=null?p.price:''}"></div><div class="fld" style="flex:1"><div class="lbl">Date type</div><select class="inp" id="dt"><option value="use-by" ${p.dateType==='use-by'?'selected':''}>Use by</option><option value="best-before" ${p.dateType==='best-before'?'selected':''}>Best before</option></select></div></div>`:''}
-    <div class="fld"><div class="lbl">Custom Expiry Rule</div><select class="inp" id="pr2"><option value="">Use storage location</option>${rs.map(r=>`<option value="${r.id}" ${p.ruleId===r.id?'selected':''}>${esc(r.name)} (${P.ruleText(r)})</option>`).join('')}</select></div>
+    <div class="fld"><div class="lbl">Custom Expiry Rule</div><select class="inp" id="pr2"><option value="">Use storage location</option>${P.customRule(p)?`<option value="__custom" selected>Own shelf life (${P.ruleText(P.customRule(p)).replace('+','')})</option>`:''}${rs.map(r=>`<option value="${r.id}" ${p.ruleId===r.id?'selected':''}>${esc(r.name)} (${P.ruleText(r)})</option>`).join('')}</select></div>
     ${!sale?`<div class="lbl" style="margin-top:4px">Allergens</div>${P.ALLERGENS.map(a=>`<button class="check ${p.allergens.includes(a)?'on':''}" data-al="${a}"><span>${esc(P.ALLERGEN_LABEL[a]||a)}</span><span class="bx">${I.tick}</span></button>`).join('')}<div style="height:14px"></div>`:''}
     <div class="fld"><div class="lbl">May Contain</div><input class="inp" id="mc" maxlength="100" value="${esc(p.mayContain)}" placeholder="e.g. Nuts, Sesame"></div>
     <div class="fld"><div class="lbl">Custom Allergens</div><input class="inp" id="ca" maxlength="100" value="${esc(p.customAllergens)}" placeholder="e.g. Garlic"></div>
@@ -894,7 +894,7 @@ function productForm(p, cat){
   sh.querySelector('#pGo').onclick=()=>{
     const name=sh.querySelector('#pn').value.trim(); if(!name) return toast('Enter a product name');
     p.image=img||null; p.description=sh.querySelector('#pdsc').value.trim();
-    p.name=name; p.mayContain=sh.querySelector('#mc').value.trim(); p.customAllergens=sh.querySelector('#ca').value.trim(); p.barcode=sh.querySelector('#bc').value.trim(); p.ruleId=sh.querySelector('#pr2').value||null;
+    p.name=name; p.mayContain=sh.querySelector('#mc').value.trim(); p.customAllergens=sh.querySelector('#ca').value.trim(); p.barcode=sh.querySelector('#bc').value.trim(); { const rv=sh.querySelector('#pr2').value; if(rv!=='__custom'){ p.ruleId=rv||null; p.customExpiry=null; } }
     if(sale){ p.ingredients=P.boldAllergens(ing.innerHTML); p.allergens=P.detectAllergens(p.ingredients); const pr=parseFloat(sh.querySelector('#pr').value); p.price=isNaN(pr)?null:pr; p.dateType=sh.querySelector('#dt').value; }
     else p.prepGuide=sh.querySelector('#pg').value.trim();
     if(isNew && orgSet('requireApproval') && !canManage()) p.approved=false;
@@ -1013,7 +1013,7 @@ function openMisc(){
 }
 function buildJob(p,o){
   o=o||{}; const c=P.byId('categories',p.categoryId); const sale=c&&c.type==='sale';
-  const r=rule(o.ruleId || p.ruleId || (sale?'r_display':ui.ruleId));
+  const r=(!o.ruleId && P.customRule(p)) || rule(o.ruleId || p.ruleId || (sale?'r_display':ui.ruleId));
   const exp=o.manual?new Date(o.manual):P.computeExpiry(r);
   return { id:P.uid('j'), productId:p.id, name:p.name, type:sale?'sale':'prep', qty:o.qty||1, expiry:exp.toISOString(), ruleName:o.manual?'Manual':r.name, rule:r,
     allergens:P.productAllergens(p), mayContain:p.mayContain||'', customAllergens:p.customAllergens||'', ingredients:p.ingredients||'', price:o.price!==undefined?o.price:p.price,

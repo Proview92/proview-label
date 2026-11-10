@@ -327,6 +327,10 @@ html .app.collapsed .side :is(.nav,#pv-x)>a,html .app.collapsed .side :is(.nav,#
 html .app.collapsed .side :is(.side-foot,#pv-x){flex-direction:column!important;align-items:center!important;justify-content:normal!important;gap:4px!important;padding:0 10px 14px!important}
 html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26px!important;padding:6px 8px!important;margin:0!important;justify-content:center!important;box-sizing:border-box!important}
 }
+.cxrow{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.cxrow .btn{width:42px;height:42px;justify-content:center;font-size:22px;padding:0}
+.cxrow #cxn{width:70px;text-align:center;font-size:18px;font-weight:700}
+.cxrow #cxu{width:auto}
 </style>
 </head>
 <body>
@@ -464,6 +468,9 @@ html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26
     if (e - t < 24 * 3600e3) return 'today';
     return 'ok';
   }
+  // a product's own shelf life (set in the back office): behaves like an expiry rule
+  const customRule = (p) => p && p.customExpiry && Number(p.customExpiry.units) > 0
+    ? { id: 'custom', name: 'Shelf life', units: Number(p.customExpiry.units), period: p.customExpiry.period || 'days', custom: true } : null;
   const ruleText = (r) => r ? '+' + r.units + ' ' + (Number(r.units) === 1 ? r.period.replace(/s$/, '') : r.period) : '';
 
   // ---------- label codes (scan-to-reprint) ----------
@@ -896,7 +903,7 @@ html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26
   global.PVL = {
     ALLERGENS, ALLERGEN_LABEL, ALLERGEN_WORDS, CATEGORY_COLOURS, LABEL_TYPES, WASTE_REASONS, ROLES, COLLECTIONS,
     uid, now, fmtDate, fmtDay, fmtTime, esc, money, initials, stripHtml,
-    detectAllergens, boldAllergens, productAllergens, computeExpiry, expiryStatus, ruleText, labelCode,
+    detectAllergens, boldAllergens, productAllergens, computeExpiry, expiryStatus, ruleText, customRule, labelCode,
     seed, blank, useStore, forget, load, save, reset, get, on, upsert, remove, live, byId, audit,
     toCSV, parseCSV, analyseMenu, sync, prune, cloudStores, exportJSON, importJSON, ensureRules, DEFAULT_RULES, photoFromFile
   };
@@ -1880,7 +1887,7 @@ VIEWS.products=(el)=>{
   el.innerHTML=`<div class="ph"><div><h1>Products</h1><p>Changes sync to every device at the next sync.</p></div><div class="btns"><label class="btn ghost">Import CSV<input type="file" accept=".csv,text/csv" id="csvIn" hidden></label><button class="btn ghost" id="csvOut">Export CSV</button><button class="btn" id="addP">+ Add product</button></div></div>${multiOrg()?`<div class="banner" style="background:var(--pri-l);border-color:#c9d6f7">${ic('grid',18)}<div><b>Showing ${scopeOrgIds().length} businesses</b><span class="hint">Each business has its own products. Pick one in the picker under the logo to work on just that menu.</span></div></div>`:''}
   <div class="filters"><input id="fq" placeholder="Search products" value="${esc(pf.q)}"><select id="ft"><option value="all">Prep & sale</option><option value="prep" ${pf.type==='prep'?'selected':''}>Prep labels</option><option value="sale" ${pf.type==='sale'?'selected':''}>Sale (PPDS) labels</option></select><select id="fc"><option value="all">All categories</option>${cats.map(c=>`<option value="${c.id}" ${pf.cat===c.id?'selected':''}>${esc(c.name)} (${c.type})</option>`).join('')}</select><span class="count">${ps.length} products</span></div>
   <div class="tbl"><table><thead><tr><th>Product</th>${multiOrg()?'<th>Business</th>':''}<th>Category</th><th>Allergens</th><th>Expiry rule</th><th>Price</th><th>Printed</th><th></th></tr></thead><tbody>
-  ${ps.map(p=>{const c=catOf(p);const al=P.productAllergens(p);const r=P.byId('rules',p.ruleId);return `<tr><td>${p.image?`<img src="${p.image}" alt="" style="width:34px;height:34px;border-radius:7px;object-fit:cover;vertical-align:middle;margin-right:9px;float:left">`:''}<b>${esc(p.name)}</b>${p.description?`<div class="hint">${esc(p.description)}</div>`:''} ${p.approved===false?'<span class="tag blue">Awaiting approval</span>':''}${p.mayContain?`<div class="hint">May contain: ${esc(p.mayContain)}</div>`:''}</td>${multiOrg()?`<td class="hint">${esc(orgName(p.orgId))}</td>`:''}<td><span class="swatch" style="background:${c.color||'#546E7A'}"></span>${esc(c.name||'')} <span class="tag mute">${c.type||''}</span></td><td>${al.map(a=>`<span class="chip">${esc(a)}</span>`).join('')||'<span class="hint">None</span>'}${p.customAllergens?`<span class="chip">${esc(p.customAllergens)}</span>`:''}</td><td>${r?esc(r.name)+' <span class="hint">'+P.ruleText(r)+'</span>':'<span class="hint">Storage location</span>'}</td><td>${p.price!=null?P.money(p.price):'—'}</td><td>${p.timesPrinted||0}</td><td style="white-space:nowrap">${p.approved===false?`<button class="btn sm" data-ap="${p.id}">Approve</button> `:''}<button class="icbtn" data-prev="${p.id}" title="Preview label">👁</button><button class="icbtn" data-ed="${p.id}" title="Edit">✎</button><button class="icbtn" data-del="${p.id}" title="Delete">🗑</button></td></tr>`;}).join('')||'<tr><td colspan="7" class="empty">No products match.</td></tr>'}</tbody></table></div>`;
+  ${ps.map(p=>{const c=catOf(p);const al=P.productAllergens(p);const r=P.customRule(p)||P.byId('rules',p.ruleId);return `<tr><td>${p.image?`<img src="${p.image}" alt="" style="width:34px;height:34px;border-radius:7px;object-fit:cover;vertical-align:middle;margin-right:9px;float:left">`:''}<b>${esc(p.name)}</b>${p.description?`<div class="hint">${esc(p.description)}</div>`:''} ${p.approved===false?'<span class="tag blue">Awaiting approval</span>':''}${p.mayContain?`<div class="hint">May contain: ${esc(p.mayContain)}</div>`:''}</td>${multiOrg()?`<td class="hint">${esc(orgName(p.orgId))}</td>`:''}<td><span class="swatch" style="background:${c.color||'#546E7A'}"></span>${esc(c.name||'')} <span class="tag mute">${c.type||''}</span></td><td>${al.map(a=>`<span class="chip">${esc(a)}</span>`).join('')||'<span class="hint">None</span>'}${p.customAllergens?`<span class="chip">${esc(p.customAllergens)}</span>`:''}</td><td>${r?esc(r.name)+' <span class="hint">'+P.ruleText(r)+'</span>':'<span class="hint">Storage location</span>'}</td><td>${p.price!=null?P.money(p.price):'—'}</td><td>${p.timesPrinted||0}</td><td style="white-space:nowrap">${p.approved===false?`<button class="btn sm" data-ap="${p.id}">Approve</button> `:''}<button class="icbtn" data-prev="${p.id}" title="Preview label">👁</button><button class="icbtn" data-ed="${p.id}" title="Edit">✎</button><button class="icbtn" data-del="${p.id}" title="Delete">🗑</button></td></tr>`;}).join('')||'<tr><td colspan="7" class="empty">No products match.</td></tr>'}</tbody></table></div>`;
   const fq=el.querySelector('#fq'); fq.oninput=()=>{pf.q=fq.value; clearTimeout(fq._t); fq._t=setTimeout(()=>{render(); const n=$('#fq'); n.focus(); n.setSelectionRange(n.value.length,n.value.length);},250);};
   el.querySelector('#ft').onchange=e=>{pf.type=e.target.value;render();}; el.querySelector('#fc').onchange=e=>{pf.cat=e.target.value;render();};
   el.querySelector('#addP').onclick=()=>withOrg(o=>productModal(null,o));
@@ -1922,7 +1929,10 @@ function productModal(p,orgId){
     <div class="algrid" id="al">${P.ALLERGENS.map(a=>`<label class="${p.allergens.includes(a)?'on':''}"><input type="checkbox" value="${a}" ${p.allergens.includes(a)?'checked':''}> ${esc(P.ALLERGEN_LABEL[a]||a)}</label>`).join('')}</div>
     <div class="g2" style="margin-top:14px"><div class="fld"><label>May contain</label><input class="inp" id="mc" value="${esc(p.mayContain)}"></div><div class="fld"><label>Custom allergens</label><input class="inp" id="ca" value="${esc(p.customAllergens)}"></div></div>
     <div class="g3"><div class="fld"><label>Price (£)</label><input class="inp" id="pr" value="${p.price!=null?p.price:''}" inputmode="decimal"></div><div class="fld"><label>Barcode</label><input class="inp" id="bc" value="${esc(p.barcode)}"></div><div class="fld"><label>Date type</label><select class="inp" id="dt"><option value="use-by">Use by</option><option value="best-before" ${p.dateType==='best-before'?'selected':''}>Best before</option></select></div></div>
-    <div class="fld"><label>Custom expiry rule</label><select class="inp" id="r"><option value="">Use the storage location chosen on the device</option>${rs.map(r=>`<option value="${r.id}" ${r.id===p.ruleId?'selected':''}>${esc(r.name)} (${P.ruleText(r)})</option>`).join('')}</select></div>
+    <div class="fld"><label>Expiry <span class="hint">· how long until the use-by date on the label</span></label><select class="inp" id="r"><option value="">Use the storage location chosen on the device</option><option value="__custom" ${P.customRule(p)?'selected':''}>Custom shelf life…</option>${rs.map(r=>`<option value="${r.id}" ${!P.customRule(p)&&r.id===p.ruleId?'selected':''}>${esc(r.name)} (${P.ruleText(r)})</option>`).join('')}</select>
+      <div id="cx" class="cxrow" style="${P.customRule(p)?'':'display:none'}"><button class="btn ghost" type="button" id="cxm" aria-label="Less">−</button><input class="inp" id="cxn" inputmode="numeric" value="${p.customExpiry?esc(p.customExpiry.units):3}"><button class="btn ghost" type="button" id="cxp" aria-label="More">+</button>
+        <select class="inp" id="cxu"><option value="hours" ${(p.customExpiry||{}).period==='hours'?'selected':''}>hours</option><option value="days" ${!(p.customExpiry&&p.customExpiry.period!=='days')?'selected':''}>days</option><option value="months" ${(p.customExpiry||{}).period==='months'?'selected':''}>months</option></select>
+        <span class="hint" id="cxe"></span></div></div>
     <div class="fld"><label>Prep guide</label><textarea class="inp" id="pg">${esc(p.prepGuide||'')}</textarea></div>`,
     `<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">${isNew?'Add product':'Save changes'}</button>`, true);
   const ing=m.querySelector('#ing'); const det=()=>{ const d=P.detectAllergens(ing.innerHTML); m.querySelector('#det').innerHTML=d.length?'Detected in ingredients: <b>'+d.join(', ')+'</b>':''; d.forEach(a=>{ const cb=m.querySelector(`#al input[value="${a}"]`); if(cb&&!cb.checked){cb.checked=true;cb.parentElement.classList.add('on');} }); };
@@ -1930,6 +1940,13 @@ function productModal(p,orgId){
   m.querySelector('#bb').onmousedown=e=>{e.preventDefault();document.execCommand('bold');};
   m.querySelector('#ab').onclick=()=>{ ing.innerHTML=P.boldAllergens(ing.innerHTML); det(); };
   m.querySelectorAll('#al input').forEach(cb=>cb.onchange=()=>cb.parentElement.classList.toggle('on',cb.checked));
+  const cxShow=()=>{ m.querySelector('#cx').style.display=m.querySelector('#r').value==='__custom'?'':'none'; cxTxt(); };
+  const cxVal=()=>Math.max(1,Math.min(999,parseInt(m.querySelector('#cxn').value,10)||1));
+  const cxTxt=()=>{ const r={units:cxVal(),period:m.querySelector('#cxu').value}; m.querySelector('#cxe').textContent='Printed today → use by '+P.fmtDay(P.computeExpiry(r))+' '+P.fmtDate(P.computeExpiry(r),r.period==='hours'); };
+  m.querySelector('#r').onchange=cxShow;
+  m.querySelector('#cxm').onclick=()=>{ m.querySelector('#cxn').value=Math.max(1,cxVal()-1); cxTxt(); };
+  m.querySelector('#cxp').onclick=()=>{ m.querySelector('#cxn').value=Math.min(999,cxVal()+1); cxTxt(); };
+  m.querySelector('#cxn').oninput=cxTxt; m.querySelector('#cxu').onchange=cxTxt; cxShow();
   let img=p.image||null;
   m.querySelector('#pPic').onchange=async e=>{ try{ img=await P.photoFromFile(e.target.files[0]); const im=m.querySelector('#pImg'); im.src=img; im.style.display=''; m.querySelector('#pPicX').style.display=''; }catch(err){ toast(err.message); } };
   m.querySelector('#pPicX').onclick=()=>{ img=null; m.querySelector('#pImg').style.display='none'; m.querySelector('#pPicX').style.display='none'; };
@@ -1937,14 +1954,15 @@ function productModal(p,orgId){
     const name=m.querySelector('#n').value.trim(); if(!name) return toast('Enter a name');
     const before=JSON.stringify([p.allergens.slice().sort(),p.name]);
     p.image=img||null; p.description=m.querySelector('#dsc').value.trim();
-    Object.assign(p,{name,categoryId:m.querySelector('#c').value,ingredients:ing.innerHTML.trim()?P.boldAllergens(ing.innerHTML):'',allergens:[...m.querySelectorAll('#al input:checked')].map(x=>x.value),mayContain:m.querySelector('#mc').value.trim(),customAllergens:m.querySelector('#ca').value.trim(),price:(v=>isNaN(v)?null:v)(parseFloat(m.querySelector('#pr').value)),barcode:m.querySelector('#bc').value.trim(),dateType:m.querySelector('#dt').value,ruleId:m.querySelector('#r').value||null,prepGuide:m.querySelector('#pg').value.trim()});
+    const rv=m.querySelector('#r').value; p.customExpiry=rv==='__custom'?{units:cxVal(),period:m.querySelector('#cxu').value}:null;
+    Object.assign(p,{name,categoryId:m.querySelector('#c').value,ingredients:ing.innerHTML.trim()?P.boldAllergens(ing.innerHTML):'',allergens:[...m.querySelectorAll('#al input:checked')].map(x=>x.value),mayContain:m.querySelector('#mc').value.trim(),customAllergens:m.querySelector('#ca').value.trim(),price:(v=>isNaN(v)?null:v)(parseFloat(m.querySelector('#pr').value)),barcode:m.querySelector('#bc').value.trim(),dateType:m.querySelector('#dt').value,ruleId:(v=>v&&v!=='__custom'?v:null)(m.querySelector('#r').value),prepGuide:m.querySelector('#pg').value.trim()});
     if(catOf(p).type==='sale'&&!P.stripHtml(p.ingredients).trim()) return toast('Sale (PPDS) labels need a full ingredients list');
     P.upsert('products',p); audit(isNew?'created':'updated','Product',p.name+(before!==JSON.stringify([p.allergens.slice().sort(),p.name])&&!isNew?' – allergens now: '+(p.allergens.join(', ')||'none'):''),p.orgId);
     closeModal(); toast(isNew?'Product added':'Saved'); render();
   };
 }
 function previewLabel(p){
-  const c=catOf(p); const r=P.byId('rules',p.ruleId)||P.byId('rules',c.type==='sale'?'r_display':'r_fridge'); const e=P.computeExpiry(r); const al=P.productAllergens(p);
+  const c=catOf(p); const r=P.customRule(p)||P.byId('rules',p.ruleId)||P.byId('rules',c.type==='sale'?'r_display':'r_fridge'); const e=P.computeExpiry(r); const al=P.productAllergens(p);
   const lab=c.type==='sale'?`<div class="lab"><div style="display:flex;justify-content:space-between"><div class="ln" style="text-align:left">${esc(p.name)}</div><b style="font-size:18px">${p.price!=null?P.money(p.price):''}</b></div><div class="ing"><b style="text-decoration:none">INGREDIENTS:</b> ${p.ingredients||''}</div>${p.mayContain?`<div class="al">May contain: ${esc(p.mayContain)}</div>`:''}<div class="ub"><span>${p.dateType==='best-before'?'BEST BEFORE':'USE BY'}:</span><span>${P.fmtDay(e).toUpperCase()}</span><span>${P.fmtDate(e)}</span></div></div>`
    :`<div class="lab"><div class="ln">${esc(p.name)}</div><div class="ub"><span>USE BY:</span><span>${P.fmtDay(e).toUpperCase()}</span><span>${P.fmtDate(e,r.period==='hours')}</span></div><div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700"><span>PRINTED: ${P.fmtDate(new Date(),true)}</span><span>${P.ruleText(r).replace('+','').toUpperCase()}</span></div>${al.length?`<div class="al">ALLERGENS: ${esc(al.join(', '))}</div>`:''}${p.mayContain?`<div class="al">M/C: ${esc(p.mayContain)}</div>`:''}</div>`;
   modal('Label preview – '+p.name,`<div style="background:#EEF1F4;padding:24px;border-radius:10px;display:flex;justify-content:center">${lab}</div><p class="hint">Shown with ${esc(r.name)} (${P.ruleText(r)}). On the device staff can change storage, quantity, batch code and flags.</p>`);

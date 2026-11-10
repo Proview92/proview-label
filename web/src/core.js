@@ -125,6 +125,9 @@
     if (e - t < 24 * 3600e3) return 'today';
     return 'ok';
   }
+  // a product's own shelf life (set in the back office): behaves like an expiry rule
+  const customRule = (p) => p && p.customExpiry && Number(p.customExpiry.units) > 0
+    ? { id: 'custom', name: 'Shelf life', units: Number(p.customExpiry.units), period: p.customExpiry.period || 'days', custom: true } : null;
   const ruleText = (r) => r ? '+' + r.units + ' ' + (Number(r.units) === 1 ? r.period.replace(/s$/, '') : r.period) : '';
 
   // ---------- label codes (scan-to-reprint) ----------
@@ -557,7 +560,7 @@
   global.PVL = {
     ALLERGENS, ALLERGEN_LABEL, ALLERGEN_WORDS, CATEGORY_COLOURS, LABEL_TYPES, WASTE_REASONS, ROLES, COLLECTIONS,
     uid, now, fmtDate, fmtDay, fmtTime, esc, money, initials, stripHtml,
-    detectAllergens, boldAllergens, productAllergens, computeExpiry, expiryStatus, ruleText, labelCode,
+    detectAllergens, boldAllergens, productAllergens, computeExpiry, expiryStatus, ruleText, customRule, labelCode,
     seed, blank, useStore, forget, load, save, reset, get, on, upsert, remove, live, byId, audit,
     toCSV, parseCSV, analyseMenu, sync, prune, cloudStores, exportJSON, importJSON, ensureRules, DEFAULT_RULES, photoFromFile
   };
