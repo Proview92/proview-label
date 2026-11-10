@@ -4130,7 +4130,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -4205,6 +4205,8 @@ const orgSet = (k) => { const o=(S.orgs||[]).find(x=>x.id===ORG()); const v=o&&o
 const rule = (id) => P.byId('rules', id) || L('rules').find(r=>r.name==='Fridge') || L('rules')[0] || { id:'_fridge', name:'Fridge', units:2, period:'days' };
 // Easy or Detailed is set per handheld in the back-office (Locations & devices). Easy unless set there.
 const modeFor = () => ((connected() ? CONN.mode : (P.byId('devices', S.deviceId) || {}).mode) === 'detailed' ? 'detailed' : 'easy');
+// names of categories / products in the screen language, when the back-office has them; labels always print the English name
+const tn = (x, f) => { f = f || 'name'; const l = T.lang(), t = x && x.i18n && x.i18n[l]; return (t && t[f]) || (x && x[f]) || ''; };
 const canManage = () => ['admin','manager'].includes(user().role);
 const canEditProducts = () => canManage() || !!orgSet('staffCanEdit');
 const siteUsers = () => P.live('users').filter(u => (u.siteIds||[]).includes(S.currentSiteId));
@@ -4227,7 +4229,7 @@ const TITLES = { home:'Categories', products:'Products', search:'Search', storag
 const MENU_ROOTS = ['home','logs','bulk','wastage','order','profiles','about','support','settings'];
 function renderHeader(){
   const isRoot = MENU_ROOTS.includes(ui.screen) && ui.stack.length===0 || ui.screen==='home';
-  const title = (ui.screen==='products'||ui.screen==='ezprod') && ui.category ? ui.category.name : TITLES[ui.screen];
+  const title = (ui.screen==='products'||ui.screen==='ezprod') && ui.category ? tn(ui.category) : TITLES[ui.screen];
   $('#hdr').innerHTML = `
     <button class="ic" id="hNav" aria-label="${isRoot?'Menu':'Back'}">${isRoot?I.menu:I.back}</button>
     <h1>${esc(title)}</h1>
@@ -4316,7 +4318,7 @@ function bindSeg(after){ $('#seg').querySelectorAll('button').forEach(b=>b.oncli
 // ---------- Easy mode: categories → products → − 1 + → Print ----------
 function easyHome(){
   const cats=[...catsFor('prep'),...catsFor('sale')];
-  $('#main').innerHTML = cats.length?`<div class="grid ezcats">${cats.map(c=>`<button class="tile" data-c="${c.id}" style="background:${c.color||'#546E7A'}">${esc(c.name)}</button>`).join('')}</div>`
+  $('#main').innerHTML = cats.length?`<div class="grid ezcats">${cats.map(c=>`<button class="tile" data-c="${c.id}" style="background:${c.color||'#546E7A'}">${esc(tn(c))}</button>`).join('')}</div>`
     :`<div class="empty">${I.box}<b>No categories yet</b>A manager can add them in Detailed mode or on label.proviewcrm.co.uk.</div>`;
   $('#main').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{ const c=P.byId('categories',b.dataset.c); ui.tab=c.type; go('ezprod',{category:c}); });
 }
@@ -4325,7 +4327,7 @@ screens.ezprod = () => {
   const ps=prodsFor(c.id).sort((a,b)=>a.name.localeCompare(b.name));
   $('#main').classList.add('grey');
   $('#main').innerHTML = ps.length?`<div class="ezgrid">${ps.map(p=>productTile(p,true)).join('')}</div>`
-    :`<div class="empty">${I.box}<b>No products in ${esc(c.name)}</b>A manager can add them in Detailed mode or on label.proviewcrm.co.uk.</div>`;
+    :`<div class="empty">${I.box}<b>No products in ${esc(tn(c))}</b>A manager can add them in Detailed mode or on label.proviewcrm.co.uk.</div>`;
   $('#main').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>easyPrint(P.byId('products',b.dataset.p)));
 };
 function easyPrint(p){
@@ -4335,17 +4337,17 @@ function easyPrint(p){
   const body=`${p.image?`<img src="${p.image}" alt="" class="ezpic">`:''}
     <div class="ezq"><button id="qm" aria-label="One less">−</button><b id="qv">1</b><button id="qp" aria-label="One more">+</button></div>
     ${j.type==='prep'||j.includeDate?`<p class="hint" style="text-align:center;margin:4px 0 0">${j.dateType==='best-before'?'Best before':'Use by'} ${P.fmtDay(j.expiry)} ${P.fmtDate(j.expiry,hrs)}</p>`:''}`;
-  const sh=openSheet(p.name, body, `<button class="btn blue ezbig" id="ezGo">${I.print} Print</button>`);
+  const sh=openSheet(tn(p), body, `<button class="btn blue ezbig" id="ezGo">${I.print} Print</button>`);
   const upd=()=>{ sh.querySelector('#qv').textContent=qty; };
   sh.querySelector('#qm').onclick=()=>{ qty=Math.max(1,qty-1); upd(); };
   sh.querySelector('#qp').onclick=()=>{ qty=Math.min(99,qty+1); upd(); };
-  sh.querySelector('#ezGo').onclick=()=>{ enqueue({...buildJob(p,{}),qty}); closeSheet(); toast(`Printing ${qty} × ${p.name}`); };
+  sh.querySelector('#ezGo').onclick=()=>{ enqueue({...buildJob(p,{}),qty}); closeSheet(); toast(`Printing ${qty} × ${tn(p)}`); };
 }
 
 screens.home = () => {
   if(ui.mode==='easy') return easyHome();
   const cats=catsFor(ui.tab);
-  $('#main').innerHTML = segHTML() + `<div class="grid">${cats.map(c=>`<button class="tile" data-c="${c.id}" style="background:${c.color||'#546E7A'}">${esc(c.name)}</button>`).join('')}</div>
+  $('#main').innerHTML = segHTML() + `<div class="grid">${cats.map(c=>`<button class="tile" data-c="${c.id}" style="background:${c.color||'#546E7A'}">${esc(tn(c))}</button>`).join('')}</div>
     ${cats.length?'':'<div class="empty">No categories yet</div>'}
     <div class="addnew"><button id="addCat">${I.plus} Add new</button></div>`;
   bindSeg();
@@ -4353,7 +4355,7 @@ screens.home = () => {
   $('#addCat').onclick=()=>needManager(newCategory);
 };
 
-function productTile(p,big){ return `<button class="ptile${p.image?' hasimg':''}" data-p="${p.id}">${p.image?`<img src="${p.image}" alt="" class="pimg">`:''}<span class="pn">${esc(p.name)}</span>${p.description?`<span class="pdesc">${esc(p.description)}</span>`:''}${p.price!=null&&ui.tab==='sale'&&ui.mode!=='easy'?`<span class="hint">${P.money(p.price)}</span>`:''}</button>`; }
+function productTile(p,big){ return `<button class="ptile${p.image?' hasimg':''}" data-p="${p.id}">${p.image?`<img src="${p.image}" alt="" class="pimg">`:''}<span class="pn">${esc(tn(p))}</span>${tn(p,'description')?`<span class="pdesc">${esc(tn(p,'description'))}</span>`:''}${p.price!=null&&ui.tab==='sale'&&ui.mode!=='easy'?`<span class="hint">${P.money(p.price)}</span>`:''}</button>`; }
 screens.products = () => {
   const c=ui.category; if(!c) return root('home');
   let ps=prodsFor(c.id);
@@ -4372,8 +4374,8 @@ screens.search = () => {
   $('#main').innerHTML = `<div class="searchbar">${I.search}<input id="q" placeholder="Search products or scan barcode" value="${esc(ui.search)}" autocomplete="off"></div><div id="res"></div>`;
   const draw=()=>{
     const q=ui.search.trim().toLowerCase();
-    const ps=L('products').filter(p=>!q || p.name.toLowerCase().includes(q) || (p.barcode||'')===q);
-    $('#res').innerHTML = ps.length?`<div class="grid two pgrid">${ps.map(p=>{const c=P.byId('categories',p.categoryId);return productTile(p).replace('</button>',`<span class="hint">${esc(c?c.name:'')} · ${c&&c.type==='sale'?'Sale':'Prep'}</span></button>`);}).join('')}</div>`:'<div class="empty"><b>No matches</b>Try another name.</div>';
+    const ps=L('products').filter(p=>!q || p.name.toLowerCase().includes(q) || tn(p).toLowerCase().includes(q) || (p.barcode||'')===q);
+    $('#res').innerHTML = ps.length?`<div class="grid two pgrid">${ps.map(p=>{const c=P.byId('categories',p.categoryId);return productTile(p).replace('</button>',`<span class="hint">${esc(c?tn(c):'')} · ${c&&c.type==='sale'?'Sale':'Prep'}</span></button>`);}).join('')}</div>`:'<div class="empty"><b>No matches</b>Try another name.</div>';
     $('#res').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ const p=P.byId('products',b.dataset.p); const c=P.byId('categories',p.categoryId); if(c) ui.tab=c.type; openPrint(p); });
   };
   const q=$('#q'); q.oninput=()=>{ui.search=q.value;draw();}; draw(); setTimeout(()=>q.focus(),50);
@@ -4451,8 +4453,8 @@ screens.bulk = () => {
       const ps=prodsFor(c.id).sort((a,b)=>a.name.localeCompare(b.name));
       const n=ps.reduce((a,p)=>a+((ui.bulk[p.id]||{}).qty||0),0);
       const open=ui.bulkOpen[c.id];
-      return `<div class="acc"><button class="ah" data-acc="${c.id}"><span><i style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${c.color||'#546E7A'};margin-right:8px"></i>${esc(c.name)}${n?`<span class="cnt">(${n} labels selected)</span>`:''}</span>${open?I.down:I.chev}</button>
-      ${open?`<div class="ab">${ps.map(p=>`<div class="ar"><span style="font-size:16px">${esc(p.name)}</span><div class="stepper"><div class="sv"><button data-dec="${p.id}">−</button><b>${(ui.bulk[p.id]||{}).qty||0}</b><button data-inc="${p.id}">+</button></div></div></div>`).join('')||'<p class="hint">No products found in this category.</p>'}</div>`:''}</div>`;
+      return `<div class="acc"><button class="ah" data-acc="${c.id}"><span><i style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${c.color||'#546E7A'};margin-right:8px"></i>${esc(tn(c))}${n?`<span class="cnt">(${n} labels selected)</span>`:''}</span>${open?I.down:I.chev}</button>
+      ${open?`<div class="ab">${ps.map(p=>`<div class="ar"><span style="font-size:16px">${esc(tn(p))}</span><div class="stepper"><div class="sv"><button data-dec="${p.id}">−</button><b>${(ui.bulk[p.id]||{}).qty||0}</b><button data-inc="${p.id}">+</button></div></div></div>`).join('')||'<p class="hint">No products found in this category.</p>'}</div>`:''}</div>`;
     }).join('')}</div>
     <div class="bottombar">${total?`<div style="text-align:center;font-weight:600">${total} label${total!==1?'s':''} selected</div>`:''}<div class="row"><button class="btn ghost" id="bReset" ${total?'':'disabled'}>Reset</button><button class="btn" id="bPrev" ${total?'':'disabled'}>Preview</button></div></div>`;
   bindSeg(()=>{ ui.bulk={}; render(); });
@@ -4463,7 +4465,7 @@ screens.bulk = () => {
   $('#bReset').onclick=()=>{ ui.bulk={}; render(); };
   $('#bPrev').onclick=()=>{
     const items=Object.values(ui.bulk);
-    const sh=openSheet('Bulk Print', `<div class="sect" style="margin-top:0">${total} labels · storage ${esc(rule(ui.ruleId).name)}</div>${items.map(x=>`<div class="kv"><span><b style="color:#000">${x.qty} ×</b></span><b>${esc(x.product.name)}</b></div>`).join('')}`, `<button class="btn" id="bGo">${I.print} Print</button>`);
+    const sh=openSheet('Bulk Print', `<div class="sect" style="margin-top:0">${total} labels · storage ${esc(rule(ui.ruleId).name)}</div>${items.map(x=>`<div class="kv"><span><b style="color:#000">${x.qty} ×</b></span><b>${esc(tn(x.product))}</b></div>`).join('')}`, `<button class="btn" id="bGo">${I.print} Print</button>`);
     sh.querySelector('#bGo').onclick=()=>{ items.forEach(x=>enqueue(buildJob(x.product,{qty:x.qty}))); ui.bulk={}; closeSheet(); render(); };
   };
 };
@@ -4660,7 +4662,7 @@ function wasteForm(pre){
   const ps=L('products').sort((a,b)=>a.name.localeCompare(b.name));
   const draw=()=>{
     const p=P.byId('products',w.productId); const unit=p&&p.price?p.price:2.5;
-    const sh=openSheet('Log Wastage', `<div class="fld"><div class="lbl">Product</div><select class="inp" id="wp"><option value="">Choose product…</option>${ps.map(x=>`<option value="${x.id}" ${x.id===w.productId?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>
+    const sh=openSheet('Log Wastage', `<div class="fld"><div class="lbl">Product</div><select class="inp" id="wp"><option value="">Choose product…</option>${ps.map(x=>`<option value="${x.id}" ${x.id===w.productId?'selected':''}>${esc(tn(x))}</option>`).join('')}</select></div>
       <div class="stepper" style="margin-bottom:16px"><span style="font-weight:500">Quantity</span><div class="sv"><button id="wm">−</button><b>${w.qty}</b><button id="wpl">+</button></div></div>
       <div class="lbl">Reason</div><div class="reasons" style="margin-bottom:16px">${P.WASTE_REASONS.map(r=>`<button data-r="${esc(r)}" class="${w.reason===r?'on':''}">${esc(r)}</button>`).join('')}</div>
       <div class="fld"><div class="lbl">Notes</div><input class="inp" id="wn" value="${esc(w.notes)}" placeholder="Optional"></div>
@@ -4690,7 +4692,7 @@ function openPrint(p){
   const rs=L('rules');
   const draw=()=>{
     const r=rule(o.ruleId); const exp=o.manual?new Date(o.manual):P.computeExpiry(r);
-    const body=`<div style="font-size:30px;font-weight:700;line-height:1.1">${esc(p.name)}</div>
+    const body=`<div style="font-size:30px;font-weight:700;line-height:1.1">${esc(tn(p))}</div>
       ${!sale?`<button class="hint" id="pgBtn" style="color:#4a6cd0;text-decoration:underline;margin-top:4px;font-size:14px">${p.prepGuide?'View Prep Guide':'Create Prep Guide'}</button>
         <div class="toggle2"><button class="tg ${o.useFirst?'on':''}" id="tUF" style="${o.useFirst?'border-color:#E53935;background:#E5393522':''}"><span class="dot" style="background:#E53935">${I.tick}</span>Use First</button><button class="tg ${o.defrost?'on':''}" id="tDF" style="${o.defrost?'border-color:#4a6cd0;background:#4a6cd022':''}"><span class="dot" style="background:#4a6cd0">${I.tick}</span>Defrost</button></div>`
       :`<div class="seg sm" style="margin:12px 0" id="sz"><button data-s="single" class="${o.size==='single'?'on':''}">Single Height</button><button data-s="double" class="${o.size==='double'?'on':''}">Double Height</button></div>

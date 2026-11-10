@@ -917,6 +917,13 @@ function importProductsCSV(text,orgId){
   audit('imported','Products',`CSV: ${added} added, ${updated} updated`,orgId);
   toast(`${added} added, ${updated} updated${newCats?', '+newCats+' new categories':''}`); render();
 }
+// names shown on handhelds set to Türkçe / Română / Български (labels always print the English name)
+const TR_LANGS=[['tr','Türkçe'],['ro','Română'],['bg','Български']];
+const trFields=(x,withDesc)=>{ const t=x.i18n||{}, v=(l,f)=>esc((t[l]||{})[f]||''), has=TR_LANGS.some(([l])=>t[l]&&(t[l].name||t[l].description));
+  return `<details class="fld" ${has?'open':''} style="border:1px solid var(--line);border-radius:10px;padding:10px 12px"><summary style="cursor:pointer;font-weight:600">Name in other languages <span class="hint">optional · shown on handhelds set to that language · labels always print in English</span></summary>
+    <div class="g3" style="margin-top:10px">${TR_LANGS.map(([l,n])=>`<div class="fld"><label>${n}</label><input class="inp" data-tl="${l}" data-tf="name" value="${v(l,'name')}"></div>`).join('')}</div>
+    ${withDesc?`<div class="g3">${TR_LANGS.map(([l,n])=>`<div class="fld"><label>Description · ${n}</label><input class="inp" data-tl="${l}" data-tf="description" maxlength="60" value="${v(l,'description')}"></div>`).join('')}</div>`:''}</details>`; };
+const readTr=(m)=>{ const o={}; m.querySelectorAll('[data-tl]').forEach(i=>{ const v=i.value.trim(); if(v) (o[i.dataset.tl]=o[i.dataset.tl]||{})[i.dataset.tf]=v; }); return o; };
 function productModal(p,orgId){
   const isNew=!p; orgId=p?p.orgId:orgId; const cats=P.live('categories').filter(c=>c.orgId===orgId); const rs=P.live('rules').filter(r=>r.orgId===orgId);
   if(!cats.length) return toast('Add a category for '+orgName(orgId)+' first (Categories).');
@@ -926,6 +933,7 @@ function productModal(p,orgId){
     <div class="g2"><div class="fld"><label>Product name</label><input class="inp" id="n" value="${esc(p.name)}" maxlength="50"></div>
     <div class="fld"><label>Category</label><select class="inp" id="c">${cats.map(c=>`<option value="${c.id}" ${c.id===p.categoryId?'selected':''}>${esc(c.name)} · ${c.type==='sale'?'Sale':'Prep'}</option>`).join('')}</select></div></div>
     <div class="fld"><label>Description <span class="hint">optional · shown under the name on handheld buttons</span></label><input class="inp" id="dsc" value="${esc(p.description||'')}" maxlength="60" placeholder="e.g. 6oz, served in a brioche bun"></div>
+    ${trFields(p,true)}
     <div class="fld"><label style="display:flex;justify-content:space-between">Ingredients <span class="hint">Required for sale (PPDS) labels · <button class="btn ghost sm" id="bb" type="button"><b>B</b></button> <button class="btn ghost sm" id="ab" type="button">Auto-bold allergens</button></span></label><div class="inp rte" id="ing" contenteditable="true">${p.ingredients||''}</div><div class="hint" id="det" style="margin-top:4px"></div></div>
     <div class="lb" style="display:flex;align-items:center;justify-content:space-between;gap:10px">Allergens (ticked automatically, add any others)<button class="btn ghost sm" id="sug" type="button" title="Suggest allergens from the product name, description and ingredients">✨ Suggest allergens</button></div>
     <div class="hint" id="sugWhy" style="margin:-4px 0 8px"></div>
@@ -958,7 +966,7 @@ function productModal(p,orgId){
   m.querySelector('#sv').onclick=()=>{
     const name=m.querySelector('#n').value.trim(); if(!name) return toast('Enter a name');
     const before=JSON.stringify([p.allergens.slice().sort(),p.name]);
-    p.image=img||null; p.description=m.querySelector('#dsc').value.trim();
+    p.image=img||null; p.description=m.querySelector('#dsc').value.trim(); p.i18n=readTr(m);
     p.customExpiry={units:cxVal(),period:'days'};
     Object.assign(p,{name,categoryId:m.querySelector('#c').value,ingredients:ing.innerHTML.trim()?P.boldAllergens(ing.innerHTML):'',allergens:[...m.querySelectorAll('#al input:checked')].map(x=>x.value),mayContain:m.querySelector('#mc').value.trim(),customAllergens:m.querySelector('#ca').value.trim(),price:(v=>isNaN(v)?null:v)(parseFloat(m.querySelector('#pr').value)),barcode:m.querySelector('#bc').value.trim(),dateType:m.querySelector('#dt').value,ruleId:null,prepGuide:m.querySelector('#pg').value.trim()});
     if(catOf(p).type==='sale'&&!P.stripHtml(p.ingredients).trim()) return toast('Sale (PPDS) labels need a full ingredients list');
@@ -978,9 +986,9 @@ VIEWS.categories=(el)=>{
   el.innerHTML=`<div class="ph"><div><h1>Categories</h1><p>The coloured buttons on the device print screen.</p></div><button class="btn" id="add">+ Add category</button></div>
   <div class="cols eq">${['prep','sale'].map(t=>`<div class="card"><h3>${t==='prep'?'Prep labels':'Sale (PPDS) labels'}</h3><div class="sub">${cats.filter(c=>c.type===t).length} categories</div><table><tbody>${cats.filter(c=>c.type===t).map(c=>`<tr><td><span class="swatch" style="background:${c.color||'#546E7A'};width:18px;height:18px"></span><b>${esc(c.name)}</b>${multiOrg()?`<div class="hint">${esc(orgName(c.orgId))}</div>`:''}</td><td class="hint">${P.live('products').filter(p=>p.categoryId===c.id).length} products</td><td style="text-align:right"><button class="icbtn" data-ed="${c.id}">✎</button><button class="icbtn" data-del="${c.id}">🗑</button></td></tr>`).join('')}</tbody></table></div>`).join('')}</div>`;
   const form=(c,orgId)=>{ const isNew=!c; c=c||{id:P.uid('c_'),orgId,name:'',type:'prep',color:null};
-    const m=modal(isNew?'Add category':'Edit category',`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(c.name)}"></div><div class="fld"><label>Label type</label><select class="inp" id="t"><option value="prep">Prep</option><option value="sale" ${c.type==='sale'?'selected':''}>Sale (PPDS)</option></select></div><div class="lb">Colour</div><div class="algrid">${P.CATEGORY_COLOURS.map(x=>`<label class="${(x.colour||null)===(c.color||null)?'on':''}"><input type="radio" name="col" value="${x.colour||''}" ${(x.colour||null)===(c.color||null)?'checked':''}><span class="swatch" style="background:${x.colour||'#546E7A'}"></span>${x.name}</label>`).join('')}</div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
+    const m=modal(isNew?'Add category':'Edit category',`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(c.name)}"></div>${trFields(c,false)}<div class="fld"><label>Label type</label><select class="inp" id="t"><option value="prep">Prep</option><option value="sale" ${c.type==='sale'?'selected':''}>Sale (PPDS)</option></select></div><div class="lb">Colour</div><div class="algrid">${P.CATEGORY_COLOURS.map(x=>`<label class="${(x.colour||null)===(c.color||null)?'on':''}"><input type="radio" name="col" value="${x.colour||''}" ${(x.colour||null)===(c.color||null)?'checked':''}><span class="swatch" style="background:${x.colour||'#546E7A'}"></span>${x.name}</label>`).join('')}</div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
     m.querySelectorAll('input[name=col]').forEach(r=>r.onchange=()=>m.querySelectorAll('.algrid label').forEach(l=>l.classList.toggle('on',l.contains(r)&&r.checked)));
-    m.querySelector('#sv').onclick=()=>{ c.name=m.querySelector('#n').value.trim(); if(!c.name) return toast('Enter a name'); c.type=m.querySelector('#t').value; c.color=(m.querySelector('input[name=col]:checked')||{}).value||null; P.upsert('categories',c); audit(isNew?'created':'updated','Category',c.name,c.orgId); closeModal(); render(); }; };
+    m.querySelector('#sv').onclick=()=>{ c.name=m.querySelector('#n').value.trim(); if(!c.name) return toast('Enter a name'); c.i18n=readTr(m); c.type=m.querySelector('#t').value; c.color=(m.querySelector('input[name=col]:checked')||{}).value||null; P.upsert('categories',c); audit(isNew?'created':'updated','Category',c.name,c.orgId); closeModal(); render(); }; };
   el.querySelector('#add').onclick=()=>withOrg(o=>form(null,o));
   el.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>form({...P.byId('categories',b.dataset.ed)}));
   el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ const c=P.byId('categories',b.dataset.del); const n=P.live('products').filter(p=>p.categoryId===c.id).length; if(n) return toast(`Move or delete its ${n} products first`); confirmM('Delete '+c.name+'?','This removes the button from all devices.','Delete',()=>{P.remove('categories',c.id);audit('deleted','Category',c.name,c.orgId);render();}); });
