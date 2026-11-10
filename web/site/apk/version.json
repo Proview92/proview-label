@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "url": "https://label.proviewcrm.co.uk/ProviewLabel.apk",
-  "notes": "Pair the handheld with a code from the back-office. Language picker, Easy mode by default, built-in printer by default."
+  "notes": "Category and product names in Türkçe, Română and Български. Pair the handheld with a code from the back-office."
 }
