@@ -33,10 +33,13 @@ Deno.serve(async (req) => {
   if (!p || new Date(p.expires_at) < new Date()) return json({ status: "expired" });
   if (!p.claimed_at) return json({ status: "waiting", code: p.code });
 
-  // already handed over once: only hand over again while the handheld is still paired (not removed since)
+  // already handed over once: only hand over again while the handheld is still paired (not removed since),
+  // and keep any changes made in the back-office since (name, location, mode)
+  let cur: Record<string, string> | null = null;
   if (p.user_id) {
-    const { data: still } = await admin.from("pl_devices").select("id").eq("id", p.device_id).maybeSingle();
+    const { data: still } = await admin.from("pl_devices").select("*").eq("id", p.device_id).maybeSingle();
     if (!still) return json({ status: "expired" });
+    cur = still;
   }
   const email = `${p.device_id}@devices.label.proviewcrm.co.uk`.toLowerCase();
   const password = randomPassword();
@@ -52,10 +55,12 @@ Deno.serve(async (req) => {
   const u = await admin.auth.admin.updateUserById(uid!, { password });
   if (u.error) return json({ error: u.error.message }, 500);
 
-  const dev = { id: p.device_id, user_id: uid, org_id: p.org_id, site_id: p.site_id, name: p.name || "Handheld", mode: p.mode || "easy", paired_by: p.claimed_by };
-  const up = await admin.from("pl_devices").upsert(dev, { onConflict: "id" });
-  if (up.error) return json({ error: up.error.message }, 500);
-  await admin.from("pl_pairings").update({ user_id: uid }).eq("code", p.code);
+  const dev = cur || { id: p.device_id, user_id: uid, org_id: p.org_id, site_id: p.site_id, name: p.name || "Handheld", mode: p.mode || "easy", paired_by: p.claimed_by };
+  if (!cur) {
+    const ins = await admin.from("pl_devices").insert(dev);
+    if (ins.error) return json({ error: ins.error.message }, 500);
+    await admin.from("pl_pairings").update({ user_id: uid }).eq("code", p.code);
+  }
 
-  return json({ status: "paired", email, password, device_id: p.device_id, org_id: p.org_id, site_id: p.site_id, name: dev.name, mode: dev.mode });
+  return json({ status: "paired", email, password, device_id: p.device_id, org_id: dev.org_id, site_id: dev.site_id, name: dev.name, mode: dev.mode });
 });
