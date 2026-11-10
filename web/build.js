@@ -6,6 +6,7 @@ const fs = require('fs');
 const R = (f) => fs.readFileSync(__dirname + '/' + f, 'utf8');
 const core = R('src/core.js'), cloud = R('src/cloud.js'), hub = R('src/hub.js'), i18n = R('src/i18n.js');
 const jsb = R('node_modules/jsbarcode/dist/barcodes/JsBarcode.code128.min.js');
+const qr = R('node_modules/qrcode-generator/qrcode.js');   // pairing QR code on the handheld
 const supa = R('node_modules/@supabase/supabase-js/dist/umd/supabase.js');
 const CONFIG = { SUPABASE_URL: 'https://fiqoirnlmhjzicvktdwa.supabase.co', SUPABASE_KEY: 'sb_publishable_j7p5qB-D6FMOV4B6zLiN_w_7xmfKLRM' };
 const uri = (f) => 'data:image/png;base64,' + fs.readFileSync(__dirname + '/assets/' + f).toString('base64');
@@ -16,6 +17,7 @@ function build(file, live) {
   h = h.replace('<script>/*CORE*/</script>', () => js(core));
   h = h.replace('<script>/*JSBARCODE*/</script>', () => js(jsb));
   h = h.replace('<script>/*CLOUD*/</script>', () => js(cloud));
+  h = h.replace('<script>/*QR*/</script>', () => js(qr));
   h = h.replace('<script>/*HUB*/</script>', () => js(hub));   // shared Proview header tray (same file as Proview Signage)
   h = h.replace('<script>/*I18N*/</script>', () => js(i18n));   // on-screen language (prints stay English)
   h = h.replace('<script>/*SUPABASE*/</script>', () => (live ? js(supa) : ''));

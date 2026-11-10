@@ -25,7 +25,9 @@ Food labelling for UK kitchens, part of the Proview CRM family (Bookings, Employ
 ### Adding a customer
 1. As master: **Locations → + Add business**. Enter the name, plus the owner's name and email.
 2. The owner signs in, either with "Sign in with Proview account" or "Create a login" using that email. They add their sites, menu, back-office logins and device staff.
-3. On each handheld: **Menu → Settings → Connect to Proview Label**. Sign in with a back-office login, pick the site, then set your own name and PIN. Products, staff and settings come down to the device. Labels, expiry and wastage go up to the server.
+3. On each handheld: open Proview Label. It shows a 6-character pairing code and a QR code. In the back-office go to **Locations & devices → + Pair handheld**, enter the code (or scan the QR code with a phone, which opens that dialog with the code filled in), and pick the location, a name and **Easy** or **Detailed** mode. The handheld opens a few seconds later. Products and settings come down to the device. Labels, expiry and wastage go up to the server.
+   - No email or password on the handheld. Pairing makes a login used only by that handheld (`supabase/functions/pl-device-pair`, migration `005_device_pairing.sql`). It can only see and change its own location.
+   - Mode, name and location can be changed later from the same page; the handheld picks them up within a minute. **Remove** cuts its access at once and it shows a new pairing code.
 
 ## What's in the box
 

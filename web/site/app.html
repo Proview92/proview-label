@@ -328,6 +328,18 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
 .ezq b{font-size:44px;min-width:70px;text-align:center}
 .ezbig{width:100%;min-height:64px;font-size:21px!important}
 .ezinfo{background:#f4f3ef;border-radius:12px;padding:12px 14px;font-size:15px;line-height:1.5}
+/* ---------- pairing screen ---------- */
+.pairscreen{position:absolute;inset:0;z-index:78;background:#141418;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 22px;text-align:center;overflow-y:auto}
+.pairscreen .pv-logo .wd{color:#fff}
+.pairscreen h2{margin:18px 0 6px;font-size:24px;font-weight:700;letter-spacing:-.01em}
+.pairscreen p{color:#c9c9d1;font-size:15px;line-height:1.5;margin:6px 0;max-width:340px}
+.pairscreen p b{color:#fff}
+.paircode{font-size:46px;font-weight:800;letter-spacing:.14em;margin:18px 0 14px;font-variant-numeric:tabular-nums;background:#26262e;border-radius:16px;padding:10px 18px 10px 26px}
+.pairqr{background:#fff;border-radius:16px;padding:10px;width:190px;height:190px}
+.pairqr svg{width:100%;height:100%;display:block}
+.pairwait{display:flex;align-items:center;gap:10px;margin-top:16px;color:#9a9aa4;font-size:14px}
+.pairerr{margin-top:12px;background:#3a1f1f;color:#f2b8be;border-radius:10px;padding:10px 14px;font-size:14px;max-width:340px}
+.pairscreen .langBtn{position:absolute;top:calc(14px + var(--safe-t));right:14px}
 /* ---------- language ---------- */
 .hdr{gap:6px}
 .langBtn{flex:none;width:36px;height:36px;border-radius:50%;overflow:hidden;padding:0;box-shadow:0 0 0 2px rgba(255,255,255,.55);background:#fff}
@@ -364,6 +376,7 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
   <div class="drawer" id="drawer"></div>
   <div class="sheet" id="sheet"></div>
   <div id="lockscreen"></div>
+  <div id="pairscreen"></div>
   <div id="modal"></div>
   <div class="printout" id="printout"></div>
   <div class="toast" id="toast"></div>
@@ -1177,10 +1190,2325 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
       if (!r.ok || j.error) throw new Error(j.error || ('Could not set the password (' + r.status + ')'));
       return j;
     },
+    // ----- handheld pairing (migration 005) -----
+    // handheld, not signed in: get (or keep) the pairing code for this handheld's secret
+    async pairStart(secret) { const { data, error } = await sb.rpc('pl_pair_start', { p_secret: secret }); if (error) throw error; return data; },
+    // handheld: { status: 'waiting' | 'expired' | 'paired', ... } (paired brings the handheld's own login)
+    async pairPoll(secret) {
+      const r = await fetch(C.SUPABASE_URL + '/functions/v1/pl-device-pair', { method: 'POST', headers: { 'content-type': 'application/json', apikey: C.SUPABASE_KEY }, body: JSON.stringify({ secret }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.error) throw new Error(j.error || ('Pairing check failed (' + r.status + ')'));
+      return j;
+    },
+    // back-office: pair the handheld showing this code
+    async claimPair(code, siteId, name, mode) { const { data, error } = await sb.rpc('pl_pair_claim', { p_code: code, p_site: siteId, p_name: name, p_mode: mode }); if (error) throw error; return data; },
+    async devices(orgIds) { let q = sb.from('pl_devices').select('*').order('name'); if (orgIds) q = q.in('org_id', orgIds); const { data, error } = await q; if (error) throw error; return data || []; },
+    async updateDevice(id, name, siteId, mode) { const { error } = await sb.rpc('pl_device_update', { p_id: id, p_name: name, p_site: siteId, p_mode: mode }); if (error) throw error; },
+    async removeDevice(id) { const { error } = await sb.rpc('pl_device_remove', { p_id: id }); if (error) throw error; },
     async removeMember(id) { const { error } = await sb.from('pl_members').delete().eq('id', id); if (error) throw error; }
   };
   g.PVLCloud = Cloud;
 })(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+//---------------------------------------------------------------------
+//
+// QR Code Generator for JavaScript
+//
+// Copyright (c) 2009 Kazuhiko Arase
+//
+// URL: http://www.d-project.com/
+//
+// Licensed under the MIT license:
+//  http://www.opensource.org/licenses/mit-license.php
+//
+// The word 'QR Code' is registered trademark of
+// DENSO WAVE INCORPORATED
+//  http://www.denso-wave.com/qrcode/faqpatent-e.html
+//
+//---------------------------------------------------------------------
+
+var qrcode = function() {
+
+  //---------------------------------------------------------------------
+  // qrcode
+  //---------------------------------------------------------------------
+
+  /**
+   * qrcode
+   * @param typeNumber 1 to 40
+   * @param errorCorrectionLevel 'L','M','Q','H'
+   */
+  var qrcode = function(typeNumber, errorCorrectionLevel) {
+
+    var PAD0 = 0xEC;
+    var PAD1 = 0x11;
+
+    var _typeNumber = typeNumber;
+    var _errorCorrectionLevel = QRErrorCorrectionLevel[errorCorrectionLevel];
+    var _modules = null;
+    var _moduleCount = 0;
+    var _dataCache = null;
+    var _dataList = [];
+
+    var _this = {};
+
+    var makeImpl = function(test, maskPattern) {
+
+      _moduleCount = _typeNumber * 4 + 17;
+      _modules = function(moduleCount) {
+        var modules = new Array(moduleCount);
+        for (var row = 0; row < moduleCount; row += 1) {
+          modules[row] = new Array(moduleCount);
+          for (var col = 0; col < moduleCount; col += 1) {
+            modules[row][col] = null;
+          }
+        }
+        return modules;
+      }(_moduleCount);
+
+      setupPositionProbePattern(0, 0);
+      setupPositionProbePattern(_moduleCount - 7, 0);
+      setupPositionProbePattern(0, _moduleCount - 7);
+      setupPositionAdjustPattern();
+      setupTimingPattern();
+      setupTypeInfo(test, maskPattern);
+
+      if (_typeNumber >= 7) {
+        setupTypeNumber(test);
+      }
+
+      if (_dataCache == null) {
+        _dataCache = createData(_typeNumber, _errorCorrectionLevel, _dataList);
+      }
+
+      mapData(_dataCache, maskPattern);
+    };
+
+    var setupPositionProbePattern = function(row, col) {
+
+      for (var r = -1; r <= 7; r += 1) {
+
+        if (row + r <= -1 || _moduleCount <= row + r) continue;
+
+        for (var c = -1; c <= 7; c += 1) {
+
+          if (col + c <= -1 || _moduleCount <= col + c) continue;
+
+          if ( (0 <= r && r <= 6 && (c == 0 || c == 6) )
+              || (0 <= c && c <= 6 && (r == 0 || r == 6) )
+              || (2 <= r && r <= 4 && 2 <= c && c <= 4) ) {
+            _modules[row + r][col + c] = true;
+          } else {
+            _modules[row + r][col + c] = false;
+          }
+        }
+      }
+    };
+
+    var getBestMaskPattern = function() {
+
+      var minLostPoint = 0;
+      var pattern = 0;
+
+      for (var i = 0; i < 8; i += 1) {
+
+        makeImpl(true, i);
+
+        var lostPoint = QRUtil.getLostPoint(_this);
+
+        if (i == 0 || minLostPoint > lostPoint) {
+          minLostPoint = lostPoint;
+          pattern = i;
+        }
+      }
+
+      return pattern;
+    };
+
+    var setupTimingPattern = function() {
+
+      for (var r = 8; r < _moduleCount - 8; r += 1) {
+        if (_modules[r][6] != null) {
+          continue;
+        }
+        _modules[r][6] = (r % 2 == 0);
+      }
+
+      for (var c = 8; c < _moduleCount - 8; c += 1) {
+        if (_modules[6][c] != null) {
+          continue;
+        }
+        _modules[6][c] = (c % 2 == 0);
+      }
+    };
+
+    var setupPositionAdjustPattern = function() {
+
+      var pos = QRUtil.getPatternPosition(_typeNumber);
+
+      for (var i = 0; i < pos.length; i += 1) {
+
+        for (var j = 0; j < pos.length; j += 1) {
+
+          var row = pos[i];
+          var col = pos[j];
+
+          if (_modules[row][col] != null) {
+            continue;
+          }
+
+          for (var r = -2; r <= 2; r += 1) {
+
+            for (var c = -2; c <= 2; c += 1) {
+
+              if (r == -2 || r == 2 || c == -2 || c == 2
+                  || (r == 0 && c == 0) ) {
+                _modules[row + r][col + c] = true;
+              } else {
+                _modules[row + r][col + c] = false;
+              }
+            }
+          }
+        }
+      }
+    };
+
+    var setupTypeNumber = function(test) {
+
+      var bits = QRUtil.getBCHTypeNumber(_typeNumber);
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[Math.floor(i / 3)][i % 3 + _moduleCount - 8 - 3] = mod;
+      }
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[i % 3 + _moduleCount - 8 - 3][Math.floor(i / 3)] = mod;
+      }
+    };
+
+    var setupTypeInfo = function(test, maskPattern) {
+
+      var data = (_errorCorrectionLevel << 3) | maskPattern;
+      var bits = QRUtil.getBCHTypeInfo(data);
+
+      // vertical
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 6) {
+          _modules[i][8] = mod;
+        } else if (i < 8) {
+          _modules[i + 1][8] = mod;
+        } else {
+          _modules[_moduleCount - 15 + i][8] = mod;
+        }
+      }
+
+      // horizontal
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 8) {
+          _modules[8][_moduleCount - i - 1] = mod;
+        } else if (i < 9) {
+          _modules[8][15 - i - 1 + 1] = mod;
+        } else {
+          _modules[8][15 - i - 1] = mod;
+        }
+      }
+
+      // fixed module
+      _modules[_moduleCount - 8][8] = (!test);
+    };
+
+    var mapData = function(data, maskPattern) {
+
+      var inc = -1;
+      var row = _moduleCount - 1;
+      var bitIndex = 7;
+      var byteIndex = 0;
+      var maskFunc = QRUtil.getMaskFunction(maskPattern);
+
+      for (var col = _moduleCount - 1; col > 0; col -= 2) {
+
+        if (col == 6) col -= 1;
+
+        while (true) {
+
+          for (var c = 0; c < 2; c += 1) {
+
+            if (_modules[row][col - c] == null) {
+
+              var dark = false;
+
+              if (byteIndex < data.length) {
+                dark = ( ( (data[byteIndex] >>> bitIndex) & 1) == 1);
+              }
+
+              var mask = maskFunc(row, col - c);
+
+              if (mask) {
+                dark = !dark;
+              }
+
+              _modules[row][col - c] = dark;
+              bitIndex -= 1;
+
+              if (bitIndex == -1) {
+                byteIndex += 1;
+                bitIndex = 7;
+              }
+            }
+          }
+
+          row += inc;
+
+          if (row < 0 || _moduleCount <= row) {
+            row -= inc;
+            inc = -inc;
+            break;
+          }
+        }
+      }
+    };
+
+    var createBytes = function(buffer, rsBlocks) {
+
+      var offset = 0;
+
+      var maxDcCount = 0;
+      var maxEcCount = 0;
+
+      var dcdata = new Array(rsBlocks.length);
+      var ecdata = new Array(rsBlocks.length);
+
+      for (var r = 0; r < rsBlocks.length; r += 1) {
+
+        var dcCount = rsBlocks[r].dataCount;
+        var ecCount = rsBlocks[r].totalCount - dcCount;
+
+        maxDcCount = Math.max(maxDcCount, dcCount);
+        maxEcCount = Math.max(maxEcCount, ecCount);
+
+        dcdata[r] = new Array(dcCount);
+
+        for (var i = 0; i < dcdata[r].length; i += 1) {
+          dcdata[r][i] = 0xff & buffer.getBuffer()[i + offset];
+        }
+        offset += dcCount;
+
+        var rsPoly = QRUtil.getErrorCorrectPolynomial(ecCount);
+        var rawPoly = qrPolynomial(dcdata[r], rsPoly.getLength() - 1);
+
+        var modPoly = rawPoly.mod(rsPoly);
+        ecdata[r] = new Array(rsPoly.getLength() - 1);
+        for (var i = 0; i < ecdata[r].length; i += 1) {
+          var modIndex = i + modPoly.getLength() - ecdata[r].length;
+          ecdata[r][i] = (modIndex >= 0)? modPoly.getAt(modIndex) : 0;
+        }
+      }
+
+      var totalCodeCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalCodeCount += rsBlocks[i].totalCount;
+      }
+
+      var data = new Array(totalCodeCount);
+      var index = 0;
+
+      for (var i = 0; i < maxDcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < dcdata[r].length) {
+            data[index] = dcdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      for (var i = 0; i < maxEcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < ecdata[r].length) {
+            data[index] = ecdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      return data;
+    };
+
+    var createData = function(typeNumber, errorCorrectionLevel, dataList) {
+
+      var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, errorCorrectionLevel);
+
+      var buffer = qrBitBuffer();
+
+      for (var i = 0; i < dataList.length; i += 1) {
+        var data = dataList[i];
+        buffer.put(data.getMode(), 4);
+        buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+        data.write(buffer);
+      }
+
+      // calc num max data.
+      var totalDataCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalDataCount += rsBlocks[i].dataCount;
+      }
+
+      if (buffer.getLengthInBits() > totalDataCount * 8) {
+        throw 'code length overflow. ('
+          + buffer.getLengthInBits()
+          + '>'
+          + totalDataCount * 8
+          + ')';
+      }
+
+      // end code
+      if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
+        buffer.put(0, 4);
+      }
+
+      // padding
+      while (buffer.getLengthInBits() % 8 != 0) {
+        buffer.putBit(false);
+      }
+
+      // padding
+      while (true) {
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD0, 8);
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD1, 8);
+      }
+
+      return createBytes(buffer, rsBlocks);
+    };
+
+    _this.addData = function(data, mode) {
+
+      mode = mode || 'Byte';
+
+      var newData = null;
+
+      switch(mode) {
+      case 'Numeric' :
+        newData = qrNumber(data);
+        break;
+      case 'Alphanumeric' :
+        newData = qrAlphaNum(data);
+        break;
+      case 'Byte' :
+        newData = qr8BitByte(data);
+        break;
+      case 'Kanji' :
+        newData = qrKanji(data);
+        break;
+      default :
+        throw 'mode:' + mode;
+      }
+
+      _dataList.push(newData);
+      _dataCache = null;
+    };
+
+    _this.isDark = function(row, col) {
+      if (row < 0 || _moduleCount <= row || col < 0 || _moduleCount <= col) {
+        throw row + ',' + col;
+      }
+      return _modules[row][col];
+    };
+
+    _this.getModuleCount = function() {
+      return _moduleCount;
+    };
+
+    _this.make = function() {
+      if (_typeNumber < 1) {
+        var typeNumber = 1;
+
+        for (; typeNumber < 40; typeNumber++) {
+          var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, _errorCorrectionLevel);
+          var buffer = qrBitBuffer();
+
+          for (var i = 0; i < _dataList.length; i++) {
+            var data = _dataList[i];
+            buffer.put(data.getMode(), 4);
+            buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+            data.write(buffer);
+          }
+
+          var totalDataCount = 0;
+          for (var i = 0; i < rsBlocks.length; i++) {
+            totalDataCount += rsBlocks[i].dataCount;
+          }
+
+          if (buffer.getLengthInBits() <= totalDataCount * 8) {
+            break;
+          }
+        }
+
+        _typeNumber = typeNumber;
+      }
+
+      makeImpl(false, getBestMaskPattern() );
+    };
+
+    _this.createTableTag = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var qrHtml = '';
+
+      qrHtml += '<table style="';
+      qrHtml += ' border-width: 0px; border-style: none;';
+      qrHtml += ' border-collapse: collapse;';
+      qrHtml += ' padding: 0px; margin: ' + margin + 'px;';
+      qrHtml += '">';
+      qrHtml += '<tbody>';
+
+      for (var r = 0; r < _this.getModuleCount(); r += 1) {
+
+        qrHtml += '<tr>';
+
+        for (var c = 0; c < _this.getModuleCount(); c += 1) {
+          qrHtml += '<td style="';
+          qrHtml += ' border-width: 0px; border-style: none;';
+          qrHtml += ' border-collapse: collapse;';
+          qrHtml += ' padding: 0px; margin: 0px;';
+          qrHtml += ' width: ' + cellSize + 'px;';
+          qrHtml += ' height: ' + cellSize + 'px;';
+          qrHtml += ' background-color: ';
+          qrHtml += _this.isDark(r, c)? '#000000' : '#ffffff';
+          qrHtml += ';';
+          qrHtml += '"/>';
+        }
+
+        qrHtml += '</tr>';
+      }
+
+      qrHtml += '</tbody>';
+      qrHtml += '</table>';
+
+      return qrHtml;
+    };
+
+    _this.createSvgTag = function(cellSize, margin, alt, title) {
+
+      var opts = {};
+      if (typeof arguments[0] == 'object') {
+        // Called by options.
+        opts = arguments[0];
+        // overwrite cellSize and margin.
+        cellSize = opts.cellSize;
+        margin = opts.margin;
+        alt = opts.alt;
+        title = opts.title;
+      }
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      // Compose alt property surrogate
+      alt = (typeof alt === 'string') ? {text: alt} : alt || {};
+      alt.text = alt.text || null;
+      alt.id = (alt.text) ? alt.id || 'qrcode-description' : null;
+
+      // Compose title property surrogate
+      title = (typeof title === 'string') ? {text: title} : title || {};
+      title.text = title.text || null;
+      title.id = (title.text) ? title.id || 'qrcode-title' : null;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var c, mc, r, mr, qrSvg='', rect;
+
+      rect = 'l' + cellSize + ',0 0,' + cellSize +
+        ' -' + cellSize + ',0 0,-' + cellSize + 'z ';
+
+      qrSvg += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg"';
+      qrSvg += !opts.scalable ? ' width="' + size + 'px" height="' + size + 'px"' : '';
+      qrSvg += ' viewBox="0 0 ' + size + ' ' + size + '" ';
+      qrSvg += ' preserveAspectRatio="xMinYMin meet"';
+      qrSvg += (title.text || alt.text) ? ' role="img" aria-labelledby="' +
+          escapeXml([title.id, alt.id].join(' ').trim() ) + '"' : '';
+      qrSvg += '>';
+      qrSvg += (title.text) ? '<title id="' + escapeXml(title.id) + '">' +
+          escapeXml(title.text) + '</title>' : '';
+      qrSvg += (alt.text) ? '<description id="' + escapeXml(alt.id) + '">' +
+          escapeXml(alt.text) + '</description>' : '';
+      qrSvg += '<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>';
+      qrSvg += '<path d="';
+
+      for (r = 0; r < _this.getModuleCount(); r += 1) {
+        mr = r * cellSize + margin;
+        for (c = 0; c < _this.getModuleCount(); c += 1) {
+          if (_this.isDark(r, c) ) {
+            mc = c*cellSize+margin;
+            qrSvg += 'M' + mc + ',' + mr + rect;
+          }
+        }
+      }
+
+      qrSvg += '" stroke="transparent" fill="black"/>';
+      qrSvg += '</svg>';
+
+      return qrSvg;
+    };
+
+    _this.createDataURL = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      return createDataURL(size, size, function(x, y) {
+        if (min <= x && x < max && min <= y && y < max) {
+          var c = Math.floor( (x - min) / cellSize);
+          var r = Math.floor( (y - min) / cellSize);
+          return _this.isDark(r, c)? 0 : 1;
+        } else {
+          return 1;
+        }
+      } );
+    };
+
+    _this.createImgTag = function(cellSize, margin, alt) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+
+      var img = '';
+      img += '<img';
+      img += '\u0020src="';
+      img += _this.createDataURL(cellSize, margin);
+      img += '"';
+      img += '\u0020width="';
+      img += size;
+      img += '"';
+      img += '\u0020height="';
+      img += size;
+      img += '"';
+      if (alt) {
+        img += '\u0020alt="';
+        img += escapeXml(alt);
+        img += '"';
+      }
+      img += '/>';
+
+      return img;
+    };
+
+    var escapeXml = function(s) {
+      var escaped = '';
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charAt(i);
+        switch(c) {
+        case '<': escaped += '&lt;'; break;
+        case '>': escaped += '&gt;'; break;
+        case '&': escaped += '&amp;'; break;
+        case '"': escaped += '&quot;'; break;
+        default : escaped += c; break;
+        }
+      }
+      return escaped;
+    };
+
+    var _createHalfASCII = function(margin) {
+      var cellSize = 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r1, r2, p;
+
+      var blocks = {
+        '██': '█',
+        '█ ': '▀',
+        ' █': '▄',
+        '  ': ' '
+      };
+
+      var blocksLastLineNoMargin = {
+        '██': '▀',
+        '█ ': '▀',
+        ' █': ' ',
+        '  ': ' '
+      };
+
+      var ascii = '';
+      for (y = 0; y < size; y += 2) {
+        r1 = Math.floor((y - min) / cellSize);
+        r2 = Math.floor((y + 1 - min) / cellSize);
+        for (x = 0; x < size; x += 1) {
+          p = '█';
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r1, Math.floor((x - min) / cellSize))) {
+            p = ' ';
+          }
+
+          if (min <= x && x < max && min <= y+1 && y+1 < max && _this.isDark(r2, Math.floor((x - min) / cellSize))) {
+            p += ' ';
+          }
+          else {
+            p += '█';
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          ascii += (margin < 1 && y+1 >= max) ? blocksLastLineNoMargin[p] : blocks[p];
+        }
+
+        ascii += '\n';
+      }
+
+      if (size % 2 && margin > 0) {
+        return ascii.substring(0, ascii.length - size - 1) + Array(size+1).join('▀');
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.createASCII = function(cellSize, margin) {
+      cellSize = cellSize || 1;
+
+      if (cellSize < 2) {
+        return _createHalfASCII(margin);
+      }
+
+      cellSize -= 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r, p;
+
+      var white = Array(cellSize+1).join('██');
+      var black = Array(cellSize+1).join('  ');
+
+      var ascii = '';
+      var line = '';
+      for (y = 0; y < size; y += 1) {
+        r = Math.floor( (y - min) / cellSize);
+        line = '';
+        for (x = 0; x < size; x += 1) {
+          p = 1;
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r, Math.floor((x - min) / cellSize))) {
+            p = 0;
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          line += p ? white : black;
+        }
+
+        for (r = 0; r < cellSize; r += 1) {
+          ascii += line + '\n';
+        }
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.renderTo2dContext = function(context, cellSize) {
+      cellSize = cellSize || 2;
+      var length = _this.getModuleCount();
+      for (var row = 0; row < length; row++) {
+        for (var col = 0; col < length; col++) {
+          context.fillStyle = _this.isDark(row, col) ? 'black' : 'white';
+          context.fillRect(row * cellSize, col * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrcode.stringToBytes
+  //---------------------------------------------------------------------
+
+  qrcode.stringToBytesFuncs = {
+    'default' : function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        bytes.push(c & 0xff);
+      }
+      return bytes;
+    }
+  };
+
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['default'];
+
+  //---------------------------------------------------------------------
+  // qrcode.createStringToBytes
+  //---------------------------------------------------------------------
+
+  /**
+   * @param unicodeData base64 string of byte array.
+   * [16bit Unicode],[16bit Bytes], ...
+   * @param numChars
+   */
+  qrcode.createStringToBytes = function(unicodeData, numChars) {
+
+    // create conversion map.
+
+    var unicodeMap = function() {
+
+      var bin = base64DecodeInputStream(unicodeData);
+      var read = function() {
+        var b = bin.read();
+        if (b == -1) throw 'eof';
+        return b;
+      };
+
+      var count = 0;
+      var unicodeMap = {};
+      while (true) {
+        var b0 = bin.read();
+        if (b0 == -1) break;
+        var b1 = read();
+        var b2 = read();
+        var b3 = read();
+        var k = String.fromCharCode( (b0 << 8) | b1);
+        var v = (b2 << 8) | b3;
+        unicodeMap[k] = v;
+        count += 1;
+      }
+      if (count != numChars) {
+        throw count + ' != ' + numChars;
+      }
+
+      return unicodeMap;
+    }();
+
+    var unknownChar = '?'.charCodeAt(0);
+
+    return function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        if (c < 128) {
+          bytes.push(c);
+        } else {
+          var b = unicodeMap[s.charAt(i)];
+          if (typeof b == 'number') {
+            if ( (b & 0xff) == b) {
+              // 1byte
+              bytes.push(b);
+            } else {
+              // 2bytes
+              bytes.push(b >>> 8);
+              bytes.push(b & 0xff);
+            }
+          } else {
+            bytes.push(unknownChar);
+          }
+        }
+      }
+      return bytes;
+    };
+  };
+
+  //---------------------------------------------------------------------
+  // QRMode
+  //---------------------------------------------------------------------
+
+  var QRMode = {
+    MODE_NUMBER :    1 << 0,
+    MODE_ALPHA_NUM : 1 << 1,
+    MODE_8BIT_BYTE : 1 << 2,
+    MODE_KANJI :     1 << 3
+  };
+
+  //---------------------------------------------------------------------
+  // QRErrorCorrectionLevel
+  //---------------------------------------------------------------------
+
+  var QRErrorCorrectionLevel = {
+    L : 1,
+    M : 0,
+    Q : 3,
+    H : 2
+  };
+
+  //---------------------------------------------------------------------
+  // QRMaskPattern
+  //---------------------------------------------------------------------
+
+  var QRMaskPattern = {
+    PATTERN000 : 0,
+    PATTERN001 : 1,
+    PATTERN010 : 2,
+    PATTERN011 : 3,
+    PATTERN100 : 4,
+    PATTERN101 : 5,
+    PATTERN110 : 6,
+    PATTERN111 : 7
+  };
+
+  //---------------------------------------------------------------------
+  // QRUtil
+  //---------------------------------------------------------------------
+
+  var QRUtil = function() {
+
+    var PATTERN_POSITION_TABLE = [
+      [],
+      [6, 18],
+      [6, 22],
+      [6, 26],
+      [6, 30],
+      [6, 34],
+      [6, 22, 38],
+      [6, 24, 42],
+      [6, 26, 46],
+      [6, 28, 50],
+      [6, 30, 54],
+      [6, 32, 58],
+      [6, 34, 62],
+      [6, 26, 46, 66],
+      [6, 26, 48, 70],
+      [6, 26, 50, 74],
+      [6, 30, 54, 78],
+      [6, 30, 56, 82],
+      [6, 30, 58, 86],
+      [6, 34, 62, 90],
+      [6, 28, 50, 72, 94],
+      [6, 26, 50, 74, 98],
+      [6, 30, 54, 78, 102],
+      [6, 28, 54, 80, 106],
+      [6, 32, 58, 84, 110],
+      [6, 30, 58, 86, 114],
+      [6, 34, 62, 90, 118],
+      [6, 26, 50, 74, 98, 122],
+      [6, 30, 54, 78, 102, 126],
+      [6, 26, 52, 78, 104, 130],
+      [6, 30, 56, 82, 108, 134],
+      [6, 34, 60, 86, 112, 138],
+      [6, 30, 58, 86, 114, 142],
+      [6, 34, 62, 90, 118, 146],
+      [6, 30, 54, 78, 102, 126, 150],
+      [6, 24, 50, 76, 102, 128, 154],
+      [6, 28, 54, 80, 106, 132, 158],
+      [6, 32, 58, 84, 110, 136, 162],
+      [6, 26, 54, 82, 110, 138, 166],
+      [6, 30, 58, 86, 114, 142, 170]
+    ];
+    var G15 = (1 << 10) | (1 << 8) | (1 << 5) | (1 << 4) | (1 << 2) | (1 << 1) | (1 << 0);
+    var G18 = (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) | (1 << 5) | (1 << 2) | (1 << 0);
+    var G15_MASK = (1 << 14) | (1 << 12) | (1 << 10) | (1 << 4) | (1 << 1);
+
+    var _this = {};
+
+    var getBCHDigit = function(data) {
+      var digit = 0;
+      while (data != 0) {
+        digit += 1;
+        data >>>= 1;
+      }
+      return digit;
+    };
+
+    _this.getBCHTypeInfo = function(data) {
+      var d = data << 10;
+      while (getBCHDigit(d) - getBCHDigit(G15) >= 0) {
+        d ^= (G15 << (getBCHDigit(d) - getBCHDigit(G15) ) );
+      }
+      return ( (data << 10) | d) ^ G15_MASK;
+    };
+
+    _this.getBCHTypeNumber = function(data) {
+      var d = data << 12;
+      while (getBCHDigit(d) - getBCHDigit(G18) >= 0) {
+        d ^= (G18 << (getBCHDigit(d) - getBCHDigit(G18) ) );
+      }
+      return (data << 12) | d;
+    };
+
+    _this.getPatternPosition = function(typeNumber) {
+      return PATTERN_POSITION_TABLE[typeNumber - 1];
+    };
+
+    _this.getMaskFunction = function(maskPattern) {
+
+      switch (maskPattern) {
+
+      case QRMaskPattern.PATTERN000 :
+        return function(i, j) { return (i + j) % 2 == 0; };
+      case QRMaskPattern.PATTERN001 :
+        return function(i, j) { return i % 2 == 0; };
+      case QRMaskPattern.PATTERN010 :
+        return function(i, j) { return j % 3 == 0; };
+      case QRMaskPattern.PATTERN011 :
+        return function(i, j) { return (i + j) % 3 == 0; };
+      case QRMaskPattern.PATTERN100 :
+        return function(i, j) { return (Math.floor(i / 2) + Math.floor(j / 3) ) % 2 == 0; };
+      case QRMaskPattern.PATTERN101 :
+        return function(i, j) { return (i * j) % 2 + (i * j) % 3 == 0; };
+      case QRMaskPattern.PATTERN110 :
+        return function(i, j) { return ( (i * j) % 2 + (i * j) % 3) % 2 == 0; };
+      case QRMaskPattern.PATTERN111 :
+        return function(i, j) { return ( (i * j) % 3 + (i + j) % 2) % 2 == 0; };
+
+      default :
+        throw 'bad maskPattern:' + maskPattern;
+      }
+    };
+
+    _this.getErrorCorrectPolynomial = function(errorCorrectLength) {
+      var a = qrPolynomial([1], 0);
+      for (var i = 0; i < errorCorrectLength; i += 1) {
+        a = a.multiply(qrPolynomial([1, QRMath.gexp(i)], 0) );
+      }
+      return a;
+    };
+
+    _this.getLengthInBits = function(mode, type) {
+
+      if (1 <= type && type < 10) {
+
+        // 1 - 9
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 10;
+        case QRMode.MODE_ALPHA_NUM : return 9;
+        case QRMode.MODE_8BIT_BYTE : return 8;
+        case QRMode.MODE_KANJI     : return 8;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 27) {
+
+        // 10 - 26
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 12;
+        case QRMode.MODE_ALPHA_NUM : return 11;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 10;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 41) {
+
+        // 27 - 40
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 14;
+        case QRMode.MODE_ALPHA_NUM : return 13;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 12;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else {
+        throw 'type:' + type;
+      }
+    };
+
+    _this.getLostPoint = function(qrcode) {
+
+      var moduleCount = qrcode.getModuleCount();
+
+      var lostPoint = 0;
+
+      // LEVEL1
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount; col += 1) {
+
+          var sameCount = 0;
+          var dark = qrcode.isDark(row, col);
+
+          for (var r = -1; r <= 1; r += 1) {
+
+            if (row + r < 0 || moduleCount <= row + r) {
+              continue;
+            }
+
+            for (var c = -1; c <= 1; c += 1) {
+
+              if (col + c < 0 || moduleCount <= col + c) {
+                continue;
+              }
+
+              if (r == 0 && c == 0) {
+                continue;
+              }
+
+              if (dark == qrcode.isDark(row + r, col + c) ) {
+                sameCount += 1;
+              }
+            }
+          }
+
+          if (sameCount > 5) {
+            lostPoint += (3 + sameCount - 5);
+          }
+        }
+      };
+
+      // LEVEL2
+
+      for (var row = 0; row < moduleCount - 1; row += 1) {
+        for (var col = 0; col < moduleCount - 1; col += 1) {
+          var count = 0;
+          if (qrcode.isDark(row, col) ) count += 1;
+          if (qrcode.isDark(row + 1, col) ) count += 1;
+          if (qrcode.isDark(row, col + 1) ) count += 1;
+          if (qrcode.isDark(row + 1, col + 1) ) count += 1;
+          if (count == 0 || count == 4) {
+            lostPoint += 3;
+          }
+        }
+      }
+
+      // LEVEL3
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount - 6; col += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row, col + 1)
+              &&  qrcode.isDark(row, col + 2)
+              &&  qrcode.isDark(row, col + 3)
+              &&  qrcode.isDark(row, col + 4)
+              && !qrcode.isDark(row, col + 5)
+              &&  qrcode.isDark(row, col + 6) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount - 6; row += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row + 1, col)
+              &&  qrcode.isDark(row + 2, col)
+              &&  qrcode.isDark(row + 3, col)
+              &&  qrcode.isDark(row + 4, col)
+              && !qrcode.isDark(row + 5, col)
+              &&  qrcode.isDark(row + 6, col) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      // LEVEL4
+
+      var darkCount = 0;
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount; row += 1) {
+          if (qrcode.isDark(row, col) ) {
+            darkCount += 1;
+          }
+        }
+      }
+
+      var ratio = Math.abs(100 * darkCount / moduleCount / moduleCount - 50) / 5;
+      lostPoint += ratio * 10;
+
+      return lostPoint;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // QRMath
+  //---------------------------------------------------------------------
+
+  var QRMath = function() {
+
+    var EXP_TABLE = new Array(256);
+    var LOG_TABLE = new Array(256);
+
+    // initialize tables
+    for (var i = 0; i < 8; i += 1) {
+      EXP_TABLE[i] = 1 << i;
+    }
+    for (var i = 8; i < 256; i += 1) {
+      EXP_TABLE[i] = EXP_TABLE[i - 4]
+        ^ EXP_TABLE[i - 5]
+        ^ EXP_TABLE[i - 6]
+        ^ EXP_TABLE[i - 8];
+    }
+    for (var i = 0; i < 255; i += 1) {
+      LOG_TABLE[EXP_TABLE[i] ] = i;
+    }
+
+    var _this = {};
+
+    _this.glog = function(n) {
+
+      if (n < 1) {
+        throw 'glog(' + n + ')';
+      }
+
+      return LOG_TABLE[n];
+    };
+
+    _this.gexp = function(n) {
+
+      while (n < 0) {
+        n += 255;
+      }
+
+      while (n >= 256) {
+        n -= 255;
+      }
+
+      return EXP_TABLE[n];
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrPolynomial
+  //---------------------------------------------------------------------
+
+  function qrPolynomial(num, shift) {
+
+    if (typeof num.length == 'undefined') {
+      throw num.length + '/' + shift;
+    }
+
+    var _num = function() {
+      var offset = 0;
+      while (offset < num.length && num[offset] == 0) {
+        offset += 1;
+      }
+      var _num = new Array(num.length - offset + shift);
+      for (var i = 0; i < num.length - offset; i += 1) {
+        _num[i] = num[i + offset];
+      }
+      return _num;
+    }();
+
+    var _this = {};
+
+    _this.getAt = function(index) {
+      return _num[index];
+    };
+
+    _this.getLength = function() {
+      return _num.length;
+    };
+
+    _this.multiply = function(e) {
+
+      var num = new Array(_this.getLength() + e.getLength() - 1);
+
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        for (var j = 0; j < e.getLength(); j += 1) {
+          num[i + j] ^= QRMath.gexp(QRMath.glog(_this.getAt(i) ) + QRMath.glog(e.getAt(j) ) );
+        }
+      }
+
+      return qrPolynomial(num, 0);
+    };
+
+    _this.mod = function(e) {
+
+      if (_this.getLength() - e.getLength() < 0) {
+        return _this;
+      }
+
+      var ratio = QRMath.glog(_this.getAt(0) ) - QRMath.glog(e.getAt(0) );
+
+      var num = new Array(_this.getLength() );
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        num[i] = _this.getAt(i);
+      }
+
+      for (var i = 0; i < e.getLength(); i += 1) {
+        num[i] ^= QRMath.gexp(QRMath.glog(e.getAt(i) ) + ratio);
+      }
+
+      // recursive call
+      return qrPolynomial(num, 0).mod(e);
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // QRRSBlock
+  //---------------------------------------------------------------------
+
+  var QRRSBlock = function() {
+
+    var RS_BLOCK_TABLE = [
+
+      // L
+      // M
+      // Q
+      // H
+
+      // 1
+      [1, 26, 19],
+      [1, 26, 16],
+      [1, 26, 13],
+      [1, 26, 9],
+
+      // 2
+      [1, 44, 34],
+      [1, 44, 28],
+      [1, 44, 22],
+      [1, 44, 16],
+
+      // 3
+      [1, 70, 55],
+      [1, 70, 44],
+      [2, 35, 17],
+      [2, 35, 13],
+
+      // 4
+      [1, 100, 80],
+      [2, 50, 32],
+      [2, 50, 24],
+      [4, 25, 9],
+
+      // 5
+      [1, 134, 108],
+      [2, 67, 43],
+      [2, 33, 15, 2, 34, 16],
+      [2, 33, 11, 2, 34, 12],
+
+      // 6
+      [2, 86, 68],
+      [4, 43, 27],
+      [4, 43, 19],
+      [4, 43, 15],
+
+      // 7
+      [2, 98, 78],
+      [4, 49, 31],
+      [2, 32, 14, 4, 33, 15],
+      [4, 39, 13, 1, 40, 14],
+
+      // 8
+      [2, 121, 97],
+      [2, 60, 38, 2, 61, 39],
+      [4, 40, 18, 2, 41, 19],
+      [4, 40, 14, 2, 41, 15],
+
+      // 9
+      [2, 146, 116],
+      [3, 58, 36, 2, 59, 37],
+      [4, 36, 16, 4, 37, 17],
+      [4, 36, 12, 4, 37, 13],
+
+      // 10
+      [2, 86, 68, 2, 87, 69],
+      [4, 69, 43, 1, 70, 44],
+      [6, 43, 19, 2, 44, 20],
+      [6, 43, 15, 2, 44, 16],
+
+      // 11
+      [4, 101, 81],
+      [1, 80, 50, 4, 81, 51],
+      [4, 50, 22, 4, 51, 23],
+      [3, 36, 12, 8, 37, 13],
+
+      // 12
+      [2, 116, 92, 2, 117, 93],
+      [6, 58, 36, 2, 59, 37],
+      [4, 46, 20, 6, 47, 21],
+      [7, 42, 14, 4, 43, 15],
+
+      // 13
+      [4, 133, 107],
+      [8, 59, 37, 1, 60, 38],
+      [8, 44, 20, 4, 45, 21],
+      [12, 33, 11, 4, 34, 12],
+
+      // 14
+      [3, 145, 115, 1, 146, 116],
+      [4, 64, 40, 5, 65, 41],
+      [11, 36, 16, 5, 37, 17],
+      [11, 36, 12, 5, 37, 13],
+
+      // 15
+      [5, 109, 87, 1, 110, 88],
+      [5, 65, 41, 5, 66, 42],
+      [5, 54, 24, 7, 55, 25],
+      [11, 36, 12, 7, 37, 13],
+
+      // 16
+      [5, 122, 98, 1, 123, 99],
+      [7, 73, 45, 3, 74, 46],
+      [15, 43, 19, 2, 44, 20],
+      [3, 45, 15, 13, 46, 16],
+
+      // 17
+      [1, 135, 107, 5, 136, 108],
+      [10, 74, 46, 1, 75, 47],
+      [1, 50, 22, 15, 51, 23],
+      [2, 42, 14, 17, 43, 15],
+
+      // 18
+      [5, 150, 120, 1, 151, 121],
+      [9, 69, 43, 4, 70, 44],
+      [17, 50, 22, 1, 51, 23],
+      [2, 42, 14, 19, 43, 15],
+
+      // 19
+      [3, 141, 113, 4, 142, 114],
+      [3, 70, 44, 11, 71, 45],
+      [17, 47, 21, 4, 48, 22],
+      [9, 39, 13, 16, 40, 14],
+
+      // 20
+      [3, 135, 107, 5, 136, 108],
+      [3, 67, 41, 13, 68, 42],
+      [15, 54, 24, 5, 55, 25],
+      [15, 43, 15, 10, 44, 16],
+
+      // 21
+      [4, 144, 116, 4, 145, 117],
+      [17, 68, 42],
+      [17, 50, 22, 6, 51, 23],
+      [19, 46, 16, 6, 47, 17],
+
+      // 22
+      [2, 139, 111, 7, 140, 112],
+      [17, 74, 46],
+      [7, 54, 24, 16, 55, 25],
+      [34, 37, 13],
+
+      // 23
+      [4, 151, 121, 5, 152, 122],
+      [4, 75, 47, 14, 76, 48],
+      [11, 54, 24, 14, 55, 25],
+      [16, 45, 15, 14, 46, 16],
+
+      // 24
+      [6, 147, 117, 4, 148, 118],
+      [6, 73, 45, 14, 74, 46],
+      [11, 54, 24, 16, 55, 25],
+      [30, 46, 16, 2, 47, 17],
+
+      // 25
+      [8, 132, 106, 4, 133, 107],
+      [8, 75, 47, 13, 76, 48],
+      [7, 54, 24, 22, 55, 25],
+      [22, 45, 15, 13, 46, 16],
+
+      // 26
+      [10, 142, 114, 2, 143, 115],
+      [19, 74, 46, 4, 75, 47],
+      [28, 50, 22, 6, 51, 23],
+      [33, 46, 16, 4, 47, 17],
+
+      // 27
+      [8, 152, 122, 4, 153, 123],
+      [22, 73, 45, 3, 74, 46],
+      [8, 53, 23, 26, 54, 24],
+      [12, 45, 15, 28, 46, 16],
+
+      // 28
+      [3, 147, 117, 10, 148, 118],
+      [3, 73, 45, 23, 74, 46],
+      [4, 54, 24, 31, 55, 25],
+      [11, 45, 15, 31, 46, 16],
+
+      // 29
+      [7, 146, 116, 7, 147, 117],
+      [21, 73, 45, 7, 74, 46],
+      [1, 53, 23, 37, 54, 24],
+      [19, 45, 15, 26, 46, 16],
+
+      // 30
+      [5, 145, 115, 10, 146, 116],
+      [19, 75, 47, 10, 76, 48],
+      [15, 54, 24, 25, 55, 25],
+      [23, 45, 15, 25, 46, 16],
+
+      // 31
+      [13, 145, 115, 3, 146, 116],
+      [2, 74, 46, 29, 75, 47],
+      [42, 54, 24, 1, 55, 25],
+      [23, 45, 15, 28, 46, 16],
+
+      // 32
+      [17, 145, 115],
+      [10, 74, 46, 23, 75, 47],
+      [10, 54, 24, 35, 55, 25],
+      [19, 45, 15, 35, 46, 16],
+
+      // 33
+      [17, 145, 115, 1, 146, 116],
+      [14, 74, 46, 21, 75, 47],
+      [29, 54, 24, 19, 55, 25],
+      [11, 45, 15, 46, 46, 16],
+
+      // 34
+      [13, 145, 115, 6, 146, 116],
+      [14, 74, 46, 23, 75, 47],
+      [44, 54, 24, 7, 55, 25],
+      [59, 46, 16, 1, 47, 17],
+
+      // 35
+      [12, 151, 121, 7, 152, 122],
+      [12, 75, 47, 26, 76, 48],
+      [39, 54, 24, 14, 55, 25],
+      [22, 45, 15, 41, 46, 16],
+
+      // 36
+      [6, 151, 121, 14, 152, 122],
+      [6, 75, 47, 34, 76, 48],
+      [46, 54, 24, 10, 55, 25],
+      [2, 45, 15, 64, 46, 16],
+
+      // 37
+      [17, 152, 122, 4, 153, 123],
+      [29, 74, 46, 14, 75, 47],
+      [49, 54, 24, 10, 55, 25],
+      [24, 45, 15, 46, 46, 16],
+
+      // 38
+      [4, 152, 122, 18, 153, 123],
+      [13, 74, 46, 32, 75, 47],
+      [48, 54, 24, 14, 55, 25],
+      [42, 45, 15, 32, 46, 16],
+
+      // 39
+      [20, 147, 117, 4, 148, 118],
+      [40, 75, 47, 7, 76, 48],
+      [43, 54, 24, 22, 55, 25],
+      [10, 45, 15, 67, 46, 16],
+
+      // 40
+      [19, 148, 118, 6, 149, 119],
+      [18, 75, 47, 31, 76, 48],
+      [34, 54, 24, 34, 55, 25],
+      [20, 45, 15, 61, 46, 16]
+    ];
+
+    var qrRSBlock = function(totalCount, dataCount) {
+      var _this = {};
+      _this.totalCount = totalCount;
+      _this.dataCount = dataCount;
+      return _this;
+    };
+
+    var _this = {};
+
+    var getRsBlockTable = function(typeNumber, errorCorrectionLevel) {
+
+      switch(errorCorrectionLevel) {
+      case QRErrorCorrectionLevel.L :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 0];
+      case QRErrorCorrectionLevel.M :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 1];
+      case QRErrorCorrectionLevel.Q :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 2];
+      case QRErrorCorrectionLevel.H :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 3];
+      default :
+        return undefined;
+      }
+    };
+
+    _this.getRSBlocks = function(typeNumber, errorCorrectionLevel) {
+
+      var rsBlock = getRsBlockTable(typeNumber, errorCorrectionLevel);
+
+      if (typeof rsBlock == 'undefined') {
+        throw 'bad rs block @ typeNumber:' + typeNumber +
+            '/errorCorrectionLevel:' + errorCorrectionLevel;
+      }
+
+      var length = rsBlock.length / 3;
+
+      var list = [];
+
+      for (var i = 0; i < length; i += 1) {
+
+        var count = rsBlock[i * 3 + 0];
+        var totalCount = rsBlock[i * 3 + 1];
+        var dataCount = rsBlock[i * 3 + 2];
+
+        for (var j = 0; j < count; j += 1) {
+          list.push(qrRSBlock(totalCount, dataCount) );
+        }
+      }
+
+      return list;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrBitBuffer
+  //---------------------------------------------------------------------
+
+  var qrBitBuffer = function() {
+
+    var _buffer = [];
+    var _length = 0;
+
+    var _this = {};
+
+    _this.getBuffer = function() {
+      return _buffer;
+    };
+
+    _this.getAt = function(index) {
+      var bufIndex = Math.floor(index / 8);
+      return ( (_buffer[bufIndex] >>> (7 - index % 8) ) & 1) == 1;
+    };
+
+    _this.put = function(num, length) {
+      for (var i = 0; i < length; i += 1) {
+        _this.putBit( ( (num >>> (length - i - 1) ) & 1) == 1);
+      }
+    };
+
+    _this.getLengthInBits = function() {
+      return _length;
+    };
+
+    _this.putBit = function(bit) {
+
+      var bufIndex = Math.floor(_length / 8);
+      if (_buffer.length <= bufIndex) {
+        _buffer.push(0);
+      }
+
+      if (bit) {
+        _buffer[bufIndex] |= (0x80 >>> (_length % 8) );
+      }
+
+      _length += 1;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrNumber
+  //---------------------------------------------------------------------
+
+  var qrNumber = function(data) {
+
+    var _mode = QRMode.MODE_NUMBER;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _data;
+
+      var i = 0;
+
+      while (i + 2 < data.length) {
+        buffer.put(strToNum(data.substring(i, i + 3) ), 10);
+        i += 3;
+      }
+
+      if (i < data.length) {
+        if (data.length - i == 1) {
+          buffer.put(strToNum(data.substring(i, i + 1) ), 4);
+        } else if (data.length - i == 2) {
+          buffer.put(strToNum(data.substring(i, i + 2) ), 7);
+        }
+      }
+    };
+
+    var strToNum = function(s) {
+      var num = 0;
+      for (var i = 0; i < s.length; i += 1) {
+        num = num * 10 + chatToNum(s.charAt(i) );
+      }
+      return num;
+    };
+
+    var chatToNum = function(c) {
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      }
+      throw 'illegal char :' + c;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrAlphaNum
+  //---------------------------------------------------------------------
+
+  var qrAlphaNum = function(data) {
+
+    var _mode = QRMode.MODE_ALPHA_NUM;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var s = _data;
+
+      var i = 0;
+
+      while (i + 1 < s.length) {
+        buffer.put(
+          getCode(s.charAt(i) ) * 45 +
+          getCode(s.charAt(i + 1) ), 11);
+        i += 2;
+      }
+
+      if (i < s.length) {
+        buffer.put(getCode(s.charAt(i) ), 6);
+      }
+    };
+
+    var getCode = function(c) {
+
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      } else if ('A' <= c && c <= 'Z') {
+        return c.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
+      } else {
+        switch (c) {
+        case ' ' : return 36;
+        case '$' : return 37;
+        case '%' : return 38;
+        case '*' : return 39;
+        case '+' : return 40;
+        case '-' : return 41;
+        case '.' : return 42;
+        case '/' : return 43;
+        case ':' : return 44;
+        default :
+          throw 'illegal char :' + c;
+        }
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qr8BitByte
+  //---------------------------------------------------------------------
+
+  var qr8BitByte = function(data) {
+
+    var _mode = QRMode.MODE_8BIT_BYTE;
+    var _data = data;
+    var _bytes = qrcode.stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _bytes.length;
+    };
+
+    _this.write = function(buffer) {
+      for (var i = 0; i < _bytes.length; i += 1) {
+        buffer.put(_bytes[i], 8);
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrKanji
+  //---------------------------------------------------------------------
+
+  var qrKanji = function(data) {
+
+    var _mode = QRMode.MODE_KANJI;
+    var _data = data;
+
+    var stringToBytes = qrcode.stringToBytesFuncs['SJIS'];
+    if (!stringToBytes) {
+      throw 'sjis not supported.';
+    }
+    !function(c, code) {
+      // self test for sjis support.
+      var test = stringToBytes(c);
+      if (test.length != 2 || ( (test[0] << 8) | test[1]) != code) {
+        throw 'sjis not supported.';
+      }
+    }('\u53cb', 0x9746);
+
+    var _bytes = stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return ~~(_bytes.length / 2);
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _bytes;
+
+      var i = 0;
+
+      while (i + 1 < data.length) {
+
+        var c = ( (0xff & data[i]) << 8) | (0xff & data[i + 1]);
+
+        if (0x8140 <= c && c <= 0x9FFC) {
+          c -= 0x8140;
+        } else if (0xE040 <= c && c <= 0xEBBF) {
+          c -= 0xC140;
+        } else {
+          throw 'illegal char at ' + (i + 1) + '/' + c;
+        }
+
+        c = ( (c >>> 8) & 0xff) * 0xC0 + (c & 0xff);
+
+        buffer.put(c, 13);
+
+        i += 2;
+      }
+
+      if (i < data.length) {
+        throw 'illegal char at ' + (i + 1);
+      }
+    };
+
+    return _this;
+  };
+
+  //=====================================================================
+  // GIF Support etc.
+  //
+
+  //---------------------------------------------------------------------
+  // byteArrayOutputStream
+  //---------------------------------------------------------------------
+
+  var byteArrayOutputStream = function() {
+
+    var _bytes = [];
+
+    var _this = {};
+
+    _this.writeByte = function(b) {
+      _bytes.push(b & 0xff);
+    };
+
+    _this.writeShort = function(i) {
+      _this.writeByte(i);
+      _this.writeByte(i >>> 8);
+    };
+
+    _this.writeBytes = function(b, off, len) {
+      off = off || 0;
+      len = len || b.length;
+      for (var i = 0; i < len; i += 1) {
+        _this.writeByte(b[i + off]);
+      }
+    };
+
+    _this.writeString = function(s) {
+      for (var i = 0; i < s.length; i += 1) {
+        _this.writeByte(s.charCodeAt(i) );
+      }
+    };
+
+    _this.toByteArray = function() {
+      return _bytes;
+    };
+
+    _this.toString = function() {
+      var s = '';
+      s += '[';
+      for (var i = 0; i < _bytes.length; i += 1) {
+        if (i > 0) {
+          s += ',';
+        }
+        s += _bytes[i];
+      }
+      s += ']';
+      return s;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64EncodeOutputStream
+  //---------------------------------------------------------------------
+
+  var base64EncodeOutputStream = function() {
+
+    var _buffer = 0;
+    var _buflen = 0;
+    var _length = 0;
+    var _base64 = '';
+
+    var _this = {};
+
+    var writeEncoded = function(b) {
+      _base64 += String.fromCharCode(encode(b & 0x3f) );
+    };
+
+    var encode = function(n) {
+      if (n < 0) {
+        // error.
+      } else if (n < 26) {
+        return 0x41 + n;
+      } else if (n < 52) {
+        return 0x61 + (n - 26);
+      } else if (n < 62) {
+        return 0x30 + (n - 52);
+      } else if (n == 62) {
+        return 0x2b;
+      } else if (n == 63) {
+        return 0x2f;
+      }
+      throw 'n:' + n;
+    };
+
+    _this.writeByte = function(n) {
+
+      _buffer = (_buffer << 8) | (n & 0xff);
+      _buflen += 8;
+      _length += 1;
+
+      while (_buflen >= 6) {
+        writeEncoded(_buffer >>> (_buflen - 6) );
+        _buflen -= 6;
+      }
+    };
+
+    _this.flush = function() {
+
+      if (_buflen > 0) {
+        writeEncoded(_buffer << (6 - _buflen) );
+        _buffer = 0;
+        _buflen = 0;
+      }
+
+      if (_length % 3 != 0) {
+        // padding
+        var padlen = 3 - _length % 3;
+        for (var i = 0; i < padlen; i += 1) {
+          _base64 += '=';
+        }
+      }
+    };
+
+    _this.toString = function() {
+      return _base64;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64DecodeInputStream
+  //---------------------------------------------------------------------
+
+  var base64DecodeInputStream = function(str) {
+
+    var _str = str;
+    var _pos = 0;
+    var _buffer = 0;
+    var _buflen = 0;
+
+    var _this = {};
+
+    _this.read = function() {
+
+      while (_buflen < 8) {
+
+        if (_pos >= _str.length) {
+          if (_buflen == 0) {
+            return -1;
+          }
+          throw 'unexpected end of file./' + _buflen;
+        }
+
+        var c = _str.charAt(_pos);
+        _pos += 1;
+
+        if (c == '=') {
+          _buflen = 0;
+          return -1;
+        } else if (c.match(/^\s$/) ) {
+          // ignore if whitespace.
+          continue;
+        }
+
+        _buffer = (_buffer << 6) | decode(c.charCodeAt(0) );
+        _buflen += 6;
+      }
+
+      var n = (_buffer >>> (_buflen - 8) ) & 0xff;
+      _buflen -= 8;
+      return n;
+    };
+
+    var decode = function(c) {
+      if (0x41 <= c && c <= 0x5a) {
+        return c - 0x41;
+      } else if (0x61 <= c && c <= 0x7a) {
+        return c - 0x61 + 26;
+      } else if (0x30 <= c && c <= 0x39) {
+        return c - 0x30 + 52;
+      } else if (c == 0x2b) {
+        return 62;
+      } else if (c == 0x2f) {
+        return 63;
+      } else {
+        throw 'c:' + c;
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // gifImage (B/W)
+  //---------------------------------------------------------------------
+
+  var gifImage = function(width, height) {
+
+    var _width = width;
+    var _height = height;
+    var _data = new Array(width * height);
+
+    var _this = {};
+
+    _this.setPixel = function(x, y, pixel) {
+      _data[y * _width + x] = pixel;
+    };
+
+    _this.write = function(out) {
+
+      //---------------------------------
+      // GIF Signature
+
+      out.writeString('GIF87a');
+
+      //---------------------------------
+      // Screen Descriptor
+
+      out.writeShort(_width);
+      out.writeShort(_height);
+
+      out.writeByte(0x80); // 2bit
+      out.writeByte(0);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Global Color Map
+
+      // black
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+
+      // white
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+
+      //---------------------------------
+      // Image Descriptor
+
+      out.writeString(',');
+      out.writeShort(0);
+      out.writeShort(0);
+      out.writeShort(_width);
+      out.writeShort(_height);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Local Color Map
+
+      //---------------------------------
+      // Raster Data
+
+      var lzwMinCodeSize = 2;
+      var raster = getLZWRaster(lzwMinCodeSize);
+
+      out.writeByte(lzwMinCodeSize);
+
+      var offset = 0;
+
+      while (raster.length - offset > 255) {
+        out.writeByte(255);
+        out.writeBytes(raster, offset, 255);
+        offset += 255;
+      }
+
+      out.writeByte(raster.length - offset);
+      out.writeBytes(raster, offset, raster.length - offset);
+      out.writeByte(0x00);
+
+      //---------------------------------
+      // GIF Terminator
+      out.writeString(';');
+    };
+
+    var bitOutputStream = function(out) {
+
+      var _out = out;
+      var _bitLength = 0;
+      var _bitBuffer = 0;
+
+      var _this = {};
+
+      _this.write = function(data, length) {
+
+        if ( (data >>> length) != 0) {
+          throw 'length over';
+        }
+
+        while (_bitLength + length >= 8) {
+          _out.writeByte(0xff & ( (data << _bitLength) | _bitBuffer) );
+          length -= (8 - _bitLength);
+          data >>>= (8 - _bitLength);
+          _bitBuffer = 0;
+          _bitLength = 0;
+        }
+
+        _bitBuffer = (data << _bitLength) | _bitBuffer;
+        _bitLength = _bitLength + length;
+      };
+
+      _this.flush = function() {
+        if (_bitLength > 0) {
+          _out.writeByte(_bitBuffer);
+        }
+      };
+
+      return _this;
+    };
+
+    var getLZWRaster = function(lzwMinCodeSize) {
+
+      var clearCode = 1 << lzwMinCodeSize;
+      var endCode = (1 << lzwMinCodeSize) + 1;
+      var bitLength = lzwMinCodeSize + 1;
+
+      // Setup LZWTable
+      var table = lzwTable();
+
+      for (var i = 0; i < clearCode; i += 1) {
+        table.add(String.fromCharCode(i) );
+      }
+      table.add(String.fromCharCode(clearCode) );
+      table.add(String.fromCharCode(endCode) );
+
+      var byteOut = byteArrayOutputStream();
+      var bitOut = bitOutputStream(byteOut);
+
+      // clear code
+      bitOut.write(clearCode, bitLength);
+
+      var dataIndex = 0;
+
+      var s = String.fromCharCode(_data[dataIndex]);
+      dataIndex += 1;
+
+      while (dataIndex < _data.length) {
+
+        var c = String.fromCharCode(_data[dataIndex]);
+        dataIndex += 1;
+
+        if (table.contains(s + c) ) {
+
+          s = s + c;
+
+        } else {
+
+          bitOut.write(table.indexOf(s), bitLength);
+
+          if (table.size() < 0xfff) {
+
+            if (table.size() == (1 << bitLength) ) {
+              bitLength += 1;
+            }
+
+            table.add(s + c);
+          }
+
+          s = c;
+        }
+      }
+
+      bitOut.write(table.indexOf(s), bitLength);
+
+      // end code
+      bitOut.write(endCode, bitLength);
+
+      bitOut.flush();
+
+      return byteOut.toByteArray();
+    };
+
+    var lzwTable = function() {
+
+      var _map = {};
+      var _size = 0;
+
+      var _this = {};
+
+      _this.add = function(key) {
+        if (_this.contains(key) ) {
+          throw 'dup key:' + key;
+        }
+        _map[key] = _size;
+        _size += 1;
+      };
+
+      _this.size = function() {
+        return _size;
+      };
+
+      _this.indexOf = function(key) {
+        return _map[key];
+      };
+
+      _this.contains = function(key) {
+        return typeof _map[key] != 'undefined';
+      };
+
+      return _this;
+    };
+
+    return _this;
+  };
+
+  var createDataURL = function(width, height, getPixel) {
+    var gif = gifImage(width, height);
+    for (var y = 0; y < height; y += 1) {
+      for (var x = 0; x < width; x += 1) {
+        gif.setPixel(x, y, getPixel(x, y) );
+      }
+    }
+
+    var b = byteArrayOutputStream();
+    gif.write(b);
+
+    var base64 = base64EncodeOutputStream();
+    var bytes = b.toByteArray();
+    for (var i = 0; i < bytes.length; i += 1) {
+      base64.writeByte(bytes[i]);
+    }
+    base64.flush();
+
+    return 'data:image/gif;base64,' + base64;
+  };
+
+  //---------------------------------------------------------------------
+  // returns qrcode function.
+
+  return qrcode;
+}();
+
+// multibyte support
+!function() {
+
+  qrcode.stringToBytesFuncs['UTF-8'] = function(s) {
+    // http://stackoverflow.com/questions/18729405/how-to-convert-utf8-string-to-byte-array
+    function toUTF8Array(str) {
+      var utf8 = [];
+      for (var i=0; i < str.length; i++) {
+        var charcode = str.charCodeAt(i);
+        if (charcode < 0x80) utf8.push(charcode);
+        else if (charcode < 0x800) {
+          utf8.push(0xc0 | (charcode >> 6),
+              0x80 | (charcode & 0x3f));
+        }
+        else if (charcode < 0xd800 || charcode >= 0xe000) {
+          utf8.push(0xe0 | (charcode >> 12),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+        // surrogate pair
+        else {
+          i++;
+          // UTF-16 encodes 0x10000-0x10FFFF by
+          // subtracting 0x10000 and splitting the
+          // 20 bits of 0x0-0xFFFFF into two halves
+          charcode = 0x10000 + (((charcode & 0x3ff)<<10)
+            | (str.charCodeAt(i) & 0x3ff));
+          utf8.push(0xf0 | (charcode >>18),
+              0x80 | ((charcode>>12) & 0x3f),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+      }
+      return utf8;
+    }
+    return toUTF8Array(s);
+  };
+
+}();
+
+(function (factory) {
+  if (typeof define === 'function' && define.amd) {
+      define([], factory);
+  } else if (typeof exports === 'object') {
+      module.exports = factory();
+  }
+}(function () {
+    return qrcode;
+}));
 
 </script>
 <script>
@@ -1455,6 +3783,20 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     'Create': ['Oluştur', 'Creează', 'Създай'],
     'Enter a name': ['Bir ad girin', 'Introdu un nume', 'Въведете име'],
     'Only managers can do this. Ask a manager to change it in the back-office.': ['Bunu yalnızca müdürler yapabilir. Yönetim panelinden değiştirmesi için bir müdüre başvurun.', 'Doar managerii pot face asta. Roagă un manager să schimbe din back-office.', 'Само мениджъри могат да направят това. Помолете мениджър да го промени от бек офиса.'],
+    'Pair this handheld': ['Bu cihazı eşleştir', 'Asociază acest terminal', 'Сдвояване на терминала'],
+    'In the back-office at label.proviewcrm.co.uk, go to Locations & devices → Pair handheld and enter this code.': ['label.proviewcrm.co.uk yönetim panelinde Locations & devices → Pair handheld bölümüne gidin ve bu kodu girin.', 'În back-office pe label.proviewcrm.co.uk, mergi la Locations & devices → Pair handheld și introdu acest cod.', 'В бек офиса на label.proviewcrm.co.uk отидете на Locations & devices → Pair handheld и въведете този код.'],
+    'Or scan the QR code with your phone.': ['Veya QR kodunu telefonunuzla okutun.', 'Sau scanează codul QR cu telefonul.', 'Или сканирайте QR кода с телефона си.'],
+    'Waiting to be paired…': ['Eşleştirme bekleniyor…', 'Se așteaptă asocierea…', 'Изчакване на сдвояване…'],
+    'Getting a code…': ['Kod alınıyor…', 'Se obține un cod…', 'Получаване на код…'],
+    'Paired': ['Eşleştirildi', 'Asociat', 'Сдвоен'],
+    'Not paired yet': ['Henüz eşleştirilmedi', 'Încă neasociat', 'Все още не е сдвоен'],
+    'Unpair': ['Eşleştirmeyi kaldır', 'Dezasociază', 'Премахни сдвояването'],
+    'Unpair this handheld': ['Bu cihazın eşleştirmesini kaldır', 'Dezasociază acest terminal', 'Премахни сдвояването на терминала'],
+    'Unpair this handheld?': ['Bu cihazın eşleştirmesi kaldırılsın mı?', 'Dezasociezi acest terminal?', 'Да се премахне ли сдвояването на терминала?'],
+    'It stops syncing and shows a new pairing code. Labels already sent stay in the back-office.': ['Senkronizasyon durur ve yeni bir eşleştirme kodu gösterilir. Gönderilmiş etiketler yönetim panelinde kalır.', 'Sincronizarea se oprește și apare un cod nou de asociere. Etichetele deja trimise rămân în back-office.', 'Синхронизацията спира и се показва нов код за сдвояване. Изпратените етикети остават в бек офиса.'],
+    'Mode': ['Mod', 'Mod', 'Режим'],
+    'Change the location in the back-office: Locations & devices.': ['Konumu yönetim panelinden değiştirin: Locations & devices.', 'Schimbă locația din back-office: Locations & devices.', 'Сменете обекта от бек офиса: Locations & devices.'],
+    'This preview runs on demo data. The Android app is paired from the back-office with a code.': ['Bu önizleme demo verisiyle çalışır. Android uygulaması yönetim panelinden bir kodla eşleştirilir.', 'Această previzualizare folosește date demo. Aplicația Android se asociază din back-office cu un cod.', 'Този преглед работи с демо данни. Android приложението се сдвоява от бек офиса с код.'],
     'Manager access needed': ['Müdür yetkisi gerekli', 'Este nevoie de acces de manager', 'Нужен е достъп на мениджър'],
     'Only managers and admins can do this. Switch to a manager profile to continue.': ['Bunu yalnızca müdürler ve yöneticiler yapabilir. Devam etmek için bir müdür profiline geçin.', 'Doar managerii și administratorii pot face asta. Treci pe un profil de manager pentru a continua.', 'Само мениджъри и администратори могат да направят това. Превключете на профил на мениджър.'],
 
@@ -1682,6 +4024,7 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     [/^Ticked (\d+): (.+) – check the recipe$/, ['{1} işaretlendi: {2} – tarifi kontrol edin', 'Bifați {1}: {2} – verifică rețeta', 'Отметнати {1}: {2} – проверете рецептата']],
     [/^You have the latest version \((.+)\)$/, ['En son sürüm sizde ({1})', 'Ai cea mai nouă versiune ({1})', 'Имате последната версия ({1})']],
     [/^Version (.+) is ready \(you have (.+)\)\.$/, ['{1} sürümü hazır (sizdeki: {2}).', 'Versiunea {1} este gata (ai {2}).', 'Версия {1} е готова (имате {2}).']],
+    [/^Paired: (.+)$/, ['Eşleştirildi: {1}', 'Asociat: {1}', 'Сдвоен: {1}']],
     [/^Printer: (.+)$/, ['Yazıcı: {1}', 'Imprimantă: {1}', 'Принтер: {1}']],
     [/^Camera unavailable: (.+)$/, ['Kamera kullanılamıyor: {1}', 'Camera nu este disponibilă: {1}', 'Камерата не е достъпна: {1}']],
     [/^Update failed: (.+)$/, ['Güncelleme başarısız: {1}', 'Actualizarea a eșuat: {1}', 'Обновлението не успя: {1}']],
@@ -1827,9 +4170,16 @@ let S = P.load();
 // ---------- Proview Label cloud (live sync with the back-office) ----------
 const Cloud = window.PVLCloud || { enabled: false };
 const DEV_KEY = 'pvl-device';
-let CONN = null;   // { uid, email, orgId, siteId } once this handheld is connected
+// A handheld is paired from the back-office with a code (no email or password on the handheld).
+// CONN = { uid, orgId, siteId, deviceId, name, mode, device: true } once paired.
+let CONN = null;
 try { CONN = JSON.parse(localStorage.getItem(DEV_KEY) || 'null'); } catch (e) { CONN = null; }
+if (CONN && !CONN.device) {   // connected the old way (email + password): pair again
+  CONN = null; try { localStorage.removeItem(DEV_KEY); localStorage.removeItem('pvl-lock'); } catch (e) {}
+  if (Cloud.enabled) Cloud.signOut().catch(() => {});
+}
 if (Cloud.enabled && CONN) S = P.useStore('cloud:' + CONN.uid, { blank: true });
+const needsPairing = () => !!(Cloud.enabled && !CONN);
 const connected = () => !!(Cloud.enabled && CONN);
 // Trial ended / suspended business: the server blocks every write, so syncing pauses and the handheld says why.
 // The whole handheld locks, printing included (owner decision 8 Nov 2026). Remembered offline in pvl-lock.
@@ -1843,7 +4193,8 @@ const ui = {
 };
 function localStorageGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
 function localStorageSet(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
-const user = () => P.byId('users', S.currentUserId) || P.live('users').find(u=>(u.siteIds||[]).includes(S.currentSiteId)) || P.live('users')[0] || { id:'-', name:'Not signed in', role:'manager', siteIds:[] };
+const user = () => connected() ? { id: CONN.deviceId, name: CONN.name || 'Handheld', role: 'manager', siteIds: [CONN.siteId] }   // a paired handheld acts for its location
+  : P.byId('users', S.currentUserId) || P.live('users').find(u=>(u.siteIds||[]).includes(S.currentSiteId)) || P.live('users')[0] || { id:'-', name:'Not signed in', role:'manager', siteIds:[] };
 const site = () => P.byId('sites', S.currentSiteId) || P.live('sites')[0] || { id:null, name:'No site yet', address:'', orgId:null };
 const ORG = () => (site()||{}).orgId || null;
 // this device only sees its own business's catalogue (products, categories, rules)
@@ -1852,8 +4203,8 @@ const L = (coll) => P.live(coll).filter(x => !x.orgId || !ORG() || x.orgId === O
 const up = (coll, rec) => P.upsert(coll, { orgId: ORG(), ...rec });
 const orgSet = (k) => { const o=(S.orgs||[]).find(x=>x.id===ORG()); const v=o&&o.settings?o.settings[k]:undefined; return v!==undefined?v:S.settings[k]; };
 const rule = (id) => P.byId('rules', id) || L('rules').find(r=>r.name==='Fridge') || L('rules')[0] || { id:'_fridge', name:'Fridge', units:2, period:'days' };
-// Easy or Detailed is set per person in the back-office (Users & permissions → Device staff). Easy unless set.
-const modeFor = () => user().mode==='detailed' ? 'detailed' : 'easy';
+// Easy or Detailed is set per handheld in the back-office (Locations & devices). Easy unless set there.
+const modeFor = () => ((connected() ? CONN.mode : (P.byId('devices', S.deviceId) || {}).mode) === 'detailed' ? 'detailed' : 'easy');
 const canManage = () => ['admin','manager'].includes(user().role);
 const canEditProducts = () => canManage() || !!orgSet('staffCanEdit');
 const siteUsers = () => P.live('users').filter(u => (u.siteIds||[]).includes(S.currentSiteId));
@@ -1897,7 +4248,7 @@ function openLang(){
     ${T.LANGS.map(l=>`<button class="langOpt ${l.code===cur?'on':''}" data-l="${l.code}"><span class="fl">${T.FLAGS[l.code]}</span><span class="nm" data-notr>${l.name}</span><span class="ok">${I.tick}</span></button>`).join('')}
     <div class="row" style="margin-top:8px"><button class="btn ghost" data-x>Close</button></div></div></div>`;
   $('#modal [data-x]').onclick=()=>$('#modal').innerHTML='';
-  $('#modal').querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{ $('#modal').innerHTML=''; T.set(b.dataset.l); render(); });
+  $('#modal').querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{ $('#modal').innerHTML=''; T.set(b.dataset.l); if(pairing) drawPair(); else render(); });
 }
 function renderStatus(){
   const st=$('#status'); const cfg=S.settings.sync;
@@ -1929,7 +4280,7 @@ function openDrawer(){
   const items=ez?[['home','Print Screen',I.print]]
     :[['home','Print Screen',I.print],['logs','Logs',I.log],['bulk','Bulk Print',I.stack],['wastage','Wastage',I.bin],['order','Label Order',I.box]];
   const inv=ez?[['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]]
-    :[['profiles','Manage Profiles',I.users],['about','About Device',I.info],['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]];
+    :[['about','About Device',I.info],['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]];
   $('#drawer').innerHTML = `<div class="dh"><div class="pv-logo"><div class="mk">PV</div><div class="wd">PROVIEW<span>LABEL</span><small>${esc(site().name.toUpperCase())}</small></div></div><button class="ic" id="dClose" style="color:#000">${I.close}</button></div>
     <div class="dl">${items.map(([k,l,ic])=>`<button class="mi ${ui.screen===k?'on':''}" data-k="${k}">${ic}${l}</button>`).join('')}
       <div class="divider" style="margin:10px 8px"></div>
@@ -1940,7 +4291,7 @@ function openDrawer(){
   $('#drawer').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
     const k=b.dataset.k; closeDrawer();
     if(k==='update') return checkUpdate(true);
-    if(k==='profiles'||k==='settings') return needManager(()=>root(k));
+    if(k==='settings') return needManager(()=>root(k));
     root(k);
   });
 }
@@ -2180,6 +4531,7 @@ screens.about = () => {
     <div class="kv"><span>Labels left on roll</span><b>${S.settings.labelsInStock}</b></div>
     <div class="kv"><span>Products / categories</span><b>${L('products').length} / ${L('categories').length}</b></div>
     <div class="kv"><span>Back-office sync</span><b>${connected()?(S.settings.sync.lastSync?rel(S.settings.sync.lastSync):'Connected'):'Not connected'}</b></div>
+    ${connected()?`<div class="kv"><span>Mode</span><b>${CONN.mode==='detailed'?'Detailed':'Easy'}</b></div>`:''}
     <div class="kv"><span>Site address</span><b style="max-width:60%">${esc(site().address||'')}</b></div></div>`;
   if(navigator.getBattery) navigator.getBattery().then(b=>{ const el=$('#bat'); if(el) el.textContent=Math.round(b.level*100)+'%'+(b.charging?' (charging)':''); }).catch(()=>{});
 };
@@ -2204,7 +4556,8 @@ screens.settings = () => {
   const pr=S.settings.printer, sy=S.settings.sync;
   $('#main').innerHTML = `<div style="padding:14px">
     <div class="sect" style="margin-top:0">Site</div>
-    <div class="fld"><select class="inp" id="site">${(connected()?P.live('sites').filter(x=>x.orgId===ORG()):P.live('sites')).map(s=>`<option value="${s.id}" ${s.id===S.currentSiteId?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
+    ${connected()?`<div class="card" style="margin-bottom:10px"><b style="font-size:15px">${esc(site().name)}</b><div class="hint">Change the location in the back-office: Locations &amp; devices.</div></div>`
+    :`<div class="fld"><select class="inp" id="site">${P.live('sites').map(s=>`<option value="${s.id}" ${s.id===S.currentSiteId?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>`}
     <div class="sect">Printer</div>
     <div class="seg sm" id="pm" style="margin:0 0 12px"><button data-m="builtin" class="${pr.mode==='builtin'?'on':''}">Built-in</button><button data-m="preview" class="${pr.mode==='preview'?'on':''}">Preview</button><button data-m="bluetooth" class="${pr.mode==='bluetooth'?'on':''}">Bluetooth</button><button data-m="tcp" class="${pr.mode==='tcp'?'on':''}">Network</button></div>
     ${pr.mode==='bluetooth'?`<div class="fld"><div class="lbl">Paired printer <button class="pill blue" id="bt">Find printers</button></div><select class="inp" id="btsel"><option value="">${pr.address?esc((pr.name||'')+' '+pr.address):'Tap “Find printers”'}</option></select></div>`:''}
@@ -2213,12 +4566,11 @@ screens.settings = () => {
     <p class="hint">${pr.mode==='builtin'?'Labels are printed as a picture, exactly as they look on screen. Tear off at the dashed line.':pr.mode==='preview'?'Labels show on screen only. Choose Bluetooth or Network to print to an ESC/POS thermal label printer (any 58/80mm thermal printer). On a Senraise H10P / H10S choose Built-in..':'Uses ESC/POS commands. Works with most 58mm/80mm thermal printers.'}</p>
     <button class="btn ghost" id="test" style="width:100%">Print test label</button>
     <div class="sect" style="margin-top:22px">Proview Label cloud</div>
-    ${connected()?`<div class="card" style="margin-bottom:10px"><b style="font-size:15px">Connected</b><div class="hint">${esc(CONN.email)} · ${esc(((S.orgs||[]).find(o=>o.id===ORG())||{}).name||'')}<br>Last sync ${S.settings.sync.lastSync?rel(S.settings.sync.lastSync):'—'}</div></div>
-      <div class="row"><button class="btn blue sm" style="flex:1" id="synow">Sync now</button><button class="btn ghost sm" style="flex:1;color:#d92d20" id="disc">Disconnect</button></div>`
-    :Cloud.enabled?`<p class="hint" style="margin-top:0">Sync this handheld with the back-office at label.proviewcrm.co.uk: products, staff and settings come down; labels, expiry and wastage go up.</p><button class="btn blue" id="conn" style="width:100%">Connect to Proview Label</button>`
-    :`<p class="hint" style="margin-top:0">This preview runs on demo data. In the Android app, connect here to sync with the live back-office.</p>`}
+    ${connected()?`<div class="card" style="margin-bottom:10px"><b style="font-size:15px">Paired</b><div class="hint">${esc(CONN.name||'Handheld')} · ${esc(((S.orgs||[]).find(o=>o.id===ORG())||{}).name||'')}<br>Last sync ${S.settings.sync.lastSync?rel(S.settings.sync.lastSync):'—'}</div></div>
+      <div class="row"><button class="btn blue sm" style="flex:1" id="synow">Sync now</button><button class="btn ghost sm" style="flex:1;color:#d92d20" id="disc">Unpair</button></div>`
+    :`<p class="hint" style="margin-top:0">This preview runs on demo data. The Android app is paired from the back-office with a code.</p>`}
   </div>`;
-  $('#site').onchange=()=>{ S.currentSiteId=$('#site').value; P.save(); const u=user(); if(!(u.siteIds||[]).includes(S.currentSiteId)){ const su=siteUsers()[0]; if(su) S.currentUserId=su.id; P.save(); } toast('Site: '+site().name); render(); };
+  if($('#site')) $('#site').onchange=()=>{ S.currentSiteId=$('#site').value; P.save(); const u=user(); if(!(u.siteIds||[]).includes(S.currentSiteId)){ const su=siteUsers()[0]; if(su) S.currentUserId=su.id; P.save(); } toast('Site: '+site().name); render(); };
   $('#pm').querySelectorAll('button').forEach(b=>b.onclick=()=>{ pr.mode=b.dataset.m; pr.chosen=true; P.save(); render(); if(pr.mode==='builtin') checkBuiltin().then(()=>{ if(ui.screen==='settings') render(); }); });
   const ip=$('#ip'); if(ip){ ip.onchange=()=>{pr.address=ip.value.trim();P.save();}; $('#port').onchange=()=>{pr.port=+$('#port').value||9100;P.save();}; }
   const bt=$('#bt'); if(bt) bt.onclick=async()=>{
@@ -2227,9 +4579,8 @@ screens.settings = () => {
       sel.onchange=()=>{ pr.address=sel.value; pr.name=(r.devices.find(d=>d.address===sel.value)||{}).name||''; P.save(); };
       if(r.devices[0]&&!pr.address){ pr.address=r.devices[0].address; pr.name=r.devices[0].name; P.save(); } }catch(e){ toast(e.message||'Bluetooth error'); } };
   $('#test').onclick=()=>enqueue({id:P.uid('j'),name:'Test label',type:'prep',qty:1,expiry:P.computeExpiry(rule('r_fridge')).toISOString(),ruleName:'Fridge',rule:rule('r_fridge'),allergens:['Milk'],mayContain:'',customAllergens:'',batch:'TEST',useFirst:true,defrost:false,code:P.labelCode(),test:true});
-  const cn=$('#conn'); if(cn) cn.onclick=connectSheet;
   const sn=$('#synow'); if(sn) sn.onclick=doSync;
-  const dc=$('#disc'); if(dc) dc.onclick=disconnect;
+  const dc=$('#disc'); if(dc) dc.onclick=()=>unpair(false);
 };
 
 // ---------- forms ----------
@@ -2569,14 +4920,19 @@ async function sendToPrinter(j){
 // ---------- sync & export ----------
 function touchDevice(){
   if(!connected()) return;
-  const d=P.byId('devices',S.deviceId)||{id:S.deviceId,name:'Handheld '+String(S.deviceId).slice(-4).toUpperCase(),version:APP_VERSION};
-  P.upsert('devices',{...d,orgId:ORG(),siteId:S.currentSiteId,labelsLeft:S.settings.labelsInStock,battery:ui.battery!=null?ui.battery:d.battery,version:APP_VERSION,lastSync:P.now()});
+  const d=P.byId('devices',S.deviceId)||{id:S.deviceId,version:APP_VERSION};
+  P.upsert('devices',{...d,name:CONN.name||d.name||'Handheld',orgId:ORG(),siteId:S.currentSiteId,labelsLeft:S.settings.labelsInStock,battery:ui.battery!=null?ui.battery:d.battery,version:APP_VERSION,lastSync:P.now()});
 }
 // Ask the server whether this handheld's business is still open. Returns the lock (or null). Never throws.
 async function checkLock(){
   if(!connected()||!Cloud.whoami) return LOCK;
+  if(navigator.onLine){ let ses; try{ ses=await Cloud.session(); }catch(e){ ses=undefined; } if(ses===null){ unpair(true); return null; } }   // its login is gone: pair again
   let w=null; try{ w=await Cloud.whoami(); }catch(e){ return LOCK; }   // offline: keep the last answer
   if(!w) return LOCK;
+  if(!w.device){ unpair(true); return null; }   // removed in the back-office: pair again
+  { const d=w.device; if(d.name!==CONN.name||d.mode!==CONN.mode||d.site_id!==CONN.siteId){   // renamed, moved or Easy/Detailed changed in the back-office
+      const moved=d.site_id!==CONN.siteId; CONN={...CONN,name:d.name,mode:d.mode,siteId:d.site_id}; try{ localStorage.setItem(DEV_KEY,JSON.stringify(CONN)); }catch(e){}
+      if(moved){ S.currentSiteId=d.site_id; P.save(); } render(); } }
   const o=(w.orgs||[]).find(x=>x.id===CONN.orgId);
   const m=o&&!w.master&&Cloud.lockMsg?Cloud.lockMsg(o):null;
   const was=!!LOCK; LOCK=m; try{ m?localStorage.setItem(LOCK_KEY,JSON.stringify(m)):localStorage.removeItem(LOCK_KEY); }catch(e){}
@@ -2591,82 +4947,88 @@ function applyLock(){
   ui.queue=[]; ui.printing=false; $('#printout').innerHTML='';
   closeSheet&&$('#sheet').classList.contains('on')&&closeSheet(); closeDrawer&&closeDrawer();
   const sp=(Cloud.SUPPORT||{}), url=Cloud.LICENCE_URL||'https://license.proviewcrm.co.uk';
-  el.innerHTML=`<div class="lockscreen"><div style="font-size:44px">🔒</div><h2>${esc(LOCK.title)}</h2><p>${esc(LOCK.text)}</p><p>This handheld is locked: printing and syncing are paused until the licence is active.</p><p>Buy a licence at <b>${esc(url.replace(/^https?:\/\//,''))}</b> or contact Proview: <b>${esc(sp.phone||'020 8935 5495')}</b> · ${esc(sp.email||'info@proviewtechgroup.co.uk')}</p><div class="row"><button class="btn blue" data-chk>Check again</button><button class="btn ghost" data-disc style="color:#d92d20">Disconnect this handheld</button></div></div>`;
+  el.innerHTML=`<div class="lockscreen"><div style="font-size:44px">🔒</div><h2>${esc(LOCK.title)}</h2><p>${esc(LOCK.text)}</p><p>This handheld is locked: printing and syncing are paused until the licence is active.</p><p>Buy a licence at <b>${esc(url.replace(/^https?:\/\//,''))}</b> or contact Proview: <b>${esc(sp.phone||'020 8935 5495')}</b> · ${esc(sp.email||'info@proviewtechgroup.co.uk')}</p><div class="row"><button class="btn blue" data-chk>Check again</button><button class="btn ghost" data-disc style="color:#d92d20">Unpair this handheld</button></div></div>`;
   el.querySelector('[data-chk]').onclick=async()=>{ const b=el.querySelector('[data-chk]'); b.disabled=true; b.textContent='Checking…'; await checkLock(); if(LOCK){ applyLock(); toast(LOCK.title+' – still locked'); } };
-  el.querySelector('[data-disc]').onclick=()=>disconnect();
+  el.querySelector('[data-disc]').onclick=()=>unpair(false);
 }
 async function doSync(){
-  if(!connected()){ toast(Cloud.enabled?'Not connected – Menu → Settings → Connect to Proview Label':'Demo data: live sync works in the Android app'); return; }
+  if(!connected()){ toast(Cloud.enabled?'Not paired yet':'Demo data: live sync works in the Android app'); return; }
   ui.syncing=true; renderStatus(); renderHeader();
   try{ if(await checkLock()){ ui.syncing=false; render(); return showLock(); }
     touchDevice(); if(Cloud.prune) await Cloud.prune(P); const r=await Cloud.sync(P,{full:true}); S=P.get(); toast(`Synced · ${r.pushed} sent, ${r.pulled} received`); }
-  catch(e){ if(await checkLock()){ ui.syncing=false; render(); return showLock(); } toast(Cloud.friendly(e)); if(/JWT|session|401/i.test(String(e.message||''))) toast('Please reconnect in Settings'); }
+  catch(e){ if(await checkLock()){ ui.syncing=false; render(); return showLock(); } toast(Cloud.friendly(e)); if(/JWT|session|401/i.test(String(e.message||''))) checkLock(); }
   ui.syncing=false; render();
 }
 let syncT=null;
 function trySync(){ if(!connected()||LOCK) return; clearTimeout(syncT); syncT=setTimeout(()=>{ Cloud.sync(P).then(()=>{ S=P.get(); renderStatus(); }).catch(()=>{ checkLock(); }); },1500); }
 if(navigator.getBattery) navigator.getBattery().then(b=>{ ui.battery=Math.round(b.level*100); }).catch(()=>{});
 let lockTick=0;
-setInterval(async()=>{ if(connected()&&navigator.onLine&&!ui.printing){ if(LOCK||++lockTick%5===1){ if(await checkLock()) return; } touchDevice(); Cloud.sync(P).then(()=>{ S=P.get(); if(!$('#sheet').classList.contains('on')&&!$('#modal').innerHTML) render(); else renderStatus(); }).catch(()=>{ checkLock(); }); } },60000);
+setInterval(async()=>{ if(connected()&&navigator.onLine&&!ui.printing){ if(await checkLock()||!connected()) return; touchDevice(); Cloud.sync(P).then(()=>{ S=P.get(); if(!$('#sheet').classList.contains('on')&&!$('#modal').innerHTML) render(); else renderStatus(); }).catch(()=>{ checkLock(); }); } },60000);
 
-function connectSheet(){
-  let step=1, who=null, uid=null, email='';
-  const draw=(msg)=>{
-    if(step===1){
-      const sh=openSheet('Connect to Proview Label',`<p class="hint" style="font-size:14px;margin-top:0">Sign in with a back-office login (owner, admin or manager). Staff then use their PINs on this handheld.</p>
-        ${msg?`<div class="tag bad" style="display:block;padding:10px 12px;margin-bottom:12px;text-transform:none;font-size:13px;letter-spacing:0">${esc(msg)}</div>`:''}
-        <div class="fld"><div class="lbl">Email</div><input class="inp" id="ce" type="email" autocomplete="username" value="${esc(email)}"></div>
-        <div class="fld"><div class="lbl">Password</div><input class="inp" id="cp" type="password" autocomplete="current-password"></div>
-        <p class="hint">Use the same email as your Proview account. No password yet? Open label.proviewcrm.co.uk and use “Forgot password?” to set one.</p>`,`<button class="btn blue" id="cgo">Sign in</button>`);
-      sh.querySelector('#cgo').onclick=async()=>{ email=sh.querySelector('#ce').value.trim().toLowerCase(); const pw=sh.querySelector('#cp').value; if(!email||!pw) return draw('Enter your email and password.');
-        sh.querySelector('#cgo').disabled=true; sh.querySelector('#cgo').textContent='Signing in…';
-        try{ const u=await Cloud.signIn(email,pw); uid=u.id; who=await Cloud.whoami(); if(!who.master&&!(who.orgs||[]).length) throw new Error('This login has no Proview Label business yet. New to Proview Label? Start a free 3-day trial at label.proviewcrm.co.uk, then connect this handheld.');
-          if(!who.master&&Cloud.lockMsg&&(who.orgs||[]).every(o=>Cloud.lockMsg(o))){ const lm=Cloud.lockMsg(who.orgs[0]); throw new Error(lm.title+'. '+lm.text+' Buy a licence at license.proviewcrm.co.uk or contact Proview on 020 8935 5495.'); }
-          S=P.useStore('cloud:'+uid,{blank:true}); S.orgs=(who.orgs||[]).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role})); P.save();
-          await Cloud.sync(P); S=P.get(); step=2; draw(); }
-        catch(e){ await Cloud.signOut().catch(()=>{}); draw(Cloud.friendly(e)); } };
-      return;
-    }
-    // step 2: pick the site this handheld lives at, and the person's own PIN
-    const sites=P.live('sites').filter(x=>{ const o=(who.orgs||[]).find(y=>y.id===x.orgId); if(who.master) return true; if(!o) return false; return o.role!=='manager'||(o.site_ids||[]).includes(x.id); });
-    const sh=openSheet('Set up this handheld',`${msg?`<div class="tag bad" style="display:block;padding:10px 12px;margin-bottom:12px;text-transform:none;font-size:13px;letter-spacing:0">${esc(msg)}</div>`:''}
-      ${sites.length?`<div class="fld"><div class="lbl">Site</div><select class="inp" id="cs">${sites.map(x=>`<option value="${x.id}">${esc(x.name)}${(S.orgs||[]).length>1?' · '+esc(((S.orgs||[]).find(o=>o.id===x.orgId)||{}).name||''):''}</option>`).join('')}</select></div>
-      <div class="fld"><div class="lbl">Handheld name</div><input class="inp" id="cn" value="Kitchen handheld"></div>
-      <div class="row"><div class="fld" style="flex:2"><div class="lbl">Your name</div><input class="inp" id="un" value="${esc(email.split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g,c=>c.toUpperCase()))}"></div><div class="fld" style="flex:1"><div class="lbl">Your PIN</div><input class="inp" id="up" inputmode="numeric" maxlength="4" type="password" placeholder="4 digits"></div></div>
-      <p class="hint">You'll be signed in on this handheld as a manager. Add other staff and their PINs in Manage Profiles or in the back-office.</p>`
-      :'<p>No sites yet for this business. Add a site in the back-office (Sites &amp; devices), then try again.</p>'}`,sites.length?`<button class="btn" id="cdone">Finish setup</button>`:`<button class="btn ghost" id="cx">Close</button>`);
-    const cx=sh.querySelector('#cx'); if(cx) cx.onclick=async()=>{ await Cloud.signOut().catch(()=>{}); S=P.useStore(null); closeSheet(); render(); };
-    const cd=sh.querySelector('#cdone'); if(cd) cd.onclick=async()=>{
-      const siteId=sh.querySelector('#cs').value, nm=sh.querySelector('#un').value.trim(), pin=sh.querySelector('#up').value.trim();
-      if(!nm) return draw('Enter your name.'); if(!/^\d{4}$/.test(pin)) return draw('Choose a 4-digit PIN.');
-      const s=P.byId('sites',siteId);
-      S.currentSiteId=siteId; S.deviceId=S.deviceId||('dev_'+P.uid('')); P.save();
-      P.ensureRules(s.orgId); const fr=P.live('rules').find(r=>r.orgId===s.orgId&&r.name==='Fridge'); if(fr){ ui.ruleId=fr.id; localStorageSet('pvl_rule',fr.id); }
-      let me=P.live('users').find(x=>x.orgId===s.orgId&&x.pin===pin&&(x.siteIds||[]).includes(siteId));
-      if(me&&me.name.toLowerCase()!==nm.toLowerCase()) return draw('Someone at this site already uses that PIN. Pick another.');
-      if(!me) me=P.upsert('users',{id:P.uid('u_'),orgId:s.orgId,name:nm,role:'manager',pin,siteIds:[siteId]});
-      S.currentUserId=me.id;
-      P.upsert('devices',{id:S.deviceId,orgId:s.orgId,siteId,name:sh.querySelector('#cn').value.trim()||'Kitchen handheld',version:APP_VERSION,labelsLeft:S.settings.labelsInStock,battery:ui.battery,lastSync:P.now()});
-      CONN={uid,email,orgId:s.orgId,siteId}; try{ localStorage.setItem(DEV_KEY,JSON.stringify(CONN)); }catch(e){}
-      cd.disabled=true; cd.textContent='Saving…';
-      try{ await Cloud.sync(P); S=P.get(); }catch(e){ toast(Cloud.friendly(e)); }
-      defaultPrinter(); closeSheet(); root('home'); toast('Connected to '+s.name);
-    };
-  };
-  draw();
+// ---------- pairing (first open, or after being removed / unpaired) ----------
+// The handheld shows a 6-character code and a QR code. In the back-office: Locations & devices → Pair handheld.
+const PAIR_KEY='pvl-pair-secret', PAIR_URL='https://label.proviewcrm.co.uk/#pair=';
+let pairing=null;   // { code, t, err } while the pairing screen is up
+function pairSecret(){ let s=localStorageGet(PAIR_KEY); if(!s||s.length<64){ const r=new Uint8Array(32); crypto.getRandomValues(r); s=[...r].map(x=>x.toString(16).padStart(2,'0')).join(''); localStorageSet(PAIR_KEY,s); } return s; }
+function qrSVG(text){ try{ const q=qrcode(0,'M'); q.addData(text); q.make(); return q.createSvgTag({cellSize:4,margin:0,scalable:true}); }catch(e){ return ''; } }
+function drawPair(){
+  const el=$('#pairscreen'); if(!pairing){ el.innerHTML=''; return; }
+  const c=pairing.code, shown=c?c.slice(0,3)+' '+c.slice(3):'';
+  el.innerHTML=`<div class="pairscreen"><button class="langBtn" id="pLang" aria-label="Language" data-notr>${T.FLAGS[T.lang()]}</button>
+    <div class="pv-logo"><div class="mk">PV</div><div class="wd">PROVIEW<span>LABEL</span></div></div>
+    <h2>Pair this handheld</h2>
+    <p>In the back-office at label.proviewcrm.co.uk, go to Locations &amp; devices → Pair handheld and enter this code.</p>
+    ${c?`<div class="paircode" data-notr>${esc(shown)}</div><div class="pairqr">${qrSVG(PAIR_URL+c)}</div><p style="margin-top:12px">Or scan the QR code with your phone.</p>`:'<div class="paircode" data-notr>··· ···</div>'}
+    <div class="pairwait"><span class="spin" style="border-color:#26262e;border-top-color:#8fb3f2"></span>${c?'Waiting to be paired…':'Getting a code…'}</div>
+    ${pairing.err?`<div class="pairerr">${esc(pairing.err)}</div>`:''}</div>`;
+  el.querySelector('#pLang').onclick=openLang;
 }
-function disconnect(){
-  confirmBox('Disconnect this handheld?','It stops syncing and goes back to demo data. Labels already sent stay in the back-office.','Disconnect',async()=>{
-    try{ touchDevice(); await Cloud.sync(P); }catch(e){}
-    await Cloud.signOut().catch(()=>{}); try{ localStorage.removeItem(DEV_KEY); localStorage.removeItem(LOCK_KEY); }catch(e){} CONN=null; LOCK=null; applyLock();
-    S=P.useStore(null); defaultPrinter(); root('home'); toast('Disconnected');
-  },true);
+function startPairing(){ if(pairing) return; pairing={code:null}; ui.queue=[]; closeAll(); drawPair(); pairTick(); }
+async function pairTick(){
+  if(!pairing) return; clearTimeout(pairing.t);
+  try{
+    if(!pairing.code){ const r=await Cloud.pairStart(pairSecret()); pairing.code=r.code; pairing.err=null; drawPair(); }
+    const r=await Cloud.pairPoll(pairSecret());
+    if(r.status==='paired'){ await finishPairing(r); return; }
+    if(r.status==='expired'){ try{ localStorage.removeItem(PAIR_KEY); }catch(e){} pairing.code=null; }
+    else if(r.code&&r.code!==pairing.code){ pairing.code=r.code; }
+    if(pairing.err){ pairing.err=null; } drawPair();
+  }catch(e){ if(pairing){ pairing.err=Cloud.friendly(e); drawPair(); } }
+  if(pairing) pairing.t=setTimeout(pairTick, pairing.code?3000:8000);
+}
+async function finishPairing(r){
+  try{
+    await Cloud.signOut().catch(()=>{});
+    const u=await Cloud.signIn(r.email,r.password);
+    CONN={uid:u.id,orgId:r.org_id,siteId:r.site_id,deviceId:r.device_id,name:r.name,mode:r.mode,device:true};
+    S=P.useStore('cloud:'+u.id,{blank:true});
+    const who=await Cloud.whoami().catch(()=>null);
+    S.orgs=((who&&who.orgs)||[]).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role}));
+    S.currentSiteId=r.site_id; S.deviceId=r.device_id; S.currentUserId=null; P.save();
+    try{ localStorage.setItem(DEV_KEY,JSON.stringify(CONN)); localStorage.removeItem(PAIR_KEY); }catch(e){}
+    try{ await Cloud.sync(P); S=P.get(); }catch(e){}
+    P.ensureRules(r.org_id); const fr=P.live('rules').find(x=>x.orgId===r.org_id&&x.name==='Fridge'); if(fr){ ui.ruleId=fr.id; localStorageSet('pvl_rule',fr.id); }
+    touchDevice(); defaultPrinter();
+    clearTimeout(pairing&&pairing.t); pairing=null; drawPair();
+    ui.mode=modeFor(); root('home'); toast('Paired: '+site().name); trySync();
+  }catch(e){ CONN=null; try{ localStorage.removeItem(DEV_KEY); }catch(x){} if(pairing){ pairing.err=Cloud.friendly(e); drawPair(); pairing.t=setTimeout(pairTick,5000); } }
+}
+// Unpair: on the handheld (Settings / lock screen) or because the back-office removed it. Shows a new code.
+function unpair(silent){
+  const go=async()=>{
+    if(!silent){ try{ touchDevice(); await Cloud.sync(P); }catch(e){} try{ await Cloud.removeDevice(CONN.deviceId); }catch(e){} }
+    await Cloud.signOut().catch(()=>{}); try{ localStorage.removeItem(DEV_KEY); localStorage.removeItem(LOCK_KEY); localStorage.removeItem(PAIR_KEY); }catch(e){}
+    CONN=null; LOCK=null; applyLock(); S=P.useStore(null); render();
+  };
+  if(silent) return go();
+  confirmBox('Unpair this handheld?','It stops syncing and shows a new pairing code. Labels already sent stay in the back-office.','Unpair',go,true);
 }
 
 // the built-in printer is the default every time the app opens; Settings can change it until the app is closed
 function defaultPrinter(){ const pr=S.settings.printer; if(pr.mode!=='builtin'){ pr.mode='builtin'; P.save(); } pr.builtinText=false; }
 // ---------- render ----------
 function render(){
+  if(needsPairing()){ startPairing(); return; }
   S=P.get();
   const m=modeFor(); if(m!==ui.mode){ ui.mode=m; ui.stack=[]; ui.screen='home'; closeDrawer(); }
   $('#main').classList.remove('grey');
@@ -2676,7 +5038,7 @@ function render(){
 }
 window.addEventListener('online',renderStatus); window.addEventListener('offline',renderStatus);
 // Android hardware back button
-document.addEventListener('ionBackButton', ev=>{ ev.detail && ev.detail.register && ev.detail.register(10,()=>{ if(connected()&&LOCK&&!$('#modal').innerHTML){ if(Native().App) Native().App.exitApp(); return; } if($('#modal').innerHTML) $('#modal').innerHTML=''; else if($('#sheet').classList.contains('on')) closeSheet(); else if($('#drawer').classList.contains('on')) closeDrawer(); else if(ui.screen!=='home') back(); else if(Native().App) Native().App.exitApp(); }); });
+document.addEventListener('ionBackButton', ev=>{ ev.detail && ev.detail.register && ev.detail.register(10,()=>{ if(pairing){ if(Native().App) Native().App.exitApp(); return; } if(connected()&&LOCK&&!$('#modal').innerHTML){ if(Native().App) Native().App.exitApp(); return; } if($('#modal').innerHTML) $('#modal').innerHTML=''; else if($('#sheet').classList.contains('on')) closeSheet(); else if($('#drawer').classList.contains('on')) closeDrawer(); else if(ui.screen!=='home') back(); else if(Native().App) Native().App.exitApp(); }); });
 // handheld hardware: built-in printer + barcode scanner (Android app only)
 // ---------- app updates ----------
 // The latest version is described at label.proviewcrm.co.uk/apk/version.json. The app checks when it opens,
@@ -2710,7 +5072,7 @@ async function installUpdate(info){
 if(isNative){ setTimeout(()=>checkUpdate(false),4000); setInterval(()=>checkUpdate(false),4*60*60*1000); }
 
 if(Native().LabelPrinter && Native().LabelPrinter.addListener){ try{ Native().LabelPrinter.addListener('scan', onHardwareScan); }catch(e){} checkBuiltin(); }
-if(Native().App && Native().App.addListener) Native().App.addListener('backButton',()=>{ if(connected()&&LOCK&&!$('#modal').innerHTML){ Native().App.exitApp(); return; } if($('#modal').innerHTML) $('#modal').innerHTML=''; else if($('#sheet').classList.contains('on')) closeSheet(); else if($('#drawer').classList.contains('on')) closeDrawer(); else if(ui.screen!=='home') back(); else Native().App.exitApp(); });
+if(Native().App && Native().App.addListener) Native().App.addListener('backButton',()=>{ if(pairing){ Native().App.exitApp(); return; } if(connected()&&LOCK&&!$('#modal').innerHTML){ Native().App.exitApp(); return; } if($('#modal').innerHTML) $('#modal').innerHTML=''; else if($('#sheet').classList.contains('on')) closeSheet(); else if($('#drawer').classList.contains('on')) closeDrawer(); else if(ui.screen!=='home') back(); else Native().App.exitApp(); });
 T.start($('#device'));
 defaultPrinter();
 render();

@@ -115,6 +115,21 @@
       if (!r.ok || j.error) throw new Error(j.error || ('Could not set the password (' + r.status + ')'));
       return j;
     },
+    // ----- handheld pairing (migration 005) -----
+    // handheld, not signed in: get (or keep) the pairing code for this handheld's secret
+    async pairStart(secret) { const { data, error } = await sb.rpc('pl_pair_start', { p_secret: secret }); if (error) throw error; return data; },
+    // handheld: { status: 'waiting' | 'expired' | 'paired', ... } (paired brings the handheld's own login)
+    async pairPoll(secret) {
+      const r = await fetch(C.SUPABASE_URL + '/functions/v1/pl-device-pair', { method: 'POST', headers: { 'content-type': 'application/json', apikey: C.SUPABASE_KEY }, body: JSON.stringify({ secret }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.error) throw new Error(j.error || ('Pairing check failed (' + r.status + ')'));
+      return j;
+    },
+    // back-office: pair the handheld showing this code
+    async claimPair(code, siteId, name, mode) { const { data, error } = await sb.rpc('pl_pair_claim', { p_code: code, p_site: siteId, p_name: name, p_mode: mode }); if (error) throw error; return data; },
+    async devices(orgIds) { let q = sb.from('pl_devices').select('*').order('name'); if (orgIds) q = q.in('org_id', orgIds); const { data, error } = await q; if (error) throw error; return data || []; },
+    async updateDevice(id, name, siteId, mode) { const { error } = await sb.rpc('pl_device_update', { p_id: id, p_name: name, p_site: siteId, p_mode: mode }); if (error) throw error; },
+    async removeDevice(id) { const { error } = await sb.rpc('pl_device_remove', { p_id: id }); if (error) throw error; },
     async removeMember(id) { const { error } = await sb.from('pl_members').delete().eq('id', id); if (error) throw error; }
   };
   g.PVLCloud = Cloud;

@@ -1142,6 +1142,21 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
       if (!r.ok || j.error) throw new Error(j.error || ('Could not set the password (' + r.status + ')'));
       return j;
     },
+    // ----- handheld pairing (migration 005) -----
+    // handheld, not signed in: get (or keep) the pairing code for this handheld's secret
+    async pairStart(secret) { const { data, error } = await sb.rpc('pl_pair_start', { p_secret: secret }); if (error) throw error; return data; },
+    // handheld: { status: 'waiting' | 'expired' | 'paired', ... } (paired brings the handheld's own login)
+    async pairPoll(secret) {
+      const r = await fetch(C.SUPABASE_URL + '/functions/v1/pl-device-pair', { method: 'POST', headers: { 'content-type': 'application/json', apikey: C.SUPABASE_KEY }, body: JSON.stringify({ secret }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.error) throw new Error(j.error || ('Pairing check failed (' + r.status + ')'));
+      return j;
+    },
+    // back-office: pair the handheld showing this code
+    async claimPair(code, siteId, name, mode) { const { data, error } = await sb.rpc('pl_pair_claim', { p_code: code, p_site: siteId, p_name: name, p_mode: mode }); if (error) throw error; return data; },
+    async devices(orgIds) { let q = sb.from('pl_devices').select('*').order('name'); if (orgIds) q = q.in('org_id', orgIds); const { data, error } = await q; if (error) throw error; return data || []; },
+    async updateDevice(id, name, siteId, mode) { const { error } = await sb.rpc('pl_device_update', { p_id: id, p_name: name, p_site: siteId, p_mode: mode }); if (error) throw error; },
+    async removeDevice(id) { const { error } = await sb.rpc('pl_device_remove', { p_id: id }); if (error) throw error; },
     async removeMember(id) { const { error } = await sb.from('pl_members').delete().eq('id', id); if (error) throw error; }
   };
   g.PVLCloud = Cloud;
@@ -1481,6 +1496,9 @@ const day=864e5;
 // row-level security enforces the same rules shown here.
 const Cloud=window.PVLCloud||{enabled:false};
 const CLOUD=!!Cloud.enabled;
+let PENDING_PAIR=null;
+function takePairHash(){ const m=(location.hash||'').match(/[#&]pair=([A-Za-z0-9]{4,10})/); if(!m) return false; PENDING_PAIR=m[1].toUpperCase(); history.replaceState(null,'',location.pathname+location.search+'#devices'); return true; }
+takePairHash();
 if(CLOUD){ P.useStore('signed-out',{blank:true}); S=P.get(); }
 const SKEY='pvl-session';
 const lsGet=(k)=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
@@ -1593,7 +1611,7 @@ const byOrg=(arr)=>{ const orgs=scopeOrgIds(); return arr.filter(x=>orgs.include
 const multiOrg=()=>scopeOrgIds().length>1;
 const COLL_KEYS=['sites','categories','products','rules','users','labels','wastage','orders','devices','audit'];
 const siteName=(id)=>(P.byId('sites',id)||{}).name||'—';
-const userName=(id)=>(P.byId('users',id)||{}).name||'—';
+const userName=(id)=>(P.byId('users',id)||P.byId('devices',id)||{}).name||'—';
 const catOf=(p)=>P.byId('categories',p.categoryId)||{};
 function route(){ const h=(location.hash||(isMaster()?'#sites':'#overview')).slice(1); const r=VIEWS[h]&&canView(h)?h:'overview';
   if(masterAll()) return 'sites';
@@ -1930,7 +1948,7 @@ function renderLogin(){
   $('#app').querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>{ const u=P.byId('users',b.dataset.u); signIn(u); });
 }
 async function ssoArrive(){ splash(); try{ if(await Cloud.consumeSsoHash()){ LOGIN={msg:'',kind:'bad',mode:'signin'}; return boot(true); } }catch(e){ WHO=null; LOGIN={msg:e.message,kind:'bad',mode:'signin'}; render(); } }
-window.addEventListener('hashchange',()=>{ if(/pv_sso=/.test(location.hash)){ if(CLOUD) ssoArrive(); return; } render(); const m=$('#main'); if(m) m.scrollTop=0; });
+window.addEventListener('hashchange',()=>{ if(/pv_sso=/.test(location.hash)){ if(CLOUD) ssoArrive(); return; } takePairHash(); render(); const m=$('#main'); if(m) m.scrollTop=0; });
 
 // ---------- modal helpers ----------
 function modal(title, body, foot, wide){
@@ -2319,13 +2337,48 @@ VIEWS.devices=(el)=>{
   const ss=P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(siteFilter==='all'||x.id===siteFilter||siteFilter==='org:'+x.orgId)), ds=bySite(P.live('devices'));
   const canAddSite=scopeOrgIds().some(o=>['master','owner','admin'].includes(orgRole(o)));
   const orgs=visibleOrgs().filter(o=>scopeOrgIds().includes(o.id)); // the open business only
-  el.innerHTML=`<div class="ph"><div><h1>Locations & devices</h1><p>${isMaster()?esc(orgName(curOrg()))+': its kitchens and the handhelds running Proview Label.':'Your kitchens and the handhelds running Proview Label.'}</p></div><div class="btns">${!CLOUD?'<button class="btn ghost" id="imp">Import from device</button><button class="btn ghost" id="cfg">Device config file</button>':''}${canAddSite?'<button class="btn" id="addS">+ Add location</button>':''}</div></div>
+  el.innerHTML=`<div class="ph"><div><h1>Locations & devices</h1><p>${isMaster()?esc(orgName(curOrg()))+': its kitchens and the handhelds running Proview Label.':'Your kitchens and the handhelds running Proview Label.'}</p></div><div class="btns">${canAddSite?'<button class="btn ghost" id="addS">+ Add location</button>':''}<button class="btn" id="pairB">+ Pair handheld</button></div></div>
   ${isMaster()?`<div class="card"><h3>Business</h3><div class="sub">The business you're working in. New businesses are set up from Locations.</div><table><thead><tr><th>Business</th><th>Locations</th><th>Devices</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${orgs.map(o=>{ const os=P.live('sites').filter(x=>x.orgId===o.id); return `<tr><td><b>${esc(o.name)}</b>${orgState(o)!=='active'?' '+stateTag(o):''}</td><td>${os.length}</td><td>${P.live('devices').filter(d=>os.some(x=>x.id===d.siteId)).length}</td><td>${P.live('labels').filter(l=>os.some(x=>x.id===l.siteId)&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap"><button class="icbtn" data-eo="${o.id}" title="Rename">✎</button></td></tr>`; }).join('')||'<tr><td colspan="5" class="empty">No business open.</td></tr>'}</tbody></table></div>`:''}
   <div class="card"><h3>Locations</h3><table><thead><tr><th>Location</th>${multiOrg()?'<th>Business</th>':''}<th>Address (printed on sale labels)</th><th>Device staff</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${ss.map(s=>`<tr><td><b>${esc(s.name)}</b><div class="hint">${esc(s.region||'')}</div></td>${multiOrg()?`<td class="hint">${esc(orgName(s.orgId))}</td>`:''}<td>${esc(s.address||'')}</td><td>${P.live('users').filter(u=>(u.siteIds||[]).includes(s.id)).length}</td><td>${P.live('labels').filter(l=>l.siteId===s.id&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap">${siteFilter!==s.id&&allowedSiteIds().length>1?`<button class="btn ghost sm" data-open="${s.id}">Open</button> `:''}${['master','owner','admin'].includes(orgRole(s.orgId))?`<button class="icbtn" data-es="${s.id}">✎</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No locations yet.</td></tr>'}</tbody></table></div>
-  <div class="card"><h3>Devices</h3><div class="sub">${CLOUD?'Handhelds appear here once they sign in (Android app → Settings → Connect to Proview Label).':'Sample devices.'}</div><table><thead><tr><th>Device</th><th>Location</th><th>Battery</th><th>Labels left</th><th>App</th><th>Last sync</th></tr></thead><tbody>${ds.map(d=>`<tr><td><b>${esc(d.name)}</b><div class="hint">${esc(d.id)}</div></td><td>${esc(siteName(d.siteId))}</td><td>${d.battery!=null?d.battery+'%':'—'}</td><td>${d.labelsLeft<60?`<span class="tag bad">${d.labelsLeft} – low</span>`:d.labelsLeft}</td><td>v${esc(d.version||'')}</td><td>${d.lastSync?P.fmtDate(d.lastSync,true):'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No devices connected yet.</td></tr>'}</tbody></table></div>`;
+  <div class="card"><h3>Handhelds</h3><div class="sub">To add one, open Proview Label on the handheld: it shows a pairing code. Tap <b>+ Pair handheld</b> and enter it, or scan the QR code on the handheld with your phone. <b>Mode</b> sets what staff see: Easy (big product buttons, print only) or Detailed (logs, bulk print, wastage, label orders).</div><div id="devs"><div class="hint">Loading…</div></div></div>`;
+  // handhelds: paired list from the server (live) or the sample devices (demo), with battery etc. from their sync records
+  const devOrgs=scopeOrgIds();
+  const devRows=async()=>{ const tele=P.live('devices');
+    if(!CLOUD) return bySite(tele).map(d=>({...d,mode:d.mode||'easy'}));
+    const rows=await Cloud.devices(devOrgs);
+    return bySite(rows.map(r=>({...(tele.find(t=>t.id===r.id)||{}),id:r.id,name:r.name,mode:r.mode,siteId:r.site_id,orgId:r.org_id,pairedAt:r.paired_at}))); };
+  const modeTag=(m)=>m==='detailed'?'<span class="tag blue">Detailed</span>':'<span class="tag mute">Easy</span>';
+  (async()=>{ const box=el.querySelector('#devs'); let rows=[];
+    try{ rows=await devRows(); }catch(e){ box.innerHTML=`<div class="lg-err">${esc(Cloud.friendly?Cloud.friendly(e):e.message)}</div>`; return; }
+    box.innerHTML=`<table><thead><tr><th>Handheld</th><th>Location</th><th>Mode</th><th>Battery</th><th>Labels left</th><th>App</th><th>Last sync</th><th></th></tr></thead><tbody>${rows.map(d=>`<tr><td><b>${esc(d.name||'Handheld')}</b></td><td>${esc(siteName(d.siteId))}</td><td>${modeTag(d.mode)}</td><td>${d.battery!=null?d.battery+'%':'—'}</td><td>${d.labelsLeft==null?'—':d.labelsLeft<60?`<span class="tag bad">${d.labelsLeft} – low</span>`:d.labelsLeft}</td><td>${d.version?'v'+esc(d.version):'—'}</td><td>${d.lastSync?P.fmtDate(d.lastSync,true):'—'}</td><td style="text-align:right;white-space:nowrap"><button class="icbtn" data-ed="${esc(d.id)}" title="Edit">✎</button><button class="icbtn" data-rm="${esc(d.id)}" title="Remove">🗑</button></td></tr>`).join('')||'<tr><td colspan="8" class="empty">No handhelds paired yet.</td></tr>'}</tbody></table>`;
+    box.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>devForm(rows.find(x=>x.id===b.dataset.ed)));
+    box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{ const d=rows.find(x=>x.id===b.dataset.rm); confirmM('Remove '+(d.name||'this handheld')+'?','It stops syncing straight away and shows a new pairing code. Labels it already sent stay here.','Remove',async()=>{
+      try{ if(CLOUD) await Cloud.removeDevice(d.id); else P.remove('devices',d.id); audit('deleted','Handheld',d.name||d.id,d.orgId); toast('Handheld removed'); render(); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } }); });
+  })();
+  const siteOpts=(orgId,sel)=>P.live('sites').filter(x=>x.orgId===orgId&&allowedSiteIds().includes(x.id)).map(x=>`<option value="${x.id}" ${x.id===sel?'selected':''}>${esc(x.name)}</option>`).join('');
+  const modeOpts=(m)=>`<option value="easy">Easy – big product buttons, print only</option><option value="detailed" ${m==='detailed'?'selected':''}>Detailed – logs, bulk print, wastage, label orders</option>`;
+  const pairForm=(orgId,code)=>{ const def=P.byId('sites',siteFilter)&&P.byId('sites',siteFilter).orgId===orgId?siteFilter:'';
+    const m=modal('Pair handheld'+(multiOrg()||isMaster()?' · '+orgName(orgId):''),`<p class="hint" style="margin-top:0">Open Proview Label on the handheld. Enter the code it shows.</p>
+      <div class="fld"><label>Pairing code</label><input class="inp" id="pc" maxlength="7" autocomplete="off" value="${esc(code||'')}" placeholder="e.g. K7Q M2X" style="font-size:22px;font-weight:700;letter-spacing:.12em;text-transform:uppercase"></div>
+      <div class="g2"><div class="fld"><label>Location</label><select class="inp" id="ps">${siteOpts(orgId,def)}</select></div><div class="fld"><label>Name</label><input class="inp" id="pn" value="Kitchen handheld"></div></div>
+      <div class="fld"><label>Mode <span class="hint">what staff see on this handheld</span></label><select class="inp" id="pm">${modeOpts('easy')}</select></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="pgo">Pair</button>`);
+    m.querySelector('#pgo').onclick=async()=>{ const c=m.querySelector('#pc').value.replace(/[^A-Za-z0-9]/g,'').toUpperCase(), site=m.querySelector('#ps').value, nm=m.querySelector('#pn').value.trim()||'Handheld', md=m.querySelector('#pm').value;
+      if(c.length!==6) return toast('Enter the 6-character code from the handheld'); if(!site) return toast('Pick a location');
+      if(!CLOUD) return toast('Pairing works on the live back-office at label.proviewcrm.co.uk');
+      const b=m.querySelector('#pgo'); b.disabled=true;
+      try{ await Cloud.claimPair(c,site,nm,md); audit('created','Handheld',nm+' at '+siteName(site),orgId); closeModal(); toast('Paired. The handheld opens in a few seconds.'); setTimeout(render,4000); render(); }
+      catch(e){ b.disabled=false; toast(Cloud.friendly?Cloud.friendly(e):e.message); } };
+    if(!code) setTimeout(()=>m.querySelector('#pc').focus(),50); };
+  const devForm=(d)=>{ const m=modal('Edit handheld',`<div class="g2"><div class="fld"><label>Name</label><input class="inp" id="dn" value="${esc(d.name||'')}"></div><div class="fld"><label>Location</label><select class="inp" id="ds">${siteOpts(d.orgId,d.siteId)}</select></div></div>
+      <div class="fld"><label>Mode <span class="hint">what staff see on this handheld</span></label><select class="inp" id="dm">${modeOpts(d.mode)}</select></div><p class="hint">The handheld picks up changes within a minute.</p>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="dsv">Save</button>`);
+    m.querySelector('#dsv').onclick=async()=>{ const nm=m.querySelector('#dn').value.trim(), site=m.querySelector('#ds').value, md=m.querySelector('#dm').value; if(!nm) return toast('Enter a name');
+      try{ if(CLOUD) await Cloud.updateDevice(d.id,nm,site,md); else { const r=P.byId('devices',d.id); P.upsert('devices',{...r,name:nm,siteId:site,mode:md}); }
+        audit('updated','Handheld',nm+' ('+(md==='detailed'?'Detailed':'Easy')+')',d.orgId); closeModal(); toast('Saved'); render(); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } }; };
+  el.querySelector('#pairB').onclick=()=>withOrg(o=>pairForm(o));
+  if(PENDING_PAIR){ const c=PENDING_PAIR; PENDING_PAIR=null; withOrg(o=>pairForm(o,c)); }
   const siteForm=(s,orgId)=>{ const isNew=!s; s=s||{id:'site_'+P.uid(''),orgId,name:'',address:'',region:''}; const m=modal((isNew?'Add location':'Edit location')+' · '+orgName(s.orgId),`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(s.name)}"></div><div class="fld"><label>Address</label><input class="inp" id="a" value="${esc(s.address||'')}"></div><div class="fld"><label>Area</label><input class="inp" id="g" value="${esc(s.region||'')}" placeholder="e.g. North London"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
     m.querySelector('#sv').onclick=()=>{ s.name=m.querySelector('#n').value.trim(); s.address=m.querySelector('#a').value.trim(); s.region=m.querySelector('#g').value.trim(); if(!s.name) return toast('Enter a name'); P.upsert('sites',s); audit(isNew?'created':'updated','Site',s.name,s.orgId); closeModal(); render(); }; };
-  if(canAddSite) el.querySelector('#addS').onclick=()=>withOrg(o=>{ if(!['master','owner','admin'].includes(orgRole(o))) return toast('Only an owner or admin can add locations.'); siteForm(null,o); });
+  if(canAddSite&&el.querySelector('#addS')) el.querySelector('#addS').onclick=()=>withOrg(o=>{ if(!['master','owner','admin'].includes(orgRole(o))) return toast('Only an owner or admin can add locations.'); siteForm(null,o); });
   el.querySelectorAll('[data-es]').forEach(b=>b.onclick=()=>siteForm({...P.byId('sites',b.dataset.es)}));
   el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ setSite(b.dataset.open); location.hash='overview'; });
   el.querySelectorAll('[data-openorg]').forEach(b=>b.onclick=()=>{ setSite('org:'+b.dataset.openorg); location.hash='overview'; });
@@ -2356,8 +2409,8 @@ VIEWS.users=(el)=>{
   el.innerHTML=`<div class="ph"><div><h1>Users & permissions</h1><p>Back-office logins use email (or “Sign in with Proview account”). Kitchen staff use a 4-digit PIN on the device.</p></div><div class="btns">${canLogins?'<button class="btn ghost" id="addL">+ Back-office login</button>':''}<button class="btn" id="addU">+ Device staff</button></div></div>
   <div class="cols"><div>
     <div class="card"><h3>Back-office logins</h3><div class="sub">People who can sign in here. Managers only see their own locations.</div><div id="logins"><div class="hint">Loading…</div></div></div>
-    <div class="card"><h3>Device staff</h3><div class="sub">Use the handheld with a PIN. They print and log wastage; device managers can also edit products. <b>App mode</b> sets what they see: Easy (big product buttons, print only) or Detailed (every feature).</div>
-      <table><thead><tr><th>Name</th><th>On device</th><th>App mode</th>${multiOrg()?'<th>Business</th>':''}<th>Locations</th><th>Labels printed</th><th></th></tr></thead><tbody>${staff.map(u=>`<tr><td><div class="row"><div class="av">${esc(P.initials(u.name))}</div><b>${esc(u.name)}</b></div></td><td>${roleTag(u.role)}</td><td>${u.mode==='detailed'?'<span class="tag blue">Detailed</span>':'<span class="tag mute">Easy</span>'}</td>${multiOrg()?`<td class="hint">${esc(orgName(u.orgId))}</td>`:''}<td>${(u.siteIds||[]).map(siteName).map(esc).join(', ')}</td><td>${P.live('labels').filter(l=>l.userId===u.id).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right"><button class="icbtn" data-ed="${u.id}">✎</button><button class="icbtn" data-del="${u.id}">🗑</button></td></tr>`).join('')||`<tr><td colspan="7" class="empty">No device staff yet.</td></tr>`}</tbody></table></div>
+    <div class="card"><h3>Device staff</h3><div class="sub">Sign in on the handheld with a PIN. They print and log wastage; device managers can also edit products.</div>
+      <table><thead><tr><th>Name</th><th>On device</th>${multiOrg()?'<th>Business</th>':''}<th>Locations</th><th>Labels printed</th><th></th></tr></thead><tbody>${staff.map(u=>`<tr><td><div class="row"><div class="av">${esc(P.initials(u.name))}</div><b>${esc(u.name)}</b></div></td><td>${roleTag(u.role)}</td>${multiOrg()?`<td class="hint">${esc(orgName(u.orgId))}</td>`:''}<td>${(u.siteIds||[]).map(siteName).map(esc).join(', ')}</td><td>${P.live('labels').filter(l=>l.userId===u.id).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right"><button class="icbtn" data-ed="${u.id}">✎</button><button class="icbtn" data-del="${u.id}">🗑</button></td></tr>`).join('')||`<tr><td colspan="6" class="empty">No device staff yet.</td></tr>`}</tbody></table></div>
   </div>
   <div class="card" style="align-self:start"><h3>Permissions</h3><div class="sub">${org?'Apply to every device at '+esc(orgName(org)):'Pick one business in the picker to change its permissions.'}</div>
     ${[['requirePhoto','Require a photo for wastage','Staff must attach a photo before logging wastage'],['requireApproval','Approve new products','Products added from the menu analyser or devices wait for a manager'],['staffCanEdit','Staff can edit products','Off: only managers can add or change products on devices']].map(([k,t,d])=>`<div class="setrow"><div><b>${t}</b><span class="hint">${d}</span></div><button class="tgl ${st[k]?'on':''}" data-set="${k}" ${org&&['master','owner','admin'].includes(orgRole(org))?'':'disabled style="opacity:.4"'} aria-label="${t}"></button></div>`).join('')}
@@ -2396,9 +2449,9 @@ VIEWS.users=(el)=>{
       catch(ex){ btn.disabled=false; toast(Cloud.friendly?Cloud.friendly(ex):ex.message); } }; };
   const staffForm=(u,orgId)=>{ const isNew=!u; u=u||{id:P.uid('u_'),orgId,name:'',role:'staff',pin:'',siteIds:allowedSiteIds().filter(id=>(P.byId('sites',id)||{}).orgId===orgId&&(siteFilter===id||!P.byId('sites',siteFilter))).slice(0,1)};
     const sites=P.live('sites').filter(x=>x.orgId===u.orgId&&allowedSiteIds().includes(x.id));
-    const md=modal((isNew?'Add device staff':'Edit device staff')+(multiOrg()||isMaster()?' · '+orgName(u.orgId):''),`<div class="g2"><div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(u.name)}"></div><div class="fld"><label>4-digit PIN</label><input class="inp" id="p" value="${esc(u.pin)}" maxlength="4" inputmode="numeric"></div></div><div class="fld"><label>On the device</label><select class="inp" id="r"><option value="staff">Staff</option><option value="manager" ${u.role==='manager'?'selected':''}>Manager (can edit products)</option></select></div><div class="fld"><label>App mode <span class="hint">what they see on the handheld</span></label><select class="inp" id="md"><option value="easy">Easy – big product buttons, print only</option><option value="detailed" ${u.mode==='detailed'?'selected':''}>Detailed – logs, bulk print, wastage, label orders</option></select></div><div class="lb">Locations they can use</div><div class="algrid">${sites.map(x=>`<label class="${(u.siteIds||[]).includes(x.id)?'on':''}"><input type="checkbox" value="${x.id}" ${(u.siteIds||[]).includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join('')}</div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
+    const md=modal((isNew?'Add device staff':'Edit device staff')+(multiOrg()||isMaster()?' · '+orgName(u.orgId):''),`<div class="g2"><div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(u.name)}"></div><div class="fld"><label>4-digit PIN</label><input class="inp" id="p" value="${esc(u.pin)}" maxlength="4" inputmode="numeric"></div></div><div class="fld"><label>On the device</label><select class="inp" id="r"><option value="staff">Staff</option><option value="manager" ${u.role==='manager'?'selected':''}>Manager (can edit products)</option></select></div><div class="lb">Locations they can use</div><div class="algrid">${sites.map(x=>`<label class="${(u.siteIds||[]).includes(x.id)?'on':''}"><input type="checkbox" value="${x.id}" ${(u.siteIds||[]).includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join('')}</div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
     md.querySelectorAll('.algrid input').forEach(cb=>cb.onchange=()=>cb.parentElement.classList.toggle('on',cb.checked));
-    md.querySelector('#sv').onclick=()=>{ u.name=md.querySelector('#n').value.trim(); u.pin=md.querySelector('#p').value.trim(); u.role=md.querySelector('#r').value; u.mode=md.querySelector('#md').value; u.siteIds=[...md.querySelectorAll('.algrid input:checked')].map(x=>x.value);
+    md.querySelector('#sv').onclick=()=>{ u.name=md.querySelector('#n').value.trim(); u.pin=md.querySelector('#p').value.trim(); u.role=md.querySelector('#r').value; u.siteIds=[...md.querySelectorAll('.algrid input:checked')].map(x=>x.value);
       if(!u.name) return toast('Enter a name'); if(!/^\d{4}$/.test(u.pin)) return toast('PIN must be 4 digits'); if(!u.siteIds.length) return toast('Pick at least one location');
       if(P.live('users').some(x=>x.id!==u.id&&x.pin===u.pin&&x.orgId===u.orgId&&(x.siteIds||[]).some(id=>u.siteIds.includes(id)))) return toast('Someone at that location already uses this PIN');
       P.upsert('users',u); audit(isNew?'created':'updated','Device staff',u.name,u.orgId); closeModal(); render(); }; };
