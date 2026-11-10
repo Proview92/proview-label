@@ -4116,7 +4116,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -4250,6 +4250,7 @@ function renderStatus(){
   else { st.className='status'; st.textContent='Demo data · '+site().name; }
 }
 function renderFooter(){
+  if($('#qModal')){ if(ui.queue.length) showQueue(); else $('#modal').innerHTML=''; }
   const f=$('#ftr');
   if(ui.mode==='easy'){ const qn=ui.queue.reduce((a,x)=>a+x.qty,0); if(!['home','ezprod'].includes(ui.screen)||!qn){ f.style.display='none'; return; }
     f.style.display='flex'; f.innerHTML=`<button class="fb" id="fQueue" aria-label="Print queue" style="flex:1">${I.queue} ${qn} label${qn!==1?'s':''} printing<span class="badge">${qn}</span></button>`; $('#fQueue').onclick=showQueue; return; }
@@ -4744,6 +4745,7 @@ function labelHTML(j){
 }
 function renderBarcodes(root){ if(!window.JsBarcode) return; root.querySelectorAll('svg[data-bc]').forEach(s=>{ try{ JsBarcode(s, s.dataset.bc, {format:'CODE128',displayValue:true,fontSize:11,height:34,margin:0,width:1.3,textMargin:0}); }catch(e){} }); }
 
+const jobName=(j)=>{ const p=j.productId&&P.byId('products',j.productId); return p?tn(p):j.name; };
 function enqueue(job){
   if(connected()&&LOCK){ applyLock(); return; }
   ui.queue.push(job); renderFooter();
@@ -4754,9 +4756,9 @@ async function processQueue(){
   if(!ui.queue.length){ ui.printing=false; $('#printout').innerHTML=''; renderFooter(); return; }
   ui.printing=true; const j=ui.queue[0];
   const n=ui.queue.reduce((a,x)=>a+x.qty,0);
-  $('#printout').innerHTML=`<div class="slot"></div><div class="paper"><img alt="Label preview" style="display:block;width:100%;image-rendering:auto" src="data:image/png;base64,${labelBitmap({...j,qty:1})}"></div><div class="pq"><span class="spin"></span>${n} label${n!==1?'s':''} in queue · ${esc(j.name)}</div>`;
+  $('#printout').innerHTML=`<div class="slot"></div><div class="paper"><img alt="Label preview" style="display:block;width:100%;image-rendering:auto" src="data:image/png;base64,${labelBitmap({...j,qty:1})}"></div><div class="pq"><span class="spin"></span>${n} label${n!==1?'s':''} in queue · ${esc(jobName(j))}</div>`;
   renderBarcodes($('#printout'));
-  try { await sendToPrinter(j); } catch(e){ toast('Printer: '+(e.message||e)); }
+  try { await Promise.race([sendToPrinter(j), new Promise((_,no)=>setTimeout(()=>no(new Error('no answer from the printer')),20000))]); } catch(e){ toast('Printer: '+(e.message||e)); }
   await new Promise(r=>setTimeout(r, 1500));
   logPrinted(j);
   if(j.qty>1){ j.qty--; j._logged=true; } else ui.queue.shift();
@@ -4782,7 +4784,7 @@ function reprintLabel(l){
   toast('Identical copy queued');
 }
 function showQueue(){
-  $('#modal').innerHTML=`<div class="modal"><div class="box"><h3>Print Queue</h3>${ui.queue.map((j,i)=>`<div class="kv"><span><b style="color:#000">${j.qty} ×</b> ${esc(j.name)}</span>${i===0?'<span class="spin"></span>':'<span class="hint">waiting</span>'}</div>`).join('')||'<p class="hint">Queue is empty.</p>'}<div class="row" style="margin-top:16px"><button class="btn ghost" id="qc">Close</button>${ui.queue.length>1?'<button class="btn red" id="qx">Cancel waiting</button>':''}</div></div></div>`;
+  $('#modal').innerHTML=`<div class="modal" id="qModal"><div class="box"><h3>Print Queue</h3>${ui.queue.map((j,i)=>`<div class="kv"><span><b style="color:#000">${j.qty} ×</b> ${esc(jobName(j))}</span>${i===0?'<span class="spin"></span>':'<span class="hint">waiting</span>'}</div>`).join('')||'<p class="hint">Queue is empty.</p>'}<div class="row" style="margin-top:16px"><button class="btn ghost" id="qc">Close</button>${ui.queue.length>1?'<button class="btn red" id="qx">Cancel waiting</button>':''}</div></div></div>`;
   $('#qc').onclick=()=>$('#modal').innerHTML='';
   const x=$('#qx'); if(x) x.onclick=()=>{ ui.queue=ui.queue.slice(0,1); $('#modal').innerHTML=''; renderFooter(); };
 }
