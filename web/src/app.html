@@ -369,7 +369,7 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
 const P = window.PVL;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.3.4';
+const APP_VERSION = '1.3.5';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -1030,12 +1030,12 @@ function labelHTML(j){
       ${j.ingredients?`<div class="ing" style="${j.size==='double'?'':'display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden'}"><b style="text-decoration:none">INGREDIENTS:</b> ${j.ingredients}</div>`:''}
       ${j.mayContain?`<div class="al">May contain: ${esc(j.mayContain)}</div>`:''}
       ${j.includeDate?`<div class="ub" style="margin-top:4px"><span>${j.dateType==='best-before'?'BEST BEFORE:':'USE BY:'}</span><span>${P.fmtDay(j.expiry).toUpperCase()}</span><span>${P.fmtDate(j.expiry)}</span></div>`:''}
-      <div class="bt"><div class="meta">${j.batch?'Batch: '+esc(j.batch)+'<br>':''}${esc(site().name)}<br>${esc(site().address||'')}</div><div class="bc"><svg data-bc="${esc(j.barcode||j.code)}"></svg></div></div></div>`;
+      <div class="bt"><div class="meta">${j.batch?'Batch: '+esc(j.batch)+'<br>':''}${esc(site().name)}<br>${esc(site().address||'')}</div></div></div>`;
   return `<div class="lab"><div class="ln">${esc(j.name)}</div>
     <div class="ub"><span>USE BY:</span><span>${P.fmtDay(j.expiry).toUpperCase()}</span><span>${P.fmtDate(j.expiry,hrs)}</span></div>
     <div class="r2"><span>PRINTED: ${P.fmtDate(new Date(),true)}</span><span>${j.ruleName==='Manual'?'MANUAL':esc((j.rule?P.ruleText(j.rule).replace('+',''):'')).toUpperCase()}</span></div>
     ${al?`<div class="al">ALLERGENS: ${esc(al)}</div>`:''}${j.mayContain?`<div class="al">M/C: ${esc(j.mayContain)}</div>`:''}
-    <div class="bt"><div>${j.defrost||j.useFirst?`<span class="flag">${j.defrost?'DEFROSTED':''}${j.defrost&&j.useFirst?' | ':''}${j.useFirst?'USE FIRST':''}</span>`:''}<div style="font-size:10px;font-weight:700;margin-top:3px">${j.batch?esc(j.batch)+' | ':''}${esc(P.initials(u.name))} · ${esc(j.ruleName||'')}</div></div><div class="bc"><svg data-bc="${esc(j.code)}"></svg></div></div></div>`;
+    <div class="bt"><div>${j.defrost||j.useFirst?`<span class="flag">${j.defrost?'DEFROSTED':''}${j.defrost&&j.useFirst?' | ':''}${j.useFirst?'USE FIRST':''}</span>`:''}<div style="font-size:10px;font-weight:700;margin-top:3px">${j.batch?esc(j.batch)+' | ':''}${esc(P.initials(u.name))} · ${esc(j.ruleName||'')}</div></div></div></div>`;
 }
 function renderBarcodes(root){ if(!window.JsBarcode) return; root.querySelectorAll('svg[data-bc]').forEach(s=>{ try{ JsBarcode(s, s.dataset.bc, {format:'CODE128',displayValue:true,fontSize:11,height:34,margin:0,width:1.3,textMargin:0}); }catch(e){} }); }
 
@@ -1049,7 +1049,7 @@ async function processQueue(){
   if(!ui.queue.length){ ui.printing=false; $('#printout').innerHTML=''; renderFooter(); return; }
   ui.printing=true; const j=ui.queue[0];
   const n=ui.queue.reduce((a,x)=>a+x.qty,0);
-  $('#printout').innerHTML=`<div class="slot"></div><div class="paper">${labelHTML(j)}</div><div class="pq"><span class="spin"></span>${n} label${n!==1?'s':''} in queue · ${esc(j.name)}</div>`;
+  $('#printout').innerHTML=`<div class="slot"></div><div class="paper"><img alt="Label preview" style="display:block;width:100%;image-rendering:auto" src="data:image/png;base64,${labelBitmap({...j,qty:1})}"></div><div class="pq"><span class="spin"></span>${n} label${n!==1?'s':''} in queue · ${esc(j.name)}</div>`;
   renderBarcodes($('#printout'));
   try { await sendToPrinter(j); } catch(e){ toast('Printer: '+(e.message||e)); }
   await new Promise(r=>setTimeout(r, 1500));
@@ -1097,7 +1097,6 @@ function escpos(j){
   if(j.defrost||j.useFirst){ push(0x1D,0x42,1); txt(' '+[j.defrost?'DEFROSTED':'',j.useFirst?'USE FIRST':''].filter(Boolean).join(' | ')+' \n'); push(0x1D,0x42,0); }
   if(j.batch) txt('Batch: '+j.batch+'\n');
   txt(P.initials(user().name)+' - '+site().name+'\n');
-  const code=String(j.barcode||j.code); push(0x1B,0x61,1,0x1D,0x68,50,0x1D,0x77,2,0x1D,0x48,2,0x1D,0x6B,73,code.length+2,0x7B,0x42); txt(code);
   push(0x0A,0x0A,0x0A,0x1D,0x56,0x42,0x00);
   return out;
 }
@@ -1106,58 +1105,72 @@ function escpos(j){
 // and the barcode print exactly as they look on screen.
 const PRINT_W = 384;
 function labelBitmap(j){
-  const W=PRINT_W, PAD=4, c=document.createElement('canvas'); c.width=W; c.height=2000;
-  const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,W,c.height); x.fillStyle='#000'; x.textBaseline='alphabetic';
+  const W=PRINT_W, PAD=6, c=document.createElement('canvas'); c.width=W; c.height=2000;
+  const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,W,c.height); x.fillStyle='#000';
   const FONT='Inter, Roboto, "Helvetica Neue", Arial, sans-serif', F=(w,sz)=>`${w} ${sz}px ${FONT}`;
-  let y=PAD;
+  let y=PAD+2;
+  const MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const nice=(d,withTime)=>{ d=new Date(d); return `${P.fmtDay(d).toUpperCase()} ${d.getDate()} ${MON[d.getMonth()]}`+(withTime?' '+P.fmtTime(d):''); };
   // words with a bold flag, wrapped to the width; returns lines of [{t,b}]
   const layout=(tokens,size,maxW)=>{ const lines=[]; let cur=[], w=0; const sp=(b)=>{ x.font=F(b?800:500,size); return x.measureText(' ').width; };
     tokens.forEach(tk=>{ String(tk.t).split(/\s+/).filter(Boolean).forEach(word=>{ x.font=F(tk.b?800:500,size); const ww=x.measureText(word).width, gap=cur.length?sp(tk.b):0;
       if(cur.length && w+gap+ww>maxW){ lines.push(cur); cur=[]; w=0; }
-      if(!cur.length && ww>maxW){ // a single very long word: hard-break it
-        let part=''; for(const ch of word){ if(x.measureText(part+ch).width>maxW){ lines.push([{t:part,b:tk.b}]); part=ch; } else part+=ch; } cur=[{t:part,b:tk.b}]; w=x.measureText(part).width; return; }
+      if(!cur.length && ww>maxW){ let part=''; for(const ch of word){ if(x.measureText(part+ch).width>maxW){ lines.push([{t:part,b:tk.b}]); part=ch; } else part+=ch; } cur=[{t:part,b:tk.b}]; w=x.measureText(part).width; return; }
       cur.push({t:word,b:tk.b}); w+=gap+ww; }); });
     if(cur.length) lines.push(cur); return lines; };
-  const drawLines=(lines,size,{align='left',inverse=false,lh=1.25}={})=>{ const h=Math.round(size*lh);
+  const drawLines=(lines,size,{align='left',lh=1.22,max=0}={})=>{ const h=Math.round(size*lh); if(max&&lines.length>max){ lines=lines.slice(0,max); const l=lines[max-1]; l[l.length-1]={...l[l.length-1],t:l[l.length-1].t+'…'}; }
     lines.forEach(line=>{ const widths=line.map(tk=>{ x.font=F(tk.b?800:500,size); return x.measureText(tk.t).width; }); x.font=F(500,size); const sp=x.measureText(' ').width;
       const total=widths.reduce((a,b)=>a+b,0)+sp*(line.length-1); let tx=align==='center'?(W-total)/2:align==='right'?W-PAD-total:PAD;
-      if(inverse){ x.fillStyle='#000'; x.fillRect(0,y,W,h+2); x.fillStyle='#fff'; }
-      line.forEach((tk,i)=>{ x.font=F(tk.b?800:500,size); x.fillText(tk.t,tx,y+Math.round(size*0.98)+(inverse?1:0)); tx+=widths[i]+sp; });
-      x.fillStyle='#000'; y+=h+(inverse?2:0); }); };
+      line.forEach((tk,i)=>{ x.font=F(tk.b?800:500,size); x.fillText(tk.t,tx,y+Math.round(size*0.92)); tx+=widths[i]+sp; }); y+=h; }); };
   const text=(t,size,o={})=>{ if(!t) return; drawLines(layout([{t,b:!!o.bold}],size,W-2*PAD),size,o); };
   const rich=(html,size,o={})=>{ const toks=String(html||'').split(/(<b>.*?<\/b>)/i).filter(Boolean).map(part=>/^<b>/i.test(part)?{t:P.stripHtml(part).toUpperCase(),b:true}:{t:P.stripHtml(part),b:false}); drawLines(layout(toks,size,W-2*PAD),size,o); };
+  // one line: text on the left, text on the right
+  const pair=(l,r,size,{bold=false,rbold=false}={})=>{ x.font=F(rbold?800:500,size); const rw=x.measureText(r||'').width; x.font=F(bold?800:500,size);
+    let lt=String(l||''); while(lt&&x.measureText(lt).width>W-2*PAD-rw-12) lt=lt.slice(0,-1); if(lt!==String(l||'')) lt=lt.slice(0,-1)+'…';
+    x.fillText(lt,PAD,y+Math.round(size*0.92)); x.font=F(rbold?800:500,size); x.fillText(r||'',W-PAD-rw,y+Math.round(size*0.92)); y+=Math.round(size*1.25); };
+  // black band with white text (use-by)
+  const band=(left,right,size)=>{ const h=Math.round(size*1.55); x.fillRect(0,y,W,h); x.fillStyle='#fff';
+    x.font=F(600,Math.round(size*0.62)); x.fillText(left,PAD+6,y+Math.round(h/2+size*0.22));
+    x.font=F(800,size); const rw=x.measureText(right).width; x.fillText(right,W-PAD-6-rw,y+Math.round(h/2+size*0.35)); x.fillStyle='#000'; y+=h; };
+  // small outlined tags (DEFROSTED, USE FIRST)
+  const tags=(list,size)=>{ if(!list.length) return; let tx=PAD; const h=Math.round(size*1.6); x.font=F(800,size);
+    list.forEach(t=>{ const w=x.measureText(t).width+20; x.fillRect(tx,y,w,h); x.fillStyle='#fff'; x.fillText(t,tx+10,y+Math.round(h/2+size*0.36)); x.fillStyle='#000'; tx+=w+8; }); y+=h; };
+  const rule=(thick)=>{ x.fillRect(PAD,y,W-2*PAD,thick||2); y+=(thick||2); };
   const gap=(n)=>{ y+=n; };
-  const rule=()=>{ x.fillRect(PAD,y,W-2*PAD,2); y+=6; };
-  const barcode=(code)=>{ if(!window.JsBarcode||!code) return; for(const bw of [2,1.5,1]){ const b=document.createElement('canvas');
-      try{ JsBarcode(b,String(code),{format:'CODE128',width:bw,height:64,displayValue:true,font:'Inter, Arial, sans-serif',fontOptions:'bold',fontSize:20,margin:0,textMargin:2,background:'#fff',lineColor:'#000'}); }catch(e){ return; }
-      if(b.width<=W||bw===1){ const dw=Math.min(b.width,W), dh=b.height*(dw/b.width); x.drawImage(b,Math.round((W-dw)/2),y,dw,dh); y+=Math.round(dh)+4; return; } } };
-  const u=user(), hrs=j.rule&&j.rule.period==='hours'&&j.ruleName!=='Manual';
+  const caption=(t)=>{ x.font=F(700,14); x.fillText(String(t).toUpperCase(),PAD,y+13); y+=18; };
+
+  const u=user(), st=site(), hrs=j.rule&&j.rule.period==='hours'&&j.ruleName!=='Manual';
   const al=(j.allergens||[]).map(a=>(P.ALLERGEN_LABEL[a]||a)).join(', ')+(j.customAllergens?((j.allergens||[]).length?', ':'')+j.customAllergens:'');
-  const dateLine=(lbl)=>`${lbl} ${P.fmtDay(j.expiry).toUpperCase()} ${P.fmtDate(j.expiry,hrs)}`;
+  const life=j.ruleName==='Manual'?'Manual date':(j.rule?((j.rule.custom?'':j.rule.name+' · ')+P.ruleText(j.rule).replace('+','')):'');
   if(j.type==='sale'){
-    text(j.name,30,{bold:true});
-    if(j.price!=null) text(P.money(j.price),30,{bold:true,align:'right'});
-    if(j.ingredients){ gap(2); rich('<b>Ingredients:</b> '+j.ingredients,19); }
-    if(al && !j.ingredients) text('ALLERGENS: '+al.toUpperCase(),20,{bold:true});
-    if(j.mayContain) text('May contain: '+j.mayContain,18);
-    if(j.includeDate){ gap(4); text(dateLine(j.dateType==='best-before'?'BEST BEFORE:':'USE BY:'),24,{bold:true,align:'center',inverse:true}); }
-    gap(4);
-    if(j.batch) text('Batch: '+j.batch,18);
-    text(site().name,18,{bold:true}); if(site().address) text(site().address,16);
-    gap(4); barcode(j.barcode||j.code);
+    if(j.price!=null){ x.font=F(800,30); const pw=x.measureText(P.money(j.price)).width;
+      const lines=layout([{t:j.name,b:true}],28,W-2*PAD-pw-14); const first=lines.shift();
+      const yy=y; drawLines([first],28); x.font=F(800,30); x.fillText(P.money(j.price),W-PAD-pw,yy+28); if(lines.length) drawLines(lines,28,{max:1}); }
+    else text(j.name,28,{bold:true,max:2});
+    gap(6); rule(2); gap(6);
+    if(j.ingredients){ caption('Ingredients'); rich(j.ingredients,18); gap(4); }
+    if(al && !j.ingredients){ caption('Allergens'); text(al.toUpperCase(),20,{bold:true}); gap(4); }
+    if(j.mayContain){ text('May contain: '+j.mayContain,16); gap(2); }
+    if(j.includeDate){ gap(6); band(j.dateType==='best-before'?'BEST BEFORE':'USE BY', nice(j.expiry,hrs), 26); gap(6); }
+    gap(2); rule(1); gap(6);
+    pair(st.name, j.batch?'Batch '+j.batch:'', 16, {bold:true});
+    if(st.address) text(st.address,15);
   } else {
-    text(j.name,32,{bold:true,align:'center'});
-    gap(2); text(dateLine('USE BY:'),26,{bold:true,align:'center',inverse:true}); gap(4);
-    text('PRINTED: '+P.fmtDate(new Date(),true)+'   '+(j.ruleName==='Manual'?'MANUAL':(j.rule?P.ruleText(j.rule).replace('+',''):'')).toUpperCase(),18);
-    if(al) text('ALLERGENS: '+al.toUpperCase(),21,{bold:true});
-    if(j.mayContain) text('M/C: '+j.mayContain,18);
-    if(j.defrost||j.useFirst){ gap(2); text([j.defrost?'DEFROSTED':'',j.useFirst?'USE FIRST':''].filter(Boolean).join(' | '),22,{bold:true,align:'center',inverse:true}); }
-    text((j.batch?j.batch+' | ':'')+P.initials(u.name)+' · '+(j.ruleName||'')+' · '+site().name,17,{bold:true});
-    gap(4); barcode(j.code);
+    text(j.name,32,{bold:true,align:'center',max:2});
+    gap(8);
+    band('USE BY', nice(j.expiry,hrs), 28);
+    gap(8);
+    pair('Prepared '+nice(new Date(),true), life, 17);
+    gap(4); rule(1); gap(8);
+    caption('Allergens'); text(al?al.toUpperCase():'NONE', al?22:18, {bold:!!al});
+    if(j.mayContain){ gap(2); text('May contain: '+j.mayContain,16); }
+    const fl=[j.defrost?'DEFROSTED':'',j.useFirst?'USE FIRST':''].filter(Boolean);
+    if(fl.length){ gap(8); tags(fl,18); }
+    gap(8); rule(1); gap(6);
+    pair('By '+P.initials(u.name)+' · '+st.name, (j.batch?'Batch '+j.batch:''), 15, {bold:false});
   }
-  gap(6); for(let i=PAD;i<W-PAD;i+=12) x.fillRect(i,y,6,2); y+=4; // dashed tear line
+  gap(10); for(let i=PAD;i<W-PAD;i+=12) x.fillRect(i,y,6,2); y+=6; // dashed tear line
   const out=document.createElement('canvas'); out.width=W; out.height=y; const o=out.getContext('2d'); o.drawImage(c,0,0);
-  // hard black/white: thermal heads print grey as speckle
   const im=o.getImageData(0,0,W,y), d=im.data; for(let i=0;i<d.length;i+=4){ const v=(d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11)<150?0:255; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255; } o.putImageData(im,0,0);
   return out.toDataURL('image/png').split(',')[1];
 }
