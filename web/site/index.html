@@ -466,7 +466,7 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
   const fmtTime = (d) => { d = new Date(d); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const money = (n) => '£' + (Number(n) || 0).toFixed(2);
-  const initials = (name) => String(name || '?').split(/[\s@._-]+/).map((w) => w.replace(/[^A-Za-z0-9]/g, '')).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+  const initials = (name) => String(name || '?').replace(/@.*/, '').split(/[\s._-]+/).map((w) => w.replace(/[^A-Za-z0-9]/g, '')).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '?';
   const stripHtml = (h) => String(h || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
 
   // ---------- allergens ----------
