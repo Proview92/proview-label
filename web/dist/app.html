@@ -4119,7 +4119,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.4.2';
+const APP_VERSION = '1.4.3';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -4232,7 +4232,7 @@ function renderHeader(){
   const hy=$('#hSync'); if(hy) hy.onclick = doSync;
   $('#hLang').onclick = openLang;
   const hb=$('#hBulk'); if(hb) hb.onclick=()=>go('bulk');
-  if(ui.syncing) $('#hSync svg').style.animation='sp 1s linear infinite';
+  const hsv=$('#hSync svg'); if(ui.syncing&&hsv) hsv.style.animation='sp 1s linear infinite';   // the sync icon only shows in Detailed mode
 }
 // on-screen language: English, Türkçe, Română, Български. Prints always stay in English (see i18n.js).
 function openLang(){
@@ -4949,13 +4949,19 @@ function applyLock(){
   el.querySelector('[data-chk]').onclick=async()=>{ const b=el.querySelector('[data-chk]'); b.disabled=true; b.textContent='Checking…'; await checkLock(); if(LOCK){ applyLock(); toast(LOCK.title+' – still locked'); } };
   el.querySelector('[data-disc]').onclick=()=>unpair(false);
 }
+// give up on a sync that takes too long (bad signal), so "Syncing…" never sticks
+const withLimit=(pr,ms)=>Promise.race([pr,new Promise((_,no)=>setTimeout(()=>no(new Error('The server took too long to answer. Try again in a moment.')),ms))]);
 async function doSync(){
   if(!connected()){ toast(Cloud.enabled?'Not paired yet':'Demo data: live sync works in the Android app'); return; }
-  ui.syncing=true; renderStatus(); renderHeader();
-  try{ if(await checkLock()){ ui.syncing=false; render(); return showLock(); }
-    touchDevice(); if(Cloud.prune) await Cloud.prune(P); const r=await Cloud.sync(P,{full:true}); S=P.get(); toast(`Synced · ${r.pushed} sent, ${r.pulled} received`); }
-  catch(e){ if(await checkLock()){ ui.syncing=false; render(); return showLock(); } toast(Cloud.friendly(e)); if(/JWT|session|401/i.test(String(e.message||''))) checkLock(); }
-  ui.syncing=false; render();
+  if(ui.syncing) return;
+  ui.syncing=true; let locked=false;
+  try{
+    renderStatus(); renderHeader();
+    if(await withLimit(checkLock(),20000)){ locked=true; return; }
+    touchDevice(); if(Cloud.prune) await withLimit(Cloud.prune(P),20000);
+    const r=await withLimit(Cloud.sync(P,{full:true}),45000); S=P.get(); toast(`Synced · ${r.pushed} sent, ${r.pulled} received`);
+  }catch(e){ toast(navigator.onLine?Cloud.friendly(e):'Offline – printing still works'); }
+  finally{ ui.syncing=false; if(connected()) render(); if(locked) showLock(); }
 }
 let syncT=null;
 function trySync(){ if(!connected()||LOCK) return; clearTimeout(syncT); syncT=setTimeout(()=>{ Cloud.sync(P).then(()=>{ S=P.get(); renderStatus(); }).catch(()=>{ checkLock(); }); },1500); }
@@ -4968,9 +4974,9 @@ setInterval(async()=>{
   if(!connected()||!navigator.onLine||ui.printing||syncBusy||ui.syncing) return;
   syncBusy=true;
   try{
-    if(await checkLock()||!connected()) return;
+    if(await withLimit(checkLock(),20000)||!connected()) return;
     touchDevice();
-    const r=await Cloud.sync(P); S=P.get();
+    const r=await withLimit(Cloud.sync(P),45000); S=P.get();
     const quiet=$('#sheet').classList.contains('on')||$('#modal').innerHTML;
     if(r&&r.pulled&&!quiet) render(); else renderStatus();
   }catch(e){ /* offline or a blip: try again next time */ }
