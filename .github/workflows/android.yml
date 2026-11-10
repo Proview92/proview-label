@@ -18,7 +18,7 @@ jobs:
       - name: Signing key
         env: { KS: "${{ secrets.LABEL_KEYSTORE_B64 }}" }
         run: |
-          if [ -n "$KS" ]; then echo "$KS" | base64 -d > "$RUNNER_TEMP/proview-label.jks"; echo "LABEL_KEYSTORE=$RUNNER_TEMP/proview-label.jks" >> "$GITHUB_ENV"; echo "signing with the Proview Label key";
+          if [ -n "$KS" ]; then printf '%s' "$KS" | tr -d ' \r\n\t"' | base64 -d > "$RUNNER_TEMP/proview-label.jks" || { echo "::error::LABEL_KEYSTORE_B64 is not valid - paste the whole of LABEL_KEYSTORE_B64.txt again"; exit 1; }; echo "key file $(wc -c < "$RUNNER_TEMP/proview-label.jks") bytes"; echo "LABEL_KEYSTORE=$RUNNER_TEMP/proview-label.jks" >> "$GITHUB_ENV"; echo "signing with the Proview Label key";
           else echo "::warning::LABEL_KEYSTORE_B64 secret not set - this APK is signed with a temporary key and will not install over other builds"; fi
       - name: Build APK
         working-directory: android-app
