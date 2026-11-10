@@ -58,6 +58,7 @@ body.framed .hdr{padding-top:24px}
 /* grids & tiles */
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px}
 .grid.two{grid-template-columns:repeat(2,1fr)}
+.pgrid .ptile{min-height:96px;font-size:17px}
 .tile{min-height:96px;border-radius:10px;color:#fff;background:#546E7A;font-weight:600;font-size:17px;padding:8px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;word-break:break-word;box-shadow:0 2px 0 rgba(0,0,0,.12)}
 .tile:active{transform:scale(.97)}
 .ptile{min-height:84px;border-radius:10px;background:#fff;border:1px solid var(--line);font-weight:600;font-size:16px;padding:10px 8px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;line-height:1.15}
@@ -368,7 +369,7 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
 const P = window.PVL;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.3.2';
+const APP_VERSION = '1.3.3';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -580,7 +581,7 @@ screens.products = () => {
   ps = ui.sort==='alpha' ? ps.sort((a,b)=>a.name.localeCompare(b.name)) : ps.sort((a,b)=>(b.timesPrinted||0)-(a.timesPrinted||0));
   $('#main').classList.add('grey');
   $('#main').innerHTML = `<div class="seg sm blue" id="sortSeg"><button data-s="alpha" class="${ui.sort==='alpha'?'on':''}">Sort A–Z</button><button data-s="freq" class="${ui.sort==='freq'?'on':''}">Freq. Printed</button></div>
-    ${ps.length?`<div class="grid">${ps.map(productTile).join('')}</div>`:`<div class="empty">${I.box}<b>No products found</b>Create a new product and it will be stored here.</div>`}
+    ${ps.length?`<div class="grid two pgrid">${ps.map(productTile).join('')}</div>`:`<div class="empty">${I.box}<b>No products found</b>Create a new product and it will be stored here.</div>`}
     <div class="addnew"><button id="addProd">${I.plus} Add new</button></div>`;
   $('#sortSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.sort=b.dataset.s;render();});
   $('#main').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>openPrint(P.byId('products',b.dataset.p)));
@@ -593,7 +594,7 @@ screens.search = () => {
   const draw=()=>{
     const q=ui.search.trim().toLowerCase();
     const ps=L('products').filter(p=>!q || p.name.toLowerCase().includes(q) || (p.barcode||'')===q);
-    $('#res').innerHTML = ps.length?`<div class="grid">${ps.map(p=>{const c=P.byId('categories',p.categoryId);return productTile(p).replace('</button>',`<span class="hint">${esc(c?c.name:'')} · ${c&&c.type==='sale'?'Sale':'Prep'}</span></button>`);}).join('')}</div>`:'<div class="empty"><b>No matches</b>Try another name.</div>';
+    $('#res').innerHTML = ps.length?`<div class="grid two pgrid">${ps.map(p=>{const c=P.byId('categories',p.categoryId);return productTile(p).replace('</button>',`<span class="hint">${esc(c?c.name:'')} · ${c&&c.type==='sale'?'Sale':'Prep'}</span></button>`);}).join('')}</div>`:'<div class="empty"><b>No matches</b>Try another name.</div>';
     $('#res').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ const p=P.byId('products',b.dataset.p); const c=P.byId('categories',p.categoryId); if(c) ui.tab=c.type; openPrint(p); });
   };
   const q=$('#q'); q.oninput=()=>{ui.search=q.value;draw();}; draw(); setTimeout(()=>q.focus(),50);
