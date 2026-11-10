@@ -1,5 +1,5 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "url": "https://label.proviewcrm.co.uk/ProviewLabel.apk",
-  "notes": "Category and product names in Türkçe, Română and Български. Pair the handheld with a code from the back-office."
+  "notes": "Bulk print button at the top, Sync now in the menu, syncs every minute, works offline. Print queue closes by itself after printing."
 }
