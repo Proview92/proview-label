@@ -1,5 +1,5 @@
 {
-  "version": "1.4.2",
+  "version": "1.4.3",
   "url": "https://label.proviewcrm.co.uk/ProviewLabel.apk",
-  "notes": "Bulk print button at the top, Sync now in the menu, syncs every minute, works offline. Print queue closes by itself after printing."
+  "notes": "Fixes \"Syncing…\" staying on screen after Sync now."
 }
