@@ -306,7 +306,7 @@ body{font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
 .side{gap:0}
 .side .nav{gap:0}
 .side .nav>*{flex-shrink:0}
-@media (hover:none) and (pointer:coarse){.top .hdr-pick select{font-size:16px!important}}
+@media (hover:none) and (pointer:coarse){.top .hdr-pick select,.ov-search{font-size:16px!important}}
 /* Locations page (master): page head and table exactly as Proview Signage's Locations page */
 .content:has(>.ph.keep){max-width:1280px}   /* Signage's page area stops at 1280px */
 .content .ph.keep{margin-bottom:22px}
@@ -332,26 +332,52 @@ html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26
 .cxrow #cxn{width:70px;text-align:center;font-size:18px;font-weight:700}
 .cxrow .cxu{font-size:16px;font-weight:600;margin-left:4px}
 
-/* ---------- All locations (master): same layout as Proview Signage ---------- */
+/* ---------- All locations (master): Proview Signage's Locations page (LOCATIONS_PAGE_STANDARD.md), same classes and values ---------- */
+.ovp .ph.ov-head{margin-bottom:22px}
+.ovp .btn{height:38px;padding:0 14px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font:600 14px var(--font);line-height:normal;gap:7px;justify-content:center;box-sizing:border-box}
+.ovp .btn:hover{border-color:#cfccc4;background:#fbfaf8;filter:none}
+.ovp .btn svg{width:16px;height:16px}
+.ovp .btn.primary{background:var(--grad);border-color:transparent;color:#fff}
+.ovp .btn.primary:hover{background:var(--grad);border-color:transparent;filter:brightness(.95)}
+.ovp .btn.sm{height:32px;padding:0 11px;font-size:13px;border-radius:8px}
+.ovp .tiny,.ov-li .tiny{font-size:12px;color:#8b8b95}
+.ovp .muted,.ov-li .muted{color:#55555f}.ovp .small,.ov-li .small{font-size:13px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:650;line-height:1.45;padding:3px 9px;border-radius:999px;background:#eeece6;color:#55555f;white-space:nowrap}
+.badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.9}
+.badge.ok{background:#e5f6ec;color:var(--ok)}.badge.bad{background:#fdecea;color:var(--bad)}.badge.warn{background:#fff4dc;color:#a36a00}
 .ov-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
 .ov-stat{padding:14px 16px;margin:0;text-align:left;font:inherit;color:inherit;cursor:pointer;transition:border-color .15s,transform .15s}
 .ov-stat:hover{border-color:#b9c6ea;transform:translateY(-1px)}
 .ov-stat:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
 .ov-stat.ok .ov-v{color:var(--ok)}.ov-stat.warn .ov-v{color:var(--warn)}.ov-stat.bad .ov-v{color:var(--bad)}
 .ov-v{font-size:26px;font-weight:700;margin-top:4px}
-.ov-tools{display:flex;justify-content:flex-end;margin-bottom:12px}.ov-search{height:40px;width:320px;max-width:100%}
+.ov-tools{display:flex;justify-content:flex-end;margin-bottom:12px}
+.ov-search{height:40px;width:100%;max-width:100%;min-width:0;font:15px var(--font);line-height:normal;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 11px;box-sizing:border-box}
+.ov-search:focus{outline:2px solid var(--pri);outline-offset:-1px;border-color:transparent}
 .ov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:18px;align-items:start}
 .ov-biz{display:flex;flex-direction:column;overflow:hidden;padding:0;margin:0}
-.ov-bh{display:flex;align-items:flex-start;gap:10px;padding:16px 18px 12px}.ov-bh h3{font-size:17px;font-weight:700;margin:0 0 2px}
+.ov-bh{display:flex;align-items:flex-start;gap:10px;padding:16px 18px 12px}.ov-bh h3{font-size:17px;font-weight:700;letter-spacing:-.015em;margin:0 0 2px}
 .ov-loc{display:flex;align-items:center;gap:10px;width:100%;padding:11px 18px;border:0;border-top:1px solid var(--line);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
 button.ov-loc:hover,button.ov-li:hover{background:#f8f7f4}
-.ov-bf{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;border-top:1px solid var(--line);margin-top:auto;flex-wrap:wrap}
+.ov-bf{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;border-top:1px solid var(--line);margin-top:auto}
+.ov-acts{display:flex;align-items:center;gap:8px;flex:none}
 .ov-dot{width:9px;height:9px;border-radius:50%;flex:none;background:#c9c7c0}.ov-dot.ok{background:var(--ok)}.ov-dot.warn{background:var(--warn)}.ov-dot.bad{background:var(--bad)}
 .ov-chev{color:var(--grey);font-size:20px;line-height:1}
 .ov-list{display:flex;flex-direction:column;max-height:60vh;overflow-y:auto}
 .ov-li{display:flex;align-items:center;gap:12px;width:100%;padding:11px 6px;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
 .ov-li:last-child{border-bottom:0}
-@media (max-width:700px){.ov-grid{grid-template-columns:1fr}.ov-search{width:100%}.ov-stats{grid-template-columns:repeat(3,1fr);gap:8px}.ov-stat{padding:10px}.ov-v{font-size:21px}}
+@media (max-width:700px){.ov-grid{grid-template-columns:1fr}.ov-search{width:100%}.ov-stats{grid-template-columns:repeat(3,1fr);gap:8px}.ov-stat{padding:10px 10px}.ov-stat .tiny{font-size:11px}.ov-v{font-size:21px}}
+/* page title only in the top bar (as Proview Signage, 1906cd5): pages open with their summary tags or description and their buttons on one row */
+.content .ph h1,.content .ph.keep h1{display:none}
+.content .ph{align-items:center;gap:16px;margin-bottom:22px}
+.content .ph p{margin:0;font-size:15px;line-height:1.45;color:#55555f}
+.head-chips{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.head-chips .chip{display:inline-flex;align-items:center;gap:6px;margin:0;padding:6px 12px;border-radius:999px;background:#efeee9;color:#44444d;font-size:13.5px;font-weight:600;line-height:1.45;white-space:nowrap}
+.head-chips .chip.ok{background:#e6f6ec;color:#0b6b35}.head-chips .chip.warn{background:#fdf1dc;color:#7a4d00}
+.chip-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+/* sign out: red button, white icon (as Proview Signage) */
+.top-me .top-out{background:#d92d20;border-color:#d92d20;color:#fff}
+.top-me .top-out:hover{background:#b42318;border-color:#b42318;color:#fff}
 </style>
 </head>
 <body>
@@ -1598,7 +1624,9 @@ const ICON={
   pin:'<path d="M12 21s-7-6.1-7-11a7 7 0 1 1 14 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
   pvloc:'<path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M9 13h1M9 17h1M14 9h1M14 13h1M14 17h1"/>',
   left:'<path d="M15 18l-6-6 6-6"/>',
-  check:'<path d="M20 6 9 17l-5-5"/>'
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  refresh:'<path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/>'
 };
 const ic=(k,s)=>`<svg width="${s||17}" height="${s||17}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[k]||''}</svg>`;
 // Feature switches for managers (owners/admins always have everything). Keep keys in step with supabase/migrations/002.
@@ -2007,7 +2035,7 @@ VIEWS.overview=(el)=>{
   const multi=(siteFilter==='all'||siteFilter.startsWith('org:'))&&bySite(P.live('sites').map(x=>({...x,siteId:x.id}))).length>1;
   const sitesHtml=multi?`<div class="card" style="padding:16px 16px 4px"><div class="row" style="justify-content:space-between;margin-bottom:10px"><div><h3>${isMaster()?'Locations':'Your locations'}</h3><div class="sub" style="margin:0">Click a location to open it. You can also switch from the location dropdown.</div></div></div>
     <div class="sitegrid">${P.live('sites').filter(x=>allowedSiteIds().includes(x.id)).sort((a,b)=>siteStats(b.id).expired-siteStats(a.id).expired||a.name.localeCompare(b.name)).map(x=>{const st=siteStats(x.id);return `<button class="sc" data-site="${x.id}"><div class="t"><b>${esc(x.name)}</b>${st.expired?`<span class="tag bad">${st.expired} expired</span>`:st.soon?`<span class="tag warn">${st.soon} due</span>`:'<span class="tag ok">All good</span>'}</div><div class="meta"><span class="dot" style="background:${st.online?'#12a150':'#8b8b95'}"></span>${st.devices} device${st.devices!==1?'s':''} · ${st.lastSync?'synced '+P.fmtDate(st.lastSync,true):'never synced'}${st.low?' · <span style="color:#d92d20">'+st.low+' low on labels</span>':''}</div><div class="nums"><div><span>${st.today}</span>labels today</div><div><span>${st.soon}</span>due 24 hrs</div><div><span>${P.money(st.waste7)}</span>waste 7d</div></div><div class="go">Open location →</div></button>`;}).join('')}</div></div>`:'';
-  el.innerHTML=`<div class="ph keep"><div><h1>${multi?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):visibleOrgs().length>1?'All businesses':isMaster()?'Locations':'Your locations'):siteFilter==='all'||siteFilter.startsWith('org:')?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):isMaster()?'All businesses':'Your locations'):esc(siteName(siteFilter))}</h1><p>${P.fmtDay(new Date())} ${P.fmtDate(new Date())}${multi?' · '+allowedSiteIds().length+' locations combined':''}${(()=>{ const v=!multi&&siteInView(); if(!v) return ''; const on=siteStats(v.id).online; return ` · <span class="dot" style="background:${on?'#12a150':'#8b8b95'}"></span>${on?'Devices online':'Devices offline'}${v.address?' · '+esc(v.address):''}`; })()}</p></div><div class="btns"><a class="btn ghost" href="#analyser">Menu analyser</a><a class="btn" href="#products">+ Add product</a></div></div>
+  el.innerHTML=`<div class="ph keep"><div class="head-chips"><span class="chip">${multi?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):visibleOrgs().length>1?'All businesses':isMaster()?'Locations':'Your locations'):siteFilter==='all'||siteFilter.startsWith('org:')?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):isMaster()?'All businesses':'Your locations'):esc(siteName(siteFilter))}</span><span class="chip">${P.fmtDay(new Date())} ${P.fmtDate(new Date())}</span>${multi?`<span class="chip">${allowedSiteIds().length} locations combined</span>`:''}${(()=>{ const v=!multi&&siteInView(); if(!v) return ''; const on=siteStats(v.id).online; return `<span class="chip${on?' ok':''}">${on?'<span class="chip-dot"></span>Devices online':'Devices offline'}</span>`; })()}</div></div><div class="btns"><a class="btn ghost" href="#analyser">Menu analyser</a><a class="btn" href="#products">+ Add product</a></div></div>
   ${expired?`<div class="banner">${ic('clock',20)}<div><b>${expired} expired item${expired!==1?'s':''} still marked active</b><span class="hint">Mark each as used or wasted so the expiry log stays accurate.</span></div><div class="sp"></div><a class="btn ghost sm" href="#expiry">Review</a></div>`:''}
   ${!allowedSiteIds().length?`<div class="card" style="text-align:center;padding:34px 20px"><h3 style="font-size:18px">${isMaster()&&!visibleOrgs().length?'Add your first business':'Add your first location'}</h3><p class="hint" style="max-width:520px;margin:8px auto 16px">${isMaster()&&!visibleOrgs().length?'Create a customer business and invite its owner. They can then add their kitchens, menu and staff, or you can set it up for them.':'Add a kitchen, then connect a handheld to it (Menu → Settings → Connect to Proview Label on the device).'}</p><a class="btn" href="#devices">${isMaster()&&!visibleOrgs().length?'+ Add business':'+ Add location'}</a></div>`:''}
   ${sitesHtml}
@@ -2302,41 +2330,67 @@ VIEWS.orders=(el)=>{
 // ---------- All sites (master landing): every business and its sites across the platform ----------
 let asq='';
 VIEWS.sites=(el)=>{
-  // Same layout as the All locations page in Proview Signage: summary boxes, then one card per business with its locations inside.
+  // Proview Signage's Locations page (LOCATIONS_PAGE_STANDARD.md): description and buttons, clickable summary boxes,
+  // search, then one card per business (status pill, health line, its locations, licence text, Open business).
   const byN=(a,b)=>String(a.name).localeCompare(String(b.name));
   const orgs=visibleOrgs().slice().sort(byN);
   const sitesOf=(o)=>P.live('sites').filter(x=>x.orgId===o.id).sort(byN);
-  const allSites=orgs.flatMap(o=>sitesOf(o).map(x=>({o,s:x,st:siteStats(x.id)})));
-  const devs=P.live('devices').filter(d=>allSites.some(r=>r.s.id===d.siteId));
-  const trialOk=!CLOUD||(WHO&&Cloud.trialReady&&Cloud.trialReady(WHO));
+  const allSites=orgs.flatMap(o=>sitesOf(o).map(x=>({o,s:x})));
+  const devsAt=(ids)=>P.live('devices').filter(d=>ids.includes(d.siteId));
+  const devs=devsAt(allSites.map(r=>r.s.id));
+  // online = synced in the last 6 hours: the same threshold as Label's device status (siteStats().online)
+  const isOn=(d)=>!!d.lastSync&&Date.now()-new Date(d.lastSync)<6*3600e3;
+  const online=devs.filter(isOn), offline=devs.filter(d=>!isOn(d));
   const needs=orgs.filter(o=>orgState(o)!=='active');
-  const sum=(k)=>allSites.reduce((t,r)=>t+(r.st[k]||0),0);
-  const tone=(st)=>st.expired?'bad':!st.devices?'':st.soon?'warn':'ok';
-  const devLine=(st)=>st.devices?`${st.devices} device${st.devices!==1?'s':''} · ${st.lastSync?'synced '+P.fmtDate(st.lastSync,true):'never synced'}`:'No devices';
-  const stat=(key,label,v,t)=>`<button type="button" class="card ov-stat ${t||''}" data-stat="${key}" title="Show the list"><div class="hint">${label}</div><div class="ov-v">${v}</div></button>`;
-  const card=(o)=>{ const os=sitesOf(o), rs=allSites.filter(r=>r.o.id===o.id), nd=rs.reduce((t,r)=>t+r.st.devices,0), single=os.length===1;
+  const trialOk=!CLOUD||(WHO&&Cloud.trialReady&&Cloud.trialReady(WHO));
+  const s_=(n)=>n===1?'':'s';
+  const day=(t)=>new Date(t).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  const devLine=(ds)=>ds.length?`${ds.filter(isOn).length} of ${ds.length} device${s_(ds.length)} synced`:'No devices';
+  const tone=(ds)=>!ds.length?'':ds.every(isOn)?'ok':ds.some(isOn)?'warn':'bad';
+  const syncTxt=(d)=>isOn(d)?'Synced '+P.fmtDate(d.lastSync,true):d.lastSync?'Last synced '+P.fmtDate(d.lastSync,true):'Never synced';
+  // status pill: red = trial ended, suspended or every device offline; amber = free trial or some devices offline;
+  // grey = nothing set up yet; green = licensed and every device synced
+  const pill=(o,os,ds)=>{ const st=orgState(o);
+    if(st==='suspended') return '<span class="badge bad">Suspended</span>';
+    if(st==='expired') return `<span class="badge bad" title="Trial ended ${esc(P.fmtDate(o.trial_ends_at,true))}">Trial expired</span>`;
+    if(st==='trial') return `<span class="badge warn" title="Ends ${esc(P.fmtDate(o.trial_ends_at,true))}">Free trial</span>`;
+    if(!os.length) return '<span class="badge">No locations yet</span>';
+    if(!ds.length) return '<span class="badge">No devices yet</span>';
+    const off=ds.filter(d=>!isOn(d)).length;
+    if(off) return `<span class="badge ${off===ds.length?'bad':'warn'}">${off} offline</span>`;
+    return '<span class="badge ok">All good</span>'; };
+  const licText=(o)=>{ const st=orgState(o);
+    if(st==='suspended') return 'Licence suspended';
+    if(st==='expired') return 'Expired';
+    if(st==='trial') return 'Trial ends '+day(o.trial_ends_at);
+    return 'Licensed'; };   // Label licenses the business (not each device)
+  const openBtn=(o,os,cls)=>os.length===1?`<button class="btn sm ${cls}" data-open="${esc(os[0].id)}">Open business</button>`:os.length?`<button class="btn sm ${cls}" data-openbiz="${esc(o.id)}">Open business</button>`:`<button class="btn sm ${cls}" data-openorg="${esc(o.id)}">Open business</button>`;
+  const card=(o)=>{ const os=sitesOf(o), ds=devsAt(os.map(x=>x.id)), single=os.length===1;
     const q=(o.name+' '+os.map(x=>x.name+' '+(x.address||'')+' '+(x.region||'')).join(' ')).toLowerCase();
-    return `<article class="card ov-biz" data-q="${esc(q)}"><div class="ov-bh"><div style="flex:1;min-width:0"><h3>${esc(o.name)}</h3><div class="hint">${single?[os[0].name!==o.name&&esc(os[0].name),devLine(rs[0].st)].filter(Boolean).join(' · '):`${os.length} location${os.length!==1?'s':''} · ${nd?nd+' device'+(nd!==1?'s':''):'no devices yet'}`}</div></div>${stateTag(o)}</div>
-      ${single?'':rs.map(r=>`<button type="button" class="ov-loc" data-open="${esc(r.s.id)}" title="Open on this location"><span class="ov-dot ${tone(r.st)}"></span><span style="flex:1;min-width:0">${esc(r.s.name)}</span><span class="hint" style="white-space:nowrap">${r.st.devices?r.st.devices+' device'+(r.st.devices!==1?'s':''):'No devices'}${r.st.expired?' · '+r.st.expired+' expired':''}</span><span class="ov-chev" aria-hidden="true">›</span></button>`).join('')}
-      ${os.length?'':'<div class="ov-loc hint">No locations yet. Open the business to add one.</div>'}
-      <div class="ov-bf"><span class="hint">${rs.reduce((t,r)=>t+r.st.today,0)} label${rs.reduce((t,r)=>t+r.st.today,0)!==1?'s':''} printed today</span><span style="display:flex;gap:8px">${trialOk?`<button class="btn ghost sm" data-trial="${esc(o.id)}" title="Extend, end or clear this business's free trial">Trial…</button>`:''}${single?`<button class="btn sm" data-open="${esc(os[0].id)}">Open business</button>`:os.length?`<button class="btn sm" data-openbiz="${esc(o.id)}">Open business</button>`:`<button class="btn sm" data-openorg="${esc(o.id)}">Open business</button>`}</span></div></article>`; };
-  const empty=`<div class="card" style="grid-column:1/-1"><div class="empty" style="padding:28px 12px"><h3 style="font-size:17px;color:var(--ink)">No businesses yet</h3><p class="hint" style="max-width:460px;margin:8px auto 16px">Add a customer business and invite its owner. They can then add their kitchens, menu and staff, or you can set it up for them.</p><div class="btns" style="justify-content:center"><button class="btn" data-addb>+ Add business</button><button class="btn ghost" data-refresh>Refresh</button></div></div></div>`;
-  el.innerHTML=`<div class="ph keep"><div><p style="margin:0">Every business on Proview Label with its locations. Open one to see it as its team does.</p></div><div class="btns"><button class="btn ghost" data-refresh>Refresh</button><button class="btn" data-addb>+ Add business</button></div></div>
-  <div class="ov-stats">${stat('biz','Businesses',orgs.length)}${stat('loc','Locations',allSites.length)}${stat('dev','Devices',devs.length)}${stat('today','Labels printed today',sum('today'),sum('today')?'ok':'')}${stat('exp','Expired labels',sum('expired'),sum('expired')?'bad':'')}${stat('att','Trials & suspended',needs.length,needs.length?'warn':'')}</div>
-  ${orgs.length>3?`<div class="ov-tools"><input type="search" id="asq" class="inp ov-search" placeholder="Search businesses or locations" aria-label="Search businesses or locations" value="${esc(asq)}"></div>`:''}
-  <div class="ov-grid">${orgs.length?orgs.map(card).join(''):empty}<p class="hint" id="asnone" style="grid-column:1/-1;display:none">No businesses or locations match “<span></span>”.</p></div>`;
+    const sub=!os.length?'No locations yet':single?[os[0].name!==o.name&&esc(os[0].name),devLine(ds)].filter(Boolean).join(' · '):`${os.length} locations · ${ds.length?ds.length+' device'+s_(ds.length):'no devices yet'}`;
+    return `<article class="card ov-biz" data-q="${esc(q)}"><div class="ov-bh"><div style="flex:1;min-width:0"><h3>${esc(o.name)}</h3><div class="muted small">${sub}</div></div>${pill(o,os,ds)}</div>
+      ${single?'':os.map(x=>{ const d=devsAt([x.id]); return `<button type="button" class="ov-loc" data-open="${esc(x.id)}" title="Open on this location"><span class="ov-dot ${tone(d)}"></span><span style="flex:1;min-width:0">${esc(x.name)}</span><span class="muted small">${devLine(d)}</span><span class="ov-chev" aria-hidden="true">›</span></button>`; }).join('')}
+      <div class="ov-bf"><span class="muted small">${licText(o)}</span><span class="ov-acts">${trialOk?`<button class="btn sm" data-trial="${esc(o.id)}" title="Extend, end or clear this business's free trial">Trial…</button>`:''}${openBtn(o,os,'primary')}</span></div></article>`; };
+  const empty=`<div class="card" style="grid-column:1/-1"><div class="empty" style="padding:28px 12px"><h3 style="font-size:17px;color:var(--ink)">No businesses yet</h3><p class="hint" style="max-width:460px;margin:8px auto 16px">Add a customer business and invite its owner. They can then add their kitchens, menu and staff, or you can set it up for them.</p><div class="btns" style="justify-content:center"><button class="btn primary" data-addb>${ic('plus',16)}Add business</button><a class="btn" href="${LIC_URL}" target="_blank" rel="noopener">Open licence portal ↗</a><button class="btn" data-refresh>${ic('refresh',16)}Refresh</button></div></div></div>`;
+  const stat=(key,label,v,t)=>`<button type="button" class="card ov-stat ${t||''}" data-stat="${key}" title="Show the list"><div class="tiny">${label}</div><div class="ov-v">${v}</div></button>`;
+  el.innerHTML=`<div class="ovp"><div class="ph keep ov-head"><p class="muted">Every business on Proview Label with its locations. Open one to see it as its team does.</p><div class="btns"><button class="btn" data-refresh title="Refresh">${ic('refresh',16)}Refresh</button><a class="btn" href="${LIC_URL}" target="_blank" rel="noopener">Licences ↗</a><button class="btn primary" data-addb>${ic('plus',16)}Add business</button></div></div>
+  <div class="ov-stats">${stat('biz','Businesses',orgs.length)}${stat('loc','Locations',allSites.length)}${stat('dev','Devices',devs.length)}${stat('on','Online',online.length,online.length?'ok':'')}${stat('off','Offline',offline.length,offline.length?'warn':'')}${stat('att','Licences need attention',needs.length,needs.length?'bad':'')}</div>
+  ${orgs.length>3?`<div class="ov-tools"><input type="search" id="asq" class="ov-search" placeholder="Search businesses or locations" aria-label="Search businesses or locations" value="${esc(asq)}"></div>`:''}
+  <div class="ov-grid">${orgs.length?orgs.map(card).join(''):empty}<p class="muted" id="asnone" style="grid-column:1/-1;display:none">No businesses or locations match “<span></span>”.</p></div></div>`;
   const filt=()=>{ const q=asq.trim().toLowerCase(); let n=0; el.querySelectorAll('[data-q]').forEach(t=>{ const on=!q||t.dataset.q.includes(q); t.style.display=on?'':'none'; if(on) n++; });
-    const no=el.querySelector('#asnone'); if(no){ no.style.display=q&&!n?'':'none'; no.querySelector('span').textContent=asq; } };
+    const no=el.querySelector('#asnone'); if(no){ no.style.display=q&&!n?'':'none'; no.querySelector('span').textContent=asq.trim(); } };
   const qi=el.querySelector('#asq'); if(qi){ qi.oninput=()=>{ asq=qi.value; filt(); }; filt(); }
   // each summary box opens the list behind its number
-  const li=(attr,t,title,sub,right)=>`<button type="button" class="ov-li" ${attr}><span class="ov-dot ${t}"></span><span style="flex:1;min-width:0"><b>${esc(title)}</b><span class="hint" style="display:block">${sub}</span></span>${right||''}<span class="ov-chev" aria-hidden="true">›</span></button>`;
-  const bizLi=(o)=>{ const rs=allSites.filter(r=>r.o.id===o.id); return li(`data-mo="${esc(o.id)}"`,rs.some(r=>r.st.expired)?'bad':rs.some(r=>r.st.devices)?'ok':'',o.name,`${rs.length} location${rs.length!==1?'s':''} · ${rs.reduce((t,r)=>t+r.st.devices,0)} device(s)`,stateTag(o)); };
-  const locLi=(r,right)=>li(`data-ms="${esc(r.s.id)}"`,tone(r.st),r.s.name,esc(r.o.name)+' · '+devLine(r.st),right);
-  const lists={ biz:['Businesses',()=>orgs.map(bizLi),'No businesses yet.'], loc:['Locations',()=>allSites.map(r=>locLi(r)),'No locations yet.'],
-    dev:['Devices',()=>devs.slice().sort((a,b)=>String(b.lastSync||'').localeCompare(String(a.lastSync||''))).map(d=>{ const r=allSites.find(x=>x.s.id===d.siteId); return li(`data-ms="${esc(d.siteId)}"`,d.lastSync&&Date.now()-new Date(d.lastSync)<864e5?'ok':'',d.name||'Handheld',esc(r.o.name)+(r.s.name!==r.o.name?' · '+esc(r.s.name):'')+' · '+(d.lastSync?'synced '+P.fmtDate(d.lastSync,true):'never synced'),d.version?`<span class="hint">v${esc(d.version)}</span>`:''); }),'No handhelds connected yet.'],
-    today:['Labels printed today',()=>allSites.filter(r=>r.st.today).sort((a,b)=>b.st.today-a.st.today).map(r=>locLi(r,`<b>${r.st.today}</b>`)),'No labels printed today.'],
-    exp:['Expired labels',()=>allSites.filter(r=>r.st.expired).sort((a,b)=>b.st.expired-a.st.expired).map(r=>locLi(r,`<span class="tag bad">${r.st.expired} expired</span>`)),'No expired labels anywhere.'],
-    att:['Trials & suspended',()=>needs.map(bizLi),'Every business is active.'] };
+  const li=(attr,t,title,sub,right)=>`<button type="button" class="ov-li" ${attr}><span class="ov-dot ${t}"></span><span style="flex:1;min-width:0"><b>${esc(title)}</b><span class="tiny" style="display:block">${sub}</span></span>${right||''}<span class="ov-chev" aria-hidden="true">›</span></button>`;
+  const bizLi=(o)=>{ const os=sitesOf(o), ds=devsAt(os.map(x=>x.id)); return li(`data-mo="${esc(o.id)}"`,tone(ds),o.name,`${os.length} location${s_(os.length)} · ${devLine(ds)}`,pill(o,os,ds)); };
+  const locLi=(r)=>{ const ds=devsAt([r.s.id]); return li(`data-ms="${esc(r.s.id)}"`,tone(ds),r.s.name,esc(r.o.name),`<span class="muted small">${devLine(ds)}</span>`); };
+  const devLi=(d)=>{ const r=allSites.find(x=>x.s.id===d.siteId); return li(`data-ms="${esc(d.siteId)}"`,isOn(d)?'ok':'bad',d.name||'Handheld',[esc(r.o.name),r.s.name!==r.o.name&&esc(r.s.name),syncTxt(d),d.version&&'v'+esc(d.version)].filter(Boolean).join(' · '),`<span class="muted small">${isOn(d)?'Online':'Offline'}</span>`); };
+  const devSort=(a,b)=>String(b.lastSync||'').localeCompare(String(a.lastSync||''));
+  const lists={ biz:['Businesses',()=>orgs.map(bizLi),'No businesses yet.'], loc:['Locations',()=>allSites.map(locLi),'No locations yet.'],
+    dev:['Devices',()=>devs.slice().sort(devSort).map(devLi),'No handhelds paired yet.'],
+    on:['Online now',()=>online.slice().sort(devSort).map(devLi),'No handhelds have synced in the last 6 hours.'],
+    off:['Offline',()=>offline.slice().sort(devSort).map(devLi),'Every handheld synced in the last 6 hours.'],
+    att:['Licences needing attention',()=>needs.map(bizLi),'Every business is licensed.'] };
   el.querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>{ const [title,items,none]=lists[b.dataset.stat]; const it=items();
     const m=modal(title,it.length?`<div class="ov-list">${it.join('')}</div>`:`<p class="hint">${none}</p>`,`<button class="btn ghost" data-x>Close</button>`);
     m.querySelectorAll('[data-ms]').forEach(x=>x.onclick=()=>{ closeModal(); setSite(x.dataset.ms); location.hash='overview'; });
