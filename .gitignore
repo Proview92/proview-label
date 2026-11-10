@@ -7,3 +7,6 @@ android-app/android/local.properties
 android-app/android/capacitor-cordova-android-plugins/build/
 *.apk
 .DS_Store
+
+# the published Android app on label.proviewcrm.co.uk/apk
+!web/site/ProviewLabel.apk
