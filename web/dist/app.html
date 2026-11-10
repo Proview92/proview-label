@@ -1008,7 +1008,7 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
 const P = window.PVL;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -1289,6 +1289,25 @@ screens.bulk = () => {
   };
 };
 
+// a scanned code: a Proview label code reprints it with today's date; a product barcode prints that product
+function handleScanCode(code){ code=String(code||'').trim(); if(!code) return;
+  const l=P.live('labels').find(x=>x.code.toUpperCase()===code.toUpperCase());
+  if(l) return reprintLabel(l, true);
+  const p=L('products').find(x=>x.barcode && x.barcode===code);
+  if(p) return enqueue(buildJob(p,{fromScan:true}));
+  toast('No label or product found for '+code);
+}
+// the handheld's own scanner (trigger / side keys). While someone is typing in a box, the scan just fills that box.
+function onHardwareScan(e){
+  const code=e&&e.code; if(!code) return;
+  if(connected()&&LOCK) return applyLock();
+  const a=document.activeElement, typing=a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable);
+  if(typing && a.id!=='code'){ // the scanner's keyboard mode usually types it in already; fill it only if it didn't
+    setTimeout(()=>{ if(!String(a.value||'').includes(code)){ a.value=code; a.dispatchEvent(new Event('input',{bubbles:true})); a.dispatchEvent(new Event('change',{bubbles:true})); } },200); return; }
+  if(a&&a.id==='code') setTimeout(()=>{ a.value=''; },50);
+  if(navigator.vibrate) navigator.vibrate(40);
+  handleScanCode(code);
+}
 let scanStream=null, scanTimer=null;
 function stopScanner(){ if(scanTimer) clearInterval(scanTimer); scanTimer=null; if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; } }
 screens.scan = () => {
@@ -1298,13 +1317,7 @@ screens.scan = () => {
     <div style="padding:0 14px"><div class="row"><input class="inp" id="code" placeholder="Or type / scan code (e.g. PV…)" autocomplete="off"><button class="btn blue sm" id="codeGo" style="min-height:50px">Print</button></div>
     <p class="hint">Scan to print mode ignores any custom expiry date and storage location. Handheld scanners that type into the box work too.</p>
     ${recent.length?`<div class="sect">Recent labels (tap to simulate a scan)</div>${recent.map(l=>`<button class="li" style="width:100%" data-code="${esc(l.code)}"><div class="t"><b>${esc(l.name)}</b><small>${esc(l.code)} · ${P.fmtDate(l.printedAt,true)}</small></div>${I.scan}</button>`).join('')}`:''}</div>`;
-  const handle=(code)=>{ code=String(code||'').trim(); if(!code) return;
-    const l=P.live('labels').find(x=>x.code.toUpperCase()===code.toUpperCase());
-    if(l) return reprintLabel(l, true);
-    const p=L('products').find(x=>x.barcode && x.barcode===code);
-    if(p) return enqueue(buildJob(p,{fromScan:true}));
-    toast('No label or product found for '+code);
-  };
+  const handle=handleScanCode;
   $('#codeGo').onclick=()=>{ handle($('#code').value); $('#code').value=''; };
   $('#code').onkeydown=e=>{ if(e.key==='Enter'){ handle($('#code').value); $('#code').value=''; } };
   $('#main').querySelectorAll('[data-code]').forEach(b=>b.onclick=()=>handle(b.dataset.code));
@@ -1373,7 +1386,7 @@ screens.about = () => {
     <div class="kv"><span>Platform</span><b>${isNative?'Android app':'Web preview'}</b></div>
     <div class="kv"><span>Battery</span><b id="bat">${d.battery!=null?d.battery+'%':'—'}</b></div>
     <div class="kv"><span>Network</span><b>${navigator.onLine?'Online':'Offline'}</b></div>
-    <div class="kv"><span>Printer</span><b>${pr.mode==='preview'?'Screen preview only':esc((pr.mode==='tcp'?'Network ':'Bluetooth ')+(pr.name||pr.address||''))}</b></div>
+    <div class="kv"><span>Printer</span><b>${pr.mode==='preview'?'Screen preview only':pr.mode==='builtin'?'Built-in printer':esc((pr.mode==='tcp'?'Network ':'Bluetooth ')+(pr.name||pr.address||''))}</b></div>
     <div class="kv"><span>Labels left on roll</span><b>${S.settings.labelsInStock}</b></div>
     <div class="kv"><span>Products / categories</span><b>${L('products').length} / ${L('categories').length}</b></div>
     <div class="kv"><span>Back-office sync</span><b>${connected()?(S.settings.sync.lastSync?rel(S.settings.sync.lastSync):'Connected'):'Not connected'}</b></div>
@@ -1403,10 +1416,12 @@ screens.settings = () => {
     <div class="sect" style="margin-top:0">Site</div>
     <div class="fld"><select class="inp" id="site">${(connected()?P.live('sites').filter(x=>x.orgId===ORG()):P.live('sites')).map(s=>`<option value="${s.id}" ${s.id===S.currentSiteId?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
     <div class="sect">Printer</div>
-    <div class="seg sm" id="pm" style="margin:0 0 12px"><button data-m="preview" class="${pr.mode==='preview'?'on':''}">Preview</button><button data-m="bluetooth" class="${pr.mode==='bluetooth'?'on':''}">Bluetooth</button><button data-m="tcp" class="${pr.mode==='tcp'?'on':''}">Network</button></div>
+    <div class="seg sm" id="pm" style="margin:0 0 12px"><button data-m="preview" class="${pr.mode==='preview'?'on':''}">Preview</button><button data-m="builtin" class="${pr.mode==='builtin'?'on':''}">Built-in</button><button data-m="bluetooth" class="${pr.mode==='bluetooth'?'on':''}">Bluetooth</button><button data-m="tcp" class="${pr.mode==='tcp'?'on':''}">Network</button></div>
     ${pr.mode==='bluetooth'?`<div class="fld"><div class="lbl">Paired printer <button class="pill blue" id="bt">Find printers</button></div><select class="inp" id="btsel"><option value="">${pr.address?esc((pr.name||'')+' '+pr.address):'Tap “Find printers”'}</option></select></div>`:''}
     ${pr.mode==='tcp'?`<div class="row"><div class="fld" style="flex:2"><div class="lbl">Printer IP</div><input class="inp" id="ip" value="${esc(pr.address)}" placeholder="192.168.1.50" inputmode="decimal"></div><div class="fld" style="flex:1"><div class="lbl">Port</div><input class="inp" id="port" value="${esc(pr.port||9100)}" inputmode="numeric"></div></div>`:''}
-    <p class="hint">${pr.mode==='preview'?'Labels show on screen only. Choose Bluetooth or Network to print to an ESC/POS thermal label printer (e.g. built-in printers on Sunmi-style handhelds, or any 58/80mm thermal printer).':'Uses ESC/POS commands. Works with most 58mm/80mm thermal printers.'}</p>
+    ${pr.mode==='builtin'?`<div class="card" style="margin-bottom:10px"><b style="font-size:15px">${BUILTIN==null?'Checking for a built-in printer…':BUILTIN.available?'Built-in printer ready':'No built-in printer found'}</b><div class="hint">${BUILTIN&&BUILTIN.available?'Prints on this handheld (H10P / H10S), 57 mm roll'+(BUILTIN.version?' · service '+esc(BUILTIN.version):''):'Built-in printing works on Senraise handhelds such as the H10P and H10S. On other devices choose Bluetooth or Network.'}</div></div>
+      <label class="kv" style="cursor:pointer"><span>Simple text labels (faster, no £ sign)</span><input type="checkbox" id="btxt" ${pr.builtinText?'checked':''}></label>`:''}
+    <p class="hint">${pr.mode==='builtin'?'Labels are printed as a picture, exactly as they look on screen. Tear off at the dashed line.':pr.mode==='preview'?'Labels show on screen only. Choose Bluetooth or Network to print to an ESC/POS thermal label printer (any 58/80mm thermal printer). On a Senraise H10P / H10S choose Built-in..':'Uses ESC/POS commands. Works with most 58mm/80mm thermal printers.'}</p>
     <button class="btn ghost" id="test" style="width:100%">Print test label</button>
     <div class="sect" style="margin-top:22px">Proview Label cloud</div>
     ${connected()?`<div class="card" style="margin-bottom:10px"><b style="font-size:15px">Connected</b><div class="hint">${esc(CONN.email)} · ${esc(((S.orgs||[]).find(o=>o.id===ORG())||{}).name||'')}<br>Last sync ${S.settings.sync.lastSync?rel(S.settings.sync.lastSync):'—'}</div></div>
@@ -1418,7 +1433,8 @@ screens.settings = () => {
     ${connected()?'':'<button class="btn ghost sm" id="rst" style="width:100%;margin-top:10px;color:#D32F2F">Reset demo data</button>'}
   </div>`;
   $('#site').onchange=()=>{ S.currentSiteId=$('#site').value; P.save(); const u=user(); if(!(u.siteIds||[]).includes(S.currentSiteId)){ const su=siteUsers()[0]; if(su) S.currentUserId=su.id; P.save(); } toast('Site: '+site().name); render(); };
-  $('#pm').querySelectorAll('button').forEach(b=>b.onclick=()=>{ pr.mode=b.dataset.m; P.save(); render(); });
+  $('#pm').querySelectorAll('button').forEach(b=>b.onclick=()=>{ pr.mode=b.dataset.m; pr.chosen=true; P.save(); render(); if(pr.mode==='builtin') checkBuiltin().then(()=>{ if(ui.screen==='settings') render(); }); });
+  const bx=$('#btxt'); if(bx) bx.onchange=()=>{ pr.builtinText=bx.checked; P.save(); };
   const ip=$('#ip'); if(ip){ ip.onchange=()=>{pr.address=ip.value.trim();P.save();}; $('#port').onchange=()=>{pr.port=+$('#port').value||9100;P.save();}; }
   const bt=$('#bt'); if(bt) bt.onclick=async()=>{
     const N=Native().LabelPrinter; if(!N){ toast('Bluetooth printing is available in the Android app'); return; }
@@ -1676,9 +1692,81 @@ function escpos(j){
   push(0x0A,0x0A,0x0A,0x1D,0x56,0x42,0x00);
   return out;
 }
+// ---------- built-in printer (Senraise H10P / H10S and similar handhelds) ----------
+// The label is drawn as a black & white picture 384 dots wide (57/58 mm roll), so £, bold allergens
+// and the barcode print exactly as they look on screen.
+const PRINT_W = 384;
+function labelBitmap(j){
+  const W=PRINT_W, PAD=4, c=document.createElement('canvas'); c.width=W; c.height=2000;
+  const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,W,c.height); x.fillStyle='#000'; x.textBaseline='alphabetic';
+  const FONT='Inter, Roboto, "Helvetica Neue", Arial, sans-serif', F=(w,sz)=>`${w} ${sz}px ${FONT}`;
+  let y=PAD;
+  // words with a bold flag, wrapped to the width; returns lines of [{t,b}]
+  const layout=(tokens,size,maxW)=>{ const lines=[]; let cur=[], w=0; const sp=(b)=>{ x.font=F(b?800:500,size); return x.measureText(' ').width; };
+    tokens.forEach(tk=>{ String(tk.t).split(/\s+/).filter(Boolean).forEach(word=>{ x.font=F(tk.b?800:500,size); const ww=x.measureText(word).width, gap=cur.length?sp(tk.b):0;
+      if(cur.length && w+gap+ww>maxW){ lines.push(cur); cur=[]; w=0; }
+      if(!cur.length && ww>maxW){ // a single very long word: hard-break it
+        let part=''; for(const ch of word){ if(x.measureText(part+ch).width>maxW){ lines.push([{t:part,b:tk.b}]); part=ch; } else part+=ch; } cur=[{t:part,b:tk.b}]; w=x.measureText(part).width; return; }
+      cur.push({t:word,b:tk.b}); w+=gap+ww; }); });
+    if(cur.length) lines.push(cur); return lines; };
+  const drawLines=(lines,size,{align='left',inverse=false,lh=1.25}={})=>{ const h=Math.round(size*lh);
+    lines.forEach(line=>{ const widths=line.map(tk=>{ x.font=F(tk.b?800:500,size); return x.measureText(tk.t).width; }); x.font=F(500,size); const sp=x.measureText(' ').width;
+      const total=widths.reduce((a,b)=>a+b,0)+sp*(line.length-1); let tx=align==='center'?(W-total)/2:align==='right'?W-PAD-total:PAD;
+      if(inverse){ x.fillStyle='#000'; x.fillRect(0,y,W,h+2); x.fillStyle='#fff'; }
+      line.forEach((tk,i)=>{ x.font=F(tk.b?800:500,size); x.fillText(tk.t,tx,y+Math.round(size*0.98)+(inverse?1:0)); tx+=widths[i]+sp; });
+      x.fillStyle='#000'; y+=h+(inverse?2:0); }); };
+  const text=(t,size,o={})=>{ if(!t) return; drawLines(layout([{t,b:!!o.bold}],size,W-2*PAD),size,o); };
+  const rich=(html,size,o={})=>{ const toks=String(html||'').split(/(<b>.*?<\/b>)/i).filter(Boolean).map(part=>/^<b>/i.test(part)?{t:P.stripHtml(part).toUpperCase(),b:true}:{t:P.stripHtml(part),b:false}); drawLines(layout(toks,size,W-2*PAD),size,o); };
+  const gap=(n)=>{ y+=n; };
+  const rule=()=>{ x.fillRect(PAD,y,W-2*PAD,2); y+=6; };
+  const barcode=(code)=>{ if(!window.JsBarcode||!code) return; for(const bw of [2,1.5,1]){ const b=document.createElement('canvas');
+      try{ JsBarcode(b,String(code),{format:'CODE128',width:bw,height:64,displayValue:true,font:'Inter, Arial, sans-serif',fontOptions:'bold',fontSize:20,margin:0,textMargin:2,background:'#fff',lineColor:'#000'}); }catch(e){ return; }
+      if(b.width<=W||bw===1){ const dw=Math.min(b.width,W), dh=b.height*(dw/b.width); x.drawImage(b,Math.round((W-dw)/2),y,dw,dh); y+=Math.round(dh)+4; return; } } };
+  const u=user(), hrs=j.rule&&j.rule.period==='hours'&&j.ruleName!=='Manual';
+  const al=(j.allergens||[]).map(a=>(P.ALLERGEN_LABEL[a]||a)).join(', ')+(j.customAllergens?((j.allergens||[]).length?', ':'')+j.customAllergens:'');
+  const dateLine=(lbl)=>`${lbl} ${P.fmtDay(j.expiry).toUpperCase()} ${P.fmtDate(j.expiry,hrs)}`;
+  if(j.type==='sale'){
+    text(j.name,30,{bold:true});
+    if(j.price!=null) text(P.money(j.price),30,{bold:true,align:'right'});
+    if(j.ingredients){ gap(2); rich('<b>Ingredients:</b> '+j.ingredients,19); }
+    if(al && !j.ingredients) text('ALLERGENS: '+al.toUpperCase(),20,{bold:true});
+    if(j.mayContain) text('May contain: '+j.mayContain,18);
+    if(j.includeDate){ gap(4); text(dateLine(j.dateType==='best-before'?'BEST BEFORE:':'USE BY:'),24,{bold:true,align:'center',inverse:true}); }
+    gap(4);
+    if(j.batch) text('Batch: '+j.batch,18);
+    text(site().name,18,{bold:true}); if(site().address) text(site().address,16);
+    gap(4); barcode(j.barcode||j.code);
+  } else {
+    text(j.name,32,{bold:true,align:'center'});
+    gap(2); text(dateLine('USE BY:'),26,{bold:true,align:'center',inverse:true}); gap(4);
+    text('PRINTED: '+P.fmtDate(new Date(),true)+'   '+(j.ruleName==='Manual'?'MANUAL':(j.rule?P.ruleText(j.rule).replace('+',''):'')).toUpperCase(),18);
+    if(al) text('ALLERGENS: '+al.toUpperCase(),21,{bold:true});
+    if(j.mayContain) text('M/C: '+j.mayContain,18);
+    if(j.defrost||j.useFirst){ gap(2); text([j.defrost?'DEFROSTED':'',j.useFirst?'USE FIRST':''].filter(Boolean).join(' | '),22,{bold:true,align:'center',inverse:true}); }
+    text((j.batch?j.batch+' | ':'')+P.initials(u.name)+' · '+(j.ruleName||'')+' · '+site().name,17,{bold:true});
+    gap(4); barcode(j.code);
+  }
+  gap(6); for(let i=PAD;i<W-PAD;i+=12) x.fillRect(i,y,6,2); y+=4; // dashed tear line
+  const out=document.createElement('canvas'); out.width=W; out.height=y; const o=out.getContext('2d'); o.drawImage(c,0,0);
+  // hard black/white: thermal heads print grey as speckle
+  const im=o.getImageData(0,0,W,y), d=im.data; for(let i=0;i<d.length;i+=4){ const v=(d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11)<150?0:255; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255; } o.putImageData(im,0,0);
+  return out.toDataURL('image/png').split(',')[1];
+}
+let BUILTIN=null; // {available, version} once checked
+async function checkBuiltin(){
+  const N=Native().LabelPrinter; if(!N||!N.builtinStatus) return BUILTIN={available:false};
+  try{ BUILTIN=await N.builtinStatus(); }catch(e){ BUILTIN={available:false}; }
+  const pr=S.settings.printer;
+  if(BUILTIN.available && pr.mode==='preview' && !pr.chosen){ pr.mode='builtin'; P.save(); toast('Built-in printer found – labels will print on this handheld'); }
+  return BUILTIN;
+}
 async function sendToPrinter(j){
   const pr=S.settings.printer; if(pr.mode==='preview') return;
   const N=Native().LabelPrinter; if(!N) throw new Error('printing to hardware needs the Android app');
+  if(pr.mode==='builtin'){
+    if(pr.builtinText){ const bytes=escpos({...j,qty:1}); let bin=''; bytes.forEach(b=>bin+=String.fromCharCode(b)); await N.printBuiltin({data:btoa(bin),feed:3}); return; }
+    await N.printBuiltin({image:labelBitmap({...j,qty:1}),feed:3}); return;
+  }
   if(!pr.address) throw new Error('no printer set – see Settings');
   const bytes=escpos({...j,qty:1}); let bin=''; bytes.forEach(b=>bin+=String.fromCharCode(b));
   await N.print({mode:pr.mode,address:pr.address,port:pr.port||9100,data:btoa(bin)});
@@ -1801,6 +1889,8 @@ function render(){
 window.addEventListener('online',renderStatus); window.addEventListener('offline',renderStatus);
 // Android hardware back button
 document.addEventListener('ionBackButton', ev=>{ ev.detail && ev.detail.register && ev.detail.register(10,()=>{ if(connected()&&LOCK&&!$('#modal').innerHTML){ if(Native().App) Native().App.exitApp(); return; } if($('#modal').innerHTML) $('#modal').innerHTML=''; else if($('#sheet').classList.contains('on')) closeSheet(); else if($('#drawer').classList.contains('on')) closeDrawer(); else if(ui.screen!=='home') back(); else if(Native().App) Native().App.exitApp(); }); });
+// handheld hardware: built-in printer + barcode scanner (Android app only)
+if(Native().LabelPrinter && Native().LabelPrinter.addListener){ try{ Native().LabelPrinter.addListener('scan', onHardwareScan); }catch(e){} checkBuiltin(); }
 if(Native().App && Native().App.addListener) Native().App.addListener('backButton',()=>{ if(connected()&&LOCK&&!$('#modal').innerHTML){ Native().App.exitApp(); return; } if($('#modal').innerHTML) $('#modal').innerHTML=''; else if($('#sheet').classList.contains('on')) closeSheet(); else if($('#drawer').classList.contains('on')) closeDrawer(); else if(ui.screen!=='home') back(); else Native().App.exitApp(); });
 render();
 setInterval(renderStatus, 60000);

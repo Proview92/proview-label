@@ -37,6 +37,11 @@
         </provider>
     </application>
 
+    <!-- the built-in printer service on Senraise handhelds (H10P / H10S) -->
+    <queries>
+        <package android:name="recieptservice.com.recieptservice" />
+    </queries>
+
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
