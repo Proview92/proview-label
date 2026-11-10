@@ -69,6 +69,8 @@
     'Scan to print mode': ['Tarayıp yazdırma modu', 'Mod scanare și tipărire', 'Режим сканиране и печат'],
     'Wastage': ['Fire', 'Deșeuri', 'Брак'],
     'Check for updates': ['Güncellemeleri kontrol et', 'Caută actualizări', 'Проверка за обновления'],
+    'Check for app updates': ['Uygulama güncellemelerini kontrol et', 'Caută actualizări ale aplicației', 'Проверка за обновления на приложението'],
+    'App': ['Uygulama', 'Aplicație', 'Приложение'],
     'signed in': ['oturum açık', 'conectat', 'вписан'],
     'just now': ['az önce', 'chiar acum', 'току-що'],
 
@@ -462,7 +464,7 @@
     'Install now': ['Şimdi yükle', 'Instalează acum', 'Инсталирай сега'],
     'Downloading update…': ['Güncelleme indiriliyor…', 'Se descarcă actualizarea…', 'Изтегляне на обновлението…'],
     'Couldn\'t check for updates. Check the internet connection.': ['Güncellemeler kontrol edilemedi. İnternet bağlantısını kontrol edin.', 'Nu s-au putut verifica actualizările. Verifică conexiunea la internet.', 'Неуспешна проверка за обновления. Проверете интернет връзката.'],
-    'Allow "Install unknown apps" for Proview Label, then tap Check for updates again': ['Proview Label için "Bilinmeyen uygulamaları yükle" iznini verin, sonra tekrar Güncellemeleri kontrol et’e dokunun', 'Permite „Instalare aplicații necunoscute” pentru Proview Label, apoi atinge din nou Caută actualizări', 'Разрешете „Инсталиране на неизвестни приложения“ за Proview Label и докоснете отново Проверка за обновления'],
+    'Allow "Install unknown apps" for Proview Label, then tap Check for app updates in Settings again': ['Proview Label için "Bilinmeyen uygulamaları yükle" iznini verin, sonra Ayarlar’da tekrar Uygulama güncellemelerini kontrol et’e dokunun', 'Permite „Instalare aplicații necunoscute” pentru Proview Label, apoi atinge din nou Caută actualizări ale aplicației în Setări', 'Разрешете „Инсталиране на неизвестни приложения“ за Proview Label и докоснете отново Проверка за обновления на приложението в Настройки'],
 
     // days (used on screen next to dates)
     'Mon': ['Pzt', 'Lun', 'Пн'], 'Tue': ['Sal', 'Mar', 'Вт'], 'Wed': ['Çar', 'Mie', 'Ср'], 'Thu': ['Per', 'Joi', 'Чт'],

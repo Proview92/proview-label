@@ -3571,6 +3571,8 @@ var qrcode = function() {
     'Scan to print mode': ['Tarayıp yazdırma modu', 'Mod scanare și tipărire', 'Режим сканиране и печат'],
     'Wastage': ['Fire', 'Deșeuri', 'Брак'],
     'Check for updates': ['Güncellemeleri kontrol et', 'Caută actualizări', 'Проверка за обновления'],
+    'Check for app updates': ['Uygulama güncellemelerini kontrol et', 'Caută actualizări ale aplicației', 'Проверка за обновления на приложението'],
+    'App': ['Uygulama', 'Aplicație', 'Приложение'],
     'signed in': ['oturum açık', 'conectat', 'вписан'],
     'just now': ['az önce', 'chiar acum', 'току-що'],
 
@@ -3964,7 +3966,7 @@ var qrcode = function() {
     'Install now': ['Şimdi yükle', 'Instalează acum', 'Инсталирай сега'],
     'Downloading update…': ['Güncelleme indiriliyor…', 'Se descarcă actualizarea…', 'Изтегляне на обновлението…'],
     'Couldn\'t check for updates. Check the internet connection.': ['Güncellemeler kontrol edilemedi. İnternet bağlantısını kontrol edin.', 'Nu s-au putut verifica actualizările. Verifică conexiunea la internet.', 'Неуспешна проверка за обновления. Проверете интернет връзката.'],
-    'Allow "Install unknown apps" for Proview Label, then tap Check for updates again': ['Proview Label için "Bilinmeyen uygulamaları yükle" iznini verin, sonra tekrar Güncellemeleri kontrol et’e dokunun', 'Permite „Instalare aplicații necunoscute” pentru Proview Label, apoi atinge din nou Caută actualizări', 'Разрешете „Инсталиране на неизвестни приложения“ за Proview Label и докоснете отново Проверка за обновления'],
+    'Allow "Install unknown apps" for Proview Label, then tap Check for app updates in Settings again': ['Proview Label için "Bilinmeyen uygulamaları yükle" iznini verin, sonra Ayarlar’da tekrar Uygulama güncellemelerini kontrol et’e dokunun', 'Permite „Instalare aplicații necunoscute” pentru Proview Label, apoi atinge din nou Caută actualizări ale aplicației în Setări', 'Разрешете „Инсталиране на неизвестни приложения“ за Proview Label и докоснете отново Проверка за обновления на приложението в Настройки'],
 
     // days (used on screen next to dates)
     'Mon': ['Pzt', 'Lun', 'Пн'], 'Tue': ['Sal', 'Mar', 'Вт'], 'Wed': ['Çar', 'Mie', 'Ср'], 'Thu': ['Per', 'Joi', 'Чт'],
@@ -4119,7 +4121,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.4.3';
+const APP_VERSION = '1.4.4';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -4273,8 +4275,8 @@ function openDrawer(){
   const ez=ui.mode==='easy';
   const items=ez?[['home','Print Screen',I.print]]
     :[['home','Print Screen',I.print],['logs','Logs',I.log],['bulk','Bulk Print',I.stack],['wastage','Wastage',I.bin],['order','Label Order',I.box]];
-  const inv=ez?[['syncnow','Sync now',I.sync],['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]]
-    :[['syncnow','Sync now',I.sync],['about','About Device',I.info],['update','Check for updates',I.sync],['support','Support',I.help],['settings','Settings',I.gear]];
+  const inv=ez?[['syncnow','Sync now',I.sync],['support','Support',I.help],['settings','Settings',I.gear]]
+    :[['syncnow','Sync now',I.sync],['about','About Device',I.info],['support','Support',I.help],['settings','Settings',I.gear]];
   $('#drawer').innerHTML = `<div class="dh"><div class="pv-logo"><div class="mk">PV</div><div class="wd">PROVIEW<span>LABEL</span><small>${esc(site().name.toUpperCase())}</small></div></div><button class="ic" id="dClose" style="color:#000">${I.close}</button></div>
     <div class="dl">${items.map(([k,l,ic])=>`<button class="mi ${ui.screen===k?'on':''}" data-k="${k}">${ic}${l}</button>`).join('')}
       <div class="divider" style="margin:10px 8px"></div>
@@ -4285,7 +4287,6 @@ function openDrawer(){
   $('#drawer').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
     const k=b.dataset.k; closeDrawer();
     if(k==='syncnow') return doSync();
-    if(k==='update') return checkUpdate(true);
     if(k==='settings') return needManager(()=>root(k));
     root(k);
   });
@@ -4560,6 +4561,9 @@ screens.settings = () => {
     ${pr.mode==='builtin'?`<div class="card" style="margin-bottom:10px"><b style="font-size:15px">${BUILTIN==null?'Checking for a built-in printer…':BUILTIN.available?'Built-in printer ready':'No built-in printer found'}</b><div class="hint">${BUILTIN&&BUILTIN.available?'Prints on this handheld (H10P / H10S), 57 mm roll'+(BUILTIN.version?' · service '+esc(BUILTIN.version):''):'Built-in printing works on Senraise handhelds such as the H10P and H10S. On other devices choose Bluetooth or Network.'}</div></div>`:''}
     <p class="hint">${pr.mode==='builtin'?'Labels are printed as a picture, exactly as they look on screen. Tear off at the dashed line.':pr.mode==='preview'?'Labels show on screen only. Choose Bluetooth or Network to print to an ESC/POS thermal label printer (any 58/80mm thermal printer). On a Senraise H10P / H10S choose Built-in..':'Uses ESC/POS commands. Works with most 58mm/80mm thermal printers.'}</p>
     <button class="btn ghost" id="test" style="width:100%">Print test label</button>
+    <div class="sect" style="margin-top:22px">App</div>
+    <div class="kv" style="margin-top:-4px"><span>App version</span><b>${APP_VERSION}</b></div>
+    <button class="btn ghost" id="chkUpd" style="width:100%;margin-top:10px">Check for app updates</button>
     <div class="sect" style="margin-top:22px">Proview Label cloud</div>
     ${connected()?`<div class="card" style="margin-bottom:10px"><b style="font-size:15px">Paired</b><div class="hint">${esc(CONN.name||'Handheld')} · ${esc(((S.orgs||[]).find(o=>o.id===ORG())||{}).name||'')}<br>Last sync ${S.settings.sync.lastSync?rel(S.settings.sync.lastSync):'—'}</div></div>
       <div class="row"><button class="btn blue sm" style="flex:1" id="synow">Sync now</button><button class="btn ghost sm" style="flex:1;color:#d92d20" id="disc">Unpair</button></div>`
@@ -4573,6 +4577,7 @@ screens.settings = () => {
     try{ const r=await N.listPaired(); const sel=$('#btsel'); sel.innerHTML=r.devices.map(d=>`<option value="${esc(d.address)}" ${d.address===pr.address?'selected':''}>${esc(d.name||'Unknown')} – ${esc(d.address)}</option>`).join('')||'<option>No paired printers. Pair one in Android Bluetooth settings.</option>';
       sel.onchange=()=>{ pr.address=sel.value; pr.name=(r.devices.find(d=>d.address===sel.value)||{}).name||''; P.save(); };
       if(r.devices[0]&&!pr.address){ pr.address=r.devices[0].address; pr.name=r.devices[0].name; P.save(); } }catch(e){ toast(e.message||'Bluetooth error'); } };
+  $('#chkUpd').onclick=()=>checkUpdate(true);
   $('#test').onclick=()=>enqueue({id:P.uid('j'),name:'Test label',type:'prep',qty:1,expiry:P.computeExpiry(rule('r_fridge')).toISOString(),ruleName:'Fridge',rule:rule('r_fridge'),allergens:['Milk'],mayContain:'',customAllergens:'',batch:'TEST',useFirst:true,defrost:false,code:P.labelCode(),test:true});
   const sn=$('#synow'); if(sn) sn.onclick=doSync;
   const dc=$('#disc'); if(dc) dc.onclick=()=>unpair(false);
@@ -5061,7 +5066,7 @@ document.addEventListener('ionBackButton', ev=>{ ev.detail && ev.detail.register
 // handheld hardware: built-in printer + barcode scanner (Android app only)
 // ---------- app updates ----------
 // The latest version is described at label.proviewcrm.co.uk/apk/version.json. The app checks when it opens,
-// every few hours, and from "Check for updates" in the side menu. Installing downloads the APK and opens
+// every few hours, and from "Check for app updates" in Settings. Installing downloads the APK and opens
 // Android's installer (staff tap Install; Android doesn't allow a silent update).
 const UPDATE_URL='https://label.proviewcrm.co.uk/apk/version.json';
 const vnum=v=>String(v||'0').split('.').slice(0,3).reduce((a,n)=>a*1000+(parseInt(n,10)||0),0)*(String(v||'').split('.').length<3?1000:1);
@@ -5084,7 +5089,7 @@ async function installUpdate(info){
   toast('Downloading update…');
   try{ await N.installUpdate({url}); }
   catch(e){
-    if(e&&e.code==='PERMISSION') toast('Allow "Install unknown apps" for Proview Label, then tap Check for updates again');
+    if(e&&e.code==='PERMISSION') toast('Allow "Install unknown apps" for Proview Label, then tap Check for app updates in Settings again');
     else toast('Update failed: '+((e&&e.message)||e));
   }
 }
