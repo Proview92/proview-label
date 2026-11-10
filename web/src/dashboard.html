@@ -1216,7 +1216,7 @@ const Logins={
     return P.live('users').filter(u=>u.email&&u.role!=='master'&&orgIds.includes(u.orgId)).map(u=>({id:u.id,org_id:u.orgId,email:u.email,name:u.name,role:u.role==='admin'?'admin':u.role,site_ids:u.siteIds||[],features:u.features||{},active:true,_demo:true})); },
   async save(m){ if(CLOUD) return Cloud.saveMember(m);
     const u=m.id?P.byId('users',m.id):{id:P.uid('u_'),pin:String(1000+Math.floor(Math.random()*9000)),password:'demo'};
-    P.upsert('users',{...u,orgId:m.org_id,name:m.name,email:m.email,features:m.features||{},role:m.role==='owner'?'admin':m.role,siteIds:m.role==='manager'?m.site_ids:P.live('sites').filter(x=>x.orgId===m.org_id).map(x=>x.id)}); },
+    P.upsert('users',{...u,orgId:m.org_id,name:m.name,email:m.email,features:m.features||{},role:m.role==='owner'?'admin':m.role,siteIds:m.role==='manager'?m.site_ids:P.live('sites').filter(x=>x.orgId===m.org_id).map(x=>x.id)}); return u.id; },
   async remove(m){ if(CLOUD) return Cloud.removeMember(m.id); P.remove('users',m.id); }
 };
 VIEWS.users=(el)=>{
@@ -1248,13 +1248,23 @@ VIEWS.users=(el)=>{
       <div id="sb"><div class="lb">Locations they can use</div><div class="algrid" id="sitesG">${sites.map(x=>`<label class="${(m.site_ids||[]).includes(x.id)?'on':''}"><input type="checkbox" value="${x.id}" ${(m.site_ids||[]).includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join('')||'<span class="hint">Add a location first.</span>'}</div>
         <div class="lb" style="margin-top:14px">What this manager can use</div><div class="algrid" id="featG">${FEATURES.map(([k,l])=>{ const on=((m.features||{})[k])!==false; return `<label class="${on?'on':''}"><input type="checkbox" data-f="${k}" ${on?'checked':''}>${esc(l)}</label>`; }).join('')}</div>
         <p class="hint">Owners and admins always have every feature. Settings is owner/admin only.</p></div>
-      ${isNew?'<p class="hint" style="margin-top:12px">They sign in at label.proviewcrm.co.uk with “Sign in with Proview account” (same login as your other Proview apps), or “Create a login” with this email.</p>':''}`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">${isNew?'Add login':'Save'}</button>`);
+      <div class="fld" style="margin-top:14px"><label>${isNew?'Password':'New password'} <span class="hint">${isNew?'optional · set one and they can sign in straight away, no email needed':'optional · leave empty to keep their current password'}</span></label>
+        <div style="display:flex;gap:8px"><input class="inp" id="pw" type="text" autocomplete="new-password" placeholder="At least 8 characters" style="flex:1;font-family:ui-monospace,Menlo,monospace"><button class="btn ghost" id="pwg" type="button">Generate</button></div>
+        <div class="hint" style="margin-top:6px">Give it to them in person or by phone. They can change it any time with “Forgot password?”.</div></div>
+      ${isNew?'<p class="hint" style="margin-top:12px">Without a password they sign in at label.proviewcrm.co.uk with “Sign in with Proview account” (same login as your other Proview apps), or “Create a login” with this email.</p>':''}`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">${isNew?'Add login':'Save'}</button>`);
     const sync=()=>md.querySelector('#sb').style.display=md.querySelector('#r').value==='manager'?'':'none'; sync(); md.querySelector('#r').onchange=sync;
+    md.querySelector('#pwg').onclick=()=>{ const A='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', r=new Uint32Array(12); crypto.getRandomValues(r); md.querySelector('#pw').value=[...r].map(x=>A[x%A.length]).join(''); };
     md.querySelectorAll('.algrid input').forEach(cb=>cb.onchange=()=>cb.parentElement.classList.toggle('on',cb.checked));
     md.querySelector('#sv').onclick=async()=>{ const e=md.querySelector('#e').value.trim().toLowerCase(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return toast('Enter a valid email');
       const rec={...m,email:e,name:md.querySelector('#n').value.trim(),role:md.querySelector('#r').value,site_ids:[...md.querySelectorAll('#sitesG input:checked')].map(x=>x.value),features:Object.fromEntries([...md.querySelectorAll('#featG input')].map(x=>[x.dataset.f,x.checked]))};
       if(rec.role==='manager'&&!rec.site_ids.length) return toast('Pick at least one location for a manager');
-      try{ await Logins.save(rec); audit(isNew?'created':'updated','Login',e+' ('+rec.role+')',rec.org_id); closeModal(); toast(isNew?'Login added':'Saved'); render(); }catch(ex){ toast(Cloud.friendly?Cloud.friendly(ex):ex.message); } }; };
+      const pw=md.querySelector('#pw').value; if(pw&&pw.length<8) return toast('Use at least 8 characters for the password');
+      const btn=md.querySelector('#sv'); btn.disabled=true;
+      try{ const id=await Logins.save(rec); audit(isNew?'created':'updated','Login',e+' ('+rec.role+')',rec.org_id);
+        if(pw){ try{ if(CLOUD) await Cloud.setMemberPassword(id||rec.id,pw); audit('updated','Login password',e,rec.org_id); }
+          catch(px){ btn.disabled=false; closeModal(); render(); return toast((isNew?'Login added, but the password wasn’t set: ':'Password not changed: ')+px.message,true); } }
+        closeModal(); toast(pw?(isNew?'Login added · they can sign in now with that password':'Password changed'):(isNew?'Login added':'Saved')); render(); }
+      catch(ex){ btn.disabled=false; toast(Cloud.friendly?Cloud.friendly(ex):ex.message); } }; };
   const staffForm=(u,orgId)=>{ const isNew=!u; u=u||{id:P.uid('u_'),orgId,name:'',role:'staff',pin:'',siteIds:allowedSiteIds().filter(id=>(P.byId('sites',id)||{}).orgId===orgId&&(siteFilter===id||!P.byId('sites',siteFilter))).slice(0,1)};
     const sites=P.live('sites').filter(x=>x.orgId===u.orgId&&allowedSiteIds().includes(x.id));
     const md=modal((isNew?'Add device staff':'Edit device staff')+(multiOrg()||isMaster()?' · '+orgName(u.orgId):''),`<div class="g2"><div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(u.name)}"></div><div class="fld"><label>4-digit PIN</label><input class="inp" id="p" value="${esc(u.pin)}" maxlength="4" inputmode="numeric"></div></div><div class="fld"><label>On the device</label><select class="inp" id="r"><option value="staff">Staff</option><option value="manager" ${u.role==='manager'?'selected':''}>Manager (can edit products)</option></select></div><div class="lb">Locations they can use</div><div class="algrid">${sites.map(x=>`<label class="${(u.siteIds||[]).includes(x.id)?'on':''}"><input type="checkbox" value="${x.id}" ${(u.siteIds||[]).includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join('')}</div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
