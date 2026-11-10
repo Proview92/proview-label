@@ -536,11 +536,28 @@
     save();
   }
 
+  // product photo: square, centre-cropped, small JPEG (synced to every handheld, so kept ~15 KB)
+  function photoFromFile(file, size) {
+    size = size || 256;
+    return new Promise((resolve, reject) => {
+      if (!file || !/^image\//.test(file.type || '')) return reject(new Error('Choose a picture file'));
+      const rd = new FileReader();
+      rd.onerror = () => reject(new Error('Could not read the picture'));
+      rd.onload = () => { const img = new Image(); img.onerror = () => reject(new Error('Could not open the picture'));
+        img.onload = () => { const s0 = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = size;
+          const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, size, size);
+          g.drawImage(img, (img.width - s0) / 2, (img.height - s0) / 2, s0, s0, 0, 0, size, size);
+          resolve(c.toDataURL('image/jpeg', 0.72)); };
+        img.src = rd.result; };
+      rd.readAsDataURL(file);
+    });
+  }
+
   global.PVL = {
     ALLERGENS, ALLERGEN_LABEL, ALLERGEN_WORDS, CATEGORY_COLOURS, LABEL_TYPES, WASTE_REASONS, ROLES, COLLECTIONS,
     uid, now, fmtDate, fmtDay, fmtTime, esc, money, initials, stripHtml,
     detectAllergens, boldAllergens, productAllergens, computeExpiry, expiryStatus, ruleText, labelCode,
     seed, blank, useStore, forget, load, save, reset, get, on, upsert, remove, live, byId, audit,
-    toCSV, parseCSV, analyseMenu, sync, prune, cloudStores, exportJSON, importJSON, ensureRules, DEFAULT_RULES
+    toCSV, parseCSV, analyseMenu, sync, prune, cloudStores, exportJSON, importJSON, ensureRules, DEFAULT_RULES, photoFromFile
   };
 })(typeof window !== 'undefined' ? window : globalThis);

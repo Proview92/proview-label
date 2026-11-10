@@ -889,12 +889,29 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     save();
   }
 
+  // product photo: square, centre-cropped, small JPEG (synced to every handheld, so kept ~15 KB)
+  function photoFromFile(file, size) {
+    size = size || 256;
+    return new Promise((resolve, reject) => {
+      if (!file || !/^image\//.test(file.type || '')) return reject(new Error('Choose a picture file'));
+      const rd = new FileReader();
+      rd.onerror = () => reject(new Error('Could not read the picture'));
+      rd.onload = () => { const img = new Image(); img.onerror = () => reject(new Error('Could not open the picture'));
+        img.onload = () => { const s0 = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = size;
+          const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, size, size);
+          g.drawImage(img, (img.width - s0) / 2, (img.height - s0) / 2, s0, s0, 0, 0, size, size);
+          resolve(c.toDataURL('image/jpeg', 0.72)); };
+        img.src = rd.result; };
+      rd.readAsDataURL(file);
+    });
+  }
+
   global.PVL = {
     ALLERGENS, ALLERGEN_LABEL, ALLERGEN_WORDS, CATEGORY_COLOURS, LABEL_TYPES, WASTE_REASONS, ROLES, COLLECTIONS,
     uid, now, fmtDate, fmtDay, fmtTime, esc, money, initials, stripHtml,
     detectAllergens, boldAllergens, productAllergens, computeExpiry, expiryStatus, ruleText, labelCode,
     seed, blank, useStore, forget, load, save, reset, get, on, upsert, remove, live, byId, audit,
-    toCSV, parseCSV, analyseMenu, sync, prune, cloudStores, exportJSON, importJSON, ensureRules, DEFAULT_RULES
+    toCSV, parseCSV, analyseMenu, sync, prune, cloudStores, exportJSON, importJSON, ensureRules, DEFAULT_RULES, photoFromFile
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -1872,7 +1889,7 @@ VIEWS.products=(el)=>{
   el.innerHTML=`<div class="ph"><div><h1>Products</h1><p>Changes sync to every device at the next sync.</p></div><div class="btns"><label class="btn ghost">Import CSV<input type="file" accept=".csv,text/csv" id="csvIn" hidden></label><button class="btn ghost" id="csvOut">Export CSV</button><button class="btn" id="addP">+ Add product</button></div></div>${multiOrg()?`<div class="banner" style="background:var(--pri-l);border-color:#c9d6f7">${ic('grid',18)}<div><b>Showing ${scopeOrgIds().length} businesses</b><span class="hint">Each business has its own products. Pick one in the picker under the logo to work on just that menu.</span></div></div>`:''}
   <div class="filters"><input id="fq" placeholder="Search products" value="${esc(pf.q)}"><select id="ft"><option value="all">Prep & sale</option><option value="prep" ${pf.type==='prep'?'selected':''}>Prep labels</option><option value="sale" ${pf.type==='sale'?'selected':''}>Sale (PPDS) labels</option></select><select id="fc"><option value="all">All categories</option>${cats.map(c=>`<option value="${c.id}" ${pf.cat===c.id?'selected':''}>${esc(c.name)} (${c.type})</option>`).join('')}</select><span class="count">${ps.length} products</span></div>
   <div class="tbl"><table><thead><tr><th>Product</th>${multiOrg()?'<th>Business</th>':''}<th>Category</th><th>Allergens</th><th>Expiry rule</th><th>Price</th><th>Printed</th><th></th></tr></thead><tbody>
-  ${ps.map(p=>{const c=catOf(p);const al=P.productAllergens(p);const r=P.byId('rules',p.ruleId);return `<tr><td><b>${esc(p.name)}</b> ${p.approved===false?'<span class="tag blue">Awaiting approval</span>':''}${p.mayContain?`<div class="hint">May contain: ${esc(p.mayContain)}</div>`:''}</td>${multiOrg()?`<td class="hint">${esc(orgName(p.orgId))}</td>`:''}<td><span class="swatch" style="background:${c.color||'#546E7A'}"></span>${esc(c.name||'')} <span class="tag mute">${c.type||''}</span></td><td>${al.map(a=>`<span class="chip">${esc(a)}</span>`).join('')||'<span class="hint">None</span>'}${p.customAllergens?`<span class="chip">${esc(p.customAllergens)}</span>`:''}</td><td>${r?esc(r.name)+' <span class="hint">'+P.ruleText(r)+'</span>':'<span class="hint">Storage location</span>'}</td><td>${p.price!=null?P.money(p.price):'—'}</td><td>${p.timesPrinted||0}</td><td style="white-space:nowrap">${p.approved===false?`<button class="btn sm" data-ap="${p.id}">Approve</button> `:''}<button class="icbtn" data-prev="${p.id}" title="Preview label">👁</button><button class="icbtn" data-ed="${p.id}" title="Edit">✎</button><button class="icbtn" data-del="${p.id}" title="Delete">🗑</button></td></tr>`;}).join('')||'<tr><td colspan="7" class="empty">No products match.</td></tr>'}</tbody></table></div>`;
+  ${ps.map(p=>{const c=catOf(p);const al=P.productAllergens(p);const r=P.byId('rules',p.ruleId);return `<tr><td>${p.image?`<img src="${p.image}" alt="" style="width:34px;height:34px;border-radius:7px;object-fit:cover;vertical-align:middle;margin-right:9px;float:left">`:''}<b>${esc(p.name)}</b> ${p.approved===false?'<span class="tag blue">Awaiting approval</span>':''}${p.mayContain?`<div class="hint">May contain: ${esc(p.mayContain)}</div>`:''}</td>${multiOrg()?`<td class="hint">${esc(orgName(p.orgId))}</td>`:''}<td><span class="swatch" style="background:${c.color||'#546E7A'}"></span>${esc(c.name||'')} <span class="tag mute">${c.type||''}</span></td><td>${al.map(a=>`<span class="chip">${esc(a)}</span>`).join('')||'<span class="hint">None</span>'}${p.customAllergens?`<span class="chip">${esc(p.customAllergens)}</span>`:''}</td><td>${r?esc(r.name)+' <span class="hint">'+P.ruleText(r)+'</span>':'<span class="hint">Storage location</span>'}</td><td>${p.price!=null?P.money(p.price):'—'}</td><td>${p.timesPrinted||0}</td><td style="white-space:nowrap">${p.approved===false?`<button class="btn sm" data-ap="${p.id}">Approve</button> `:''}<button class="icbtn" data-prev="${p.id}" title="Preview label">👁</button><button class="icbtn" data-ed="${p.id}" title="Edit">✎</button><button class="icbtn" data-del="${p.id}" title="Delete">🗑</button></td></tr>`;}).join('')||'<tr><td colspan="7" class="empty">No products match.</td></tr>'}</tbody></table></div>`;
   const fq=el.querySelector('#fq'); fq.oninput=()=>{pf.q=fq.value; clearTimeout(fq._t); fq._t=setTimeout(()=>{render(); const n=$('#fq'); n.focus(); n.setSelectionRange(n.value.length,n.value.length);},250);};
   el.querySelector('#ft').onchange=e=>{pf.type=e.target.value;render();}; el.querySelector('#fc').onchange=e=>{pf.cat=e.target.value;render();};
   el.querySelector('#addP').onclick=()=>withOrg(o=>productModal(null,o));
@@ -1905,6 +1922,7 @@ function productModal(p,orgId){
   if(!cats.length) return toast('Add a category for '+orgName(orgId)+' first (Categories).');
   p=p?JSON.parse(JSON.stringify(p)):{id:P.uid('p_'),orgId,categoryId:cats[0].id,name:'',allergens:[],mayContain:'',customAllergens:'',ingredients:'',price:null,barcode:'',ruleId:null,dateType:'use-by',prepGuide:'',timesPrinted:0,approved:true};
   const m=modal((isNew?'Add product':'Edit product')+(multiOrg()||isMaster()?' · '+orgName(orgId):''),`
+    <div class="fld"><label>Picture <span class="hint">shown on the product button on handhelds</span></label><div style="display:flex;align-items:center;gap:12px"><img id="pImg" alt="" style="width:64px;height:64px;border-radius:10px;object-fit:cover;background:#f4f3ef;border:1px solid var(--line);${p.image?'':'display:none'}" src="${p.image||''}"><label class="btn ghost sm">${p.image?'Change picture':'Upload picture'}<input type="file" id="pPic" accept="image/*" hidden></label><button class="btn ghost sm" id="pPicX" type="button" style="color:#d92d20;${p.image?'':'display:none'}">Remove</button></div></div>
     <div class="g2"><div class="fld"><label>Product name</label><input class="inp" id="n" value="${esc(p.name)}" maxlength="50"></div>
     <div class="fld"><label>Category</label><select class="inp" id="c">${cats.map(c=>`<option value="${c.id}" ${c.id===p.categoryId?'selected':''}>${esc(c.name)} · ${c.type==='sale'?'Sale':'Prep'}</option>`).join('')}</select></div></div>
     <div class="fld"><label style="display:flex;justify-content:space-between">Ingredients <span class="hint">Required for sale (PPDS) labels · <button class="btn ghost sm" id="bb" type="button"><b>B</b></button> <button class="btn ghost sm" id="ab" type="button">Auto-bold allergens</button></span></label><div class="inp rte" id="ing" contenteditable="true">${p.ingredients||''}</div><div class="hint" id="det" style="margin-top:4px"></div></div>
@@ -1920,9 +1938,13 @@ function productModal(p,orgId){
   m.querySelector('#bb').onmousedown=e=>{e.preventDefault();document.execCommand('bold');};
   m.querySelector('#ab').onclick=()=>{ ing.innerHTML=P.boldAllergens(ing.innerHTML); det(); };
   m.querySelectorAll('#al input').forEach(cb=>cb.onchange=()=>cb.parentElement.classList.toggle('on',cb.checked));
+  let img=p.image||null;
+  m.querySelector('#pPic').onchange=async e=>{ try{ img=await P.photoFromFile(e.target.files[0]); const im=m.querySelector('#pImg'); im.src=img; im.style.display=''; m.querySelector('#pPicX').style.display=''; }catch(err){ toast(err.message); } };
+  m.querySelector('#pPicX').onclick=()=>{ img=null; m.querySelector('#pImg').style.display='none'; m.querySelector('#pPicX').style.display='none'; };
   m.querySelector('#sv').onclick=()=>{
     const name=m.querySelector('#n').value.trim(); if(!name) return toast('Enter a name');
     const before=JSON.stringify([p.allergens.slice().sort(),p.name]);
+    p.image=img||null;
     Object.assign(p,{name,categoryId:m.querySelector('#c').value,ingredients:ing.innerHTML.trim()?P.boldAllergens(ing.innerHTML):'',allergens:[...m.querySelectorAll('#al input:checked')].map(x=>x.value),mayContain:m.querySelector('#mc').value.trim(),customAllergens:m.querySelector('#ca').value.trim(),price:(v=>isNaN(v)?null:v)(parseFloat(m.querySelector('#pr').value)),barcode:m.querySelector('#bc').value.trim(),dateType:m.querySelector('#dt').value,ruleId:m.querySelector('#r').value||null,prepGuide:m.querySelector('#pg').value.trim()});
     if(catOf(p).type==='sale'&&!P.stripHtml(p.ingredients).trim()) return toast('Sale (PPDS) labels need a full ingredients list');
     P.upsert('products',p); audit(isNew?'created':'updated','Product',p.name+(before!==JSON.stringify([p.allergens.slice().sort(),p.name])&&!isNew?' – allergens now: '+(p.allergens.join(', ')||'none'):''),p.orgId);

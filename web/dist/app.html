@@ -304,6 +304,27 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
 .toast{background:#141418;border-radius:12px}
 .preview-wrap{background:#efeee9}
 .spin{border-color:var(--blue-l);border-top-color:var(--blue)}
+
+/* ---------- Easy / Detailed mode ---------- */
+.modeTgl{flex:none;height:34px;padding:0 11px 0 9px;border-radius:17px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap;border:1px solid rgba(255,255,255,.22)}
+.modeTgl i{width:22px;height:13px;border-radius:7px;background:rgba(255,255,255,.35);position:relative;flex:none}
+.modeTgl i:after{content:"";position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:50%;background:#fff;transition:left .15s}
+.modeTgl.ez i{background:#3ecf8e}.modeTgl.ez i:after{left:11px}
+.ezchips-unused{display:flex;gap:8px;overflow-x:auto;padding:12px 14px 2px;scrollbar-width:none}.ezchips::-webkit-scrollbar{display:none}
+.ezchips button{flex:none;height:40px;padding:0 16px;border-radius:20px;background:#fff;border:1px solid var(--line);font:inherit;font-size:15px;font-weight:600;color:#141418}
+.ezchips button.on{background:var(--grad,#4a6cd0);color:#fff;border-color:transparent}
+.ezgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:12px 14px 18px}
+.ezgrid .ptile{min-height:120px;font-size:19px;font-weight:700;line-height:1.2}
+.ezcats .tile{min-height:110px;font-size:20px}
+.ptile.hasimg{padding:6px 6px 8px;justify-content:flex-start;gap:6px}
+.ptile .pimg{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block;background:#f4f3ef}
+.ezgrid .ptile .pimg{border-radius:10px}
+.ezpic{display:block;width:160px;height:160px;object-fit:cover;border-radius:14px;margin:4px auto 0}
+.ezq{display:flex;align-items:center;justify-content:center;gap:22px;margin:18px 0 6px}
+.ezq button{width:64px;height:64px;border-radius:50%;font-size:32px;font-weight:700;background:#fff;border:1px solid var(--line);color:#141418}
+.ezq b{font-size:44px;min-width:70px;text-align:center}
+.ezbig{width:100%;min-height:64px;font-size:21px!important}
+.ezinfo{background:#f4f3ef;border-radius:12px;padding:12px 14px;font-size:15px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -879,12 +900,29 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
     save();
   }
 
+  // product photo: square, centre-cropped, small JPEG (synced to every handheld, so kept ~15 KB)
+  function photoFromFile(file, size) {
+    size = size || 256;
+    return new Promise((resolve, reject) => {
+      if (!file || !/^image\//.test(file.type || '')) return reject(new Error('Choose a picture file'));
+      const rd = new FileReader();
+      rd.onerror = () => reject(new Error('Could not read the picture'));
+      rd.onload = () => { const img = new Image(); img.onerror = () => reject(new Error('Could not open the picture'));
+        img.onload = () => { const s0 = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = size;
+          const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, size, size);
+          g.drawImage(img, (img.width - s0) / 2, (img.height - s0) / 2, s0, s0, 0, 0, size, size);
+          resolve(c.toDataURL('image/jpeg', 0.72)); };
+        img.src = rd.result; };
+      rd.readAsDataURL(file);
+    });
+  }
+
   global.PVL = {
     ALLERGENS, ALLERGEN_LABEL, ALLERGEN_WORDS, CATEGORY_COLOURS, LABEL_TYPES, WASTE_REASONS, ROLES, COLLECTIONS,
     uid, now, fmtDate, fmtDay, fmtTime, esc, money, initials, stripHtml,
     detectAllergens, boldAllergens, productAllergens, computeExpiry, expiryStatus, ruleText, labelCode,
     seed, blank, useStore, forget, load, save, reset, get, on, upsert, remove, live, byId, audit,
-    toCSV, parseCSV, analyseMenu, sync, prune, cloudStores, exportJSON, importJSON, ensureRules, DEFAULT_RULES
+    toCSV, parseCSV, analyseMenu, sync, prune, cloudStores, exportJSON, importJSON, ensureRules, DEFAULT_RULES, photoFromFile
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -1008,7 +1046,7 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
 const P = window.PVL;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -1058,7 +1096,7 @@ const LOCK_KEY = 'pvl-lock';
 let LOCK = null;   // { title, text } while this handheld's business is locked
 try { LOCK = connected() ? JSON.parse(localStorage.getItem(LOCK_KEY) || 'null') : null; } catch (e) { LOCK = null; }
 const ui = {
-  screen: 'home', stack: [], tab: localStorageGet('pvl_tab') || 'prep', category: null, sort: 'alpha',
+  screen: 'home', stack: [], tab: localStorageGet('pvl_tab') || 'prep', mode: localStorageGet('pvl_mode') || 'detailed', ezCat: 'all', category: null, sort: 'alpha',
   ruleId: localStorageGet('pvl_rule') || 'r_fridge', queue: [], printing: false, syncing: false,
   bulk: {}, bulkOpen: {}, logFilter: 'all', search: ''
 };
@@ -1095,16 +1133,18 @@ const TITLES = { home:'Categories', products:'Products', search:'Search', storag
 const MENU_ROOTS = ['home','logs','bulk','scan','wastage','order','profiles','about','support','settings'];
 function renderHeader(){
   const isRoot = MENU_ROOTS.includes(ui.screen) && ui.stack.length===0 || ui.screen==='home';
-  const title = ui.screen==='products' && ui.category ? ui.category.name : TITLES[ui.screen];
+  const title = (ui.screen==='products'||ui.screen==='ezprod') && ui.category ? ui.category.name : TITLES[ui.screen];
   $('#hdr').innerHTML = `
     <button class="ic" id="hNav" aria-label="${isRoot?'Menu':'Back'}">${isRoot?I.menu:I.back}</button>
     <h1>${esc(title)}</h1>
-    ${['home','products'].includes(ui.screen)?`<button class="ic" id="hSearch" aria-label="Search">${I.search}</button>`:''}
-    <button class="ic" id="hSync" aria-label="Sync">${I.sync}</button>
-    <button class="avatar" id="hUser" aria-label="Switch profile">${esc(P.initials(user().name))}</button>`;
+    ${['home','products'].includes(ui.screen)&&ui.mode!=='easy'?`<button class="ic" id="hSearch" aria-label="Search">${I.search}</button>`:''}
+    ${ui.mode!=='easy'?`<button class="ic" id="hSync" aria-label="Sync">${I.sync}</button>`:''}
+    <button class="avatar" id="hUser" aria-label="Switch profile">${esc(P.initials(user().name))}</button>
+    <button class="modeTgl ${ui.mode==='easy'?'ez':''}" id="hMode" aria-label="Switch between Easy and Detailed mode" title="Switch mode"><i></i>${ui.mode==='easy'?'Easy':'Detailed'}</button>`;
   $('#hNav').onclick = isRoot ? openDrawer : back;
   const hs=$('#hSearch'); if(hs) hs.onclick=()=>go('search',{search:''});
-  $('#hSync').onclick = doSync;
+  const hy=$('#hSync'); if(hy) hy.onclick = doSync;
+  $('#hMode').onclick = ()=>{ ui.mode = ui.mode==='easy'?'detailed':'easy'; localStorageSet('pvl_mode',ui.mode); toast(ui.mode==='easy'?'Easy mode: tap a product, then Print':'Detailed mode: all options'); root('home'); };
   $('#hUser').onclick = openSwitch;
   if(ui.syncing) $('#hSync svg').style.animation='sp 1s linear infinite';
 }
@@ -1119,6 +1159,8 @@ function renderStatus(){
 }
 function renderFooter(){
   const f=$('#ftr');
+  if(ui.mode==='easy'){ const qn=ui.queue.reduce((a,x)=>a+x.qty,0); if(!['home','ezprod'].includes(ui.screen)||!qn){ f.style.display='none'; return; }
+    f.style.display='flex'; f.innerHTML=`<button class="fb" id="fQueue" aria-label="Print queue" style="flex:1">${I.queue} ${qn} label${qn!==1?'s':''} printing<span class="badge">${qn}</span></button>`; $('#fQueue').onclick=showQueue; return; }
   if(!['home','products','search'].includes(ui.screen)){ f.style.display='none'; return; }
   f.style.display='flex';
   const r=rule(ui.ruleId); const qn=ui.queue.reduce((a,x)=>a+x.qty,0);
@@ -1130,8 +1172,11 @@ function renderFooter(){
   const fq=$('#fQueue'); if(fq) fq.onclick=showQueue;
 }
 function openDrawer(){
-  const items=[['home','Print Screen',I.print],['logs','Logs',I.log],['bulk','Bulk Print',I.stack],['scan','Scan to print mode',I.scan],['wastage','Wastage',I.bin],['order','Label Order',I.box]];
-  const inv=[['profiles','Manage Profiles',I.users],['switch','Switch Profiles',I.swap],['about','About Device',I.info],['support','Support',I.help],['settings','Settings',I.gear]];
+  const ez=ui.mode==='easy';
+  const items=ez?[['home','Print Screen',I.print],['scan','Scan to print mode',I.scan]]
+    :[['home','Print Screen',I.print],['logs','Logs',I.log],['bulk','Bulk Print',I.stack],['scan','Scan to print mode',I.scan],['wastage','Wastage',I.bin],['order','Label Order',I.box]];
+  const inv=ez?[['switch','Switch Profiles',I.swap],['support','Support',I.help],['settings','Settings',I.gear]]
+    :[['profiles','Manage Profiles',I.users],['switch','Switch Profiles',I.swap],['about','About Device',I.info],['support','Support',I.help],['settings','Settings',I.gear]];
   $('#drawer').innerHTML = `<div class="dh"><div class="pv-logo"><div class="mk">PV</div><div class="wd">PROVIEW<span>LABEL</span><small>${esc(site().name.toUpperCase())}</small></div></div><button class="ic" id="dClose" style="color:#000">${I.close}</button></div>
     <div class="dl">${items.map(([k,l,ic])=>`<button class="mi ${ui.screen===k?'on':''}" data-k="${k}">${ic}${l}</button>`).join('')}
       <div class="divider" style="margin:10px 8px"></div>
@@ -1164,7 +1209,37 @@ function prodsFor(catId){ return L('products').filter(p=>p.categoryId===catId); 
 function segHTML(){ return `<div class="seg" id="seg"><button data-t="prep" class="${ui.tab==='prep'?'on':''}">Prep</button><button data-t="sale" class="${ui.tab==='sale'?'on':''}">Sale</button></div>`; }
 function bindSeg(after){ $('#seg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ ui.tab=b.dataset.t; localStorageSet('pvl_tab',ui.tab); after?after():render(); }); }
 
+// ---------- Easy mode: categories → products → − 1 + → Print ----------
+function easyHome(){
+  const cats=[...catsFor('prep'),...catsFor('sale')];
+  $('#main').innerHTML = cats.length?`<div class="grid ezcats">${cats.map(c=>`<button class="tile" data-c="${c.id}" style="background:${c.color||'#546E7A'}">${esc(c.name)}</button>`).join('')}</div>`
+    :`<div class="empty">${I.box}<b>No categories yet</b>A manager can add them in Detailed mode or on label.proviewcrm.co.uk.</div>`;
+  $('#main').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{ const c=P.byId('categories',b.dataset.c); ui.tab=c.type; go('ezprod',{category:c}); });
+}
+screens.ezprod = () => {
+  const c=ui.category; if(!c) return root('home');
+  const ps=prodsFor(c.id).sort((a,b)=>a.name.localeCompare(b.name));
+  $('#main').classList.add('grey');
+  $('#main').innerHTML = ps.length?`<div class="ezgrid">${ps.map(p=>productTile(p,true)).join('')}</div>`
+    :`<div class="empty">${I.box}<b>No products in ${esc(c.name)}</b>A manager can add them in Detailed mode or on label.proviewcrm.co.uk.</div>`;
+  $('#main').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>easyPrint(P.byId('products',b.dataset.p)));
+};
+function easyPrint(p){
+  if(!p) return;
+  if(connected()&&LOCK) return applyLock();
+  let qty=1; const j=buildJob(p,{}); const hrs=j.rule&&j.rule.period==='hours';
+  const body=`${p.image?`<img src="${p.image}" alt="" class="ezpic">`:''}
+    <div class="ezq"><button id="qm" aria-label="One less">−</button><b id="qv">1</b><button id="qp" aria-label="One more">+</button></div>
+    ${j.type==='prep'||j.includeDate?`<p class="hint" style="text-align:center;margin:4px 0 0">${j.dateType==='best-before'?'Best before':'Use by'} ${P.fmtDay(j.expiry)} ${P.fmtDate(j.expiry,hrs)}</p>`:''}`;
+  const sh=openSheet(p.name, body, `<button class="btn blue ezbig" id="ezGo">${I.print} Print</button>`);
+  const upd=()=>{ sh.querySelector('#qv').textContent=qty; };
+  sh.querySelector('#qm').onclick=()=>{ qty=Math.max(1,qty-1); upd(); };
+  sh.querySelector('#qp').onclick=()=>{ qty=Math.min(99,qty+1); upd(); };
+  sh.querySelector('#ezGo').onclick=()=>{ enqueue({...buildJob(p,{}),qty}); closeSheet(); toast(`Printing ${qty} × ${p.name}`); };
+}
+
 screens.home = () => {
+  if(ui.mode==='easy') return easyHome();
   const cats=catsFor(ui.tab);
   $('#main').innerHTML = segHTML() + `<div class="grid">${cats.map(c=>`<button class="tile" data-c="${c.id}" style="background:${c.color||'#546E7A'}">${esc(c.name)}</button>`).join('')}</div>
     ${cats.length?'':'<div class="empty">No categories yet</div>'}
@@ -1174,7 +1249,7 @@ screens.home = () => {
   $('#addCat').onclick=()=>needManager(newCategory);
 };
 
-function productTile(p){ const al=P.productAllergens(p); return `<button class="ptile" data-p="${p.id}">${esc(p.name)}${al.length?`<span class="chips">${al.slice(0,3).map(a=>`<span class="chip">${esc(a)}</span>`).join('')}${al.length>3?`<span class="chip">+${al.length-3}</span>`:''}</span>`:''}${p.price!=null&&ui.tab==='sale'?`<span class="hint">${P.money(p.price)}</span>`:''}</button>`; }
+function productTile(p,big){ const al=P.productAllergens(p); return `<button class="ptile${p.image?' hasimg':''}" data-p="${p.id}">${p.image?`<img src="${p.image}" alt="" class="pimg">`:''}<span class="pn">${esc(p.name)}</span>${al.length?`<span class="chips">${al.slice(0,3).map(a=>`<span class="chip">${esc(a)}</span>`).join('')}${al.length>3?`<span class="chip">+${al.length-3}</span>`:''}</span>`:''}${p.price!=null&&ui.tab==='sale'?`<span class="hint">${P.money(p.price)}</span>`:''}</button>`; }
 screens.products = () => {
   const c=ui.category; if(!c) return root('home');
   let ps=prodsFor(c.id);
@@ -1471,7 +1546,8 @@ function productForm(p, cat){
   const isNew=!p; const c=cat||P.byId('categories',p.categoryId); const sale=c.type==='sale';
   p = p ? JSON.parse(JSON.stringify(p)) : {id:P.uid('p_'),categoryId:c.id,name:'',allergens:[],mayContain:'',customAllergens:'',ingredients:'',price:null,barcode:'',ruleId:null,dateType:'use-by',prepGuide:'',timesPrinted:0,approved:true};
   const rs=L('rules');
-  const body = `<div class="fld"><div class="lbl">Product Name</div><input class="inp" id="pn" maxlength="50" value="${esc(p.name)}"></div>
+  const body = `<div class="fld"><div class="lbl">Picture <span class="hint" style="font-weight:400">shown on the product button</span></div><div class="row" style="align-items:center;gap:12px"><img id="pImg" alt="" style="width:72px;height:72px;border-radius:10px;object-fit:cover;background:#f4f3ef;${p.image?'':'display:none'}" src="${p.image||''}"><label class="btn ghost sm" style="flex:1">${p.image?'Change picture':'Add picture'}<input type="file" id="pPic" accept="image/*" hidden></label>${p.image?'<button class="btn ghost sm" id="pPicX" type="button" style="color:#d92d20">Remove</button>':''}</div></div>
+    <div class="fld"><div class="lbl">Product Name</div><input class="inp" id="pn" maxlength="50" value="${esc(p.name)}"></div>
     ${sale?`<div class="fld"><div class="lbl">Ingredients <span><button class="pill" id="boldB" type="button"><b>B</b></button> <button class="pill blue" id="autoB" type="button">Auto-bold allergens</button></span></div><div class="inp rte" id="ing" contenteditable="true">${p.ingredients||''}</div><div class="hint" id="detected"></div></div>
       <div class="row"><div class="fld" style="flex:1"><div class="lbl">Price (£)</div><input class="inp" id="pr" inputmode="decimal" value="${p.price!=null?p.price:''}"></div><div class="fld" style="flex:1"><div class="lbl">Date type</div><select class="inp" id="dt"><option value="use-by" ${p.dateType==='use-by'?'selected':''}>Use by</option><option value="best-before" ${p.dateType==='best-before'?'selected':''}>Best before</option></select></div></div>`:''}
     <div class="fld"><div class="lbl">Custom Expiry Rule</div><select class="inp" id="pr2"><option value="">Use storage location</option>${rs.map(r=>`<option value="${r.id}" ${p.ruleId===r.id?'selected':''}>${esc(r.name)} (${P.ruleText(r)})</option>`).join('')}</select></div>
@@ -1487,8 +1563,12 @@ function productForm(p, cat){
   if(ing){ const upd=()=>{ const d=P.detectAllergens(ing.innerHTML); sh.querySelector('#detected').innerHTML=d.length?'Detected: <b>'+d.join(', ')+'</b>':'No allergens detected yet'; }; ing.oninput=upd; upd();
     sh.querySelector('#boldB').onmousedown=e=>{ e.preventDefault(); document.execCommand('bold'); };
     sh.querySelector('#autoB').onclick=()=>{ ing.innerHTML=P.boldAllergens(ing.innerHTML); upd(); }; }
+  let img=p.image||null;
+  sh.querySelector('#pPic').onchange=async e=>{ try{ img=await P.photoFromFile(e.target.files[0]); const im=sh.querySelector('#pImg'); im.src=img; im.style.display=''; }catch(err){ toast(err.message); } };
+  const px=sh.querySelector('#pPicX'); if(px) px.onclick=()=>{ img=null; sh.querySelector('#pImg').style.display='none'; px.remove(); };
   sh.querySelector('#pGo').onclick=()=>{
     const name=sh.querySelector('#pn').value.trim(); if(!name) return toast('Enter a product name');
+    p.image=img||null;
     p.name=name; p.mayContain=sh.querySelector('#mc').value.trim(); p.customAllergens=sh.querySelector('#ca').value.trim(); p.barcode=sh.querySelector('#bc').value.trim(); p.ruleId=sh.querySelector('#pr2').value||null;
     if(sale){ p.ingredients=P.boldAllergens(ing.innerHTML); p.allergens=P.detectAllergens(p.ingredients); const pr=parseFloat(sh.querySelector('#pr').value); p.price=isNaN(pr)?null:pr; p.dateType=sh.querySelector('#dt').value; }
     else p.prepGuide=sh.querySelector('#pg').value.trim();
