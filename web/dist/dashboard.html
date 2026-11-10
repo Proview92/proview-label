@@ -1727,7 +1727,7 @@ function render(){
   // header (same as Proview Signage): tray (status, search, chat, inbox, notifications), Proview dashboard, avatar and sign out
   const top=$('#top');
   if(window.PVHub){ const cap=PVHub.tray({dot:syncDot(),bell:bellBtn()}); top.appendChild(cap); const d=PVHub.dashLink(u.role!=='manager'); if(d) top.appendChild(d); PVHub.paint(); }
-  top.insertAdjacentHTML('beforeend',`<div class="top-me"><button class="top-av" id="tbMe" title="${esc(u.name)} · ${esc(acctSub(u))}" aria-label="My account" aria-haspopup="menu" aria-expanded="false">${esc(P.initials(u.name))}</button><button class="icon-btn top-out" id="tbOut" title="Sign out" aria-label="Sign out">${ic('out',18)}</button></div>`);
+  top.insertAdjacentHTML('beforeend',`<div class="top-me"><button class="top-av" id="tbMe" title="${esc(u.name)} · ${esc(acctSub(u))}" aria-label="My account" aria-haspopup="menu" aria-expanded="false">${esc(meInitials(u))}</button><button class="icon-btn top-out" id="tbOut" title="Sign out" aria-label="Sign out">${ic('out',18)}</button></div>`);
   VIEWS[r]($('#main'));
   const tbn=trialBanner(); if(tbn&&r!=='sites') $('#main').insertAdjacentHTML('afterbegin',tbn);
   const sp=$('#sitePick'); if(sp&&!sp.disabled) sp.onchange=e=>pickSite(e.target.value);
@@ -1736,15 +1736,16 @@ function render(){
   $('#tbOut').onclick=()=>signOut();
   // avatar: the account menu under it (same as Proview Signage): who's signed in, Users & permissions, Sync now, Sign out
   $('#tbMe').onclick=(e)=>{ const b=e.currentTarget; if(!window.PVHub||!PVHub.accountMenu) return accountModal(u);
-    PVHub.accountMenu(b,{ initials:P.initials(u.name), name:u.name, email:u.email||'', sub:acctSub(u), focusFirst:e.detail===0,
+    PVHub.accountMenu(b,{ initials:meInitials(u), name:u.name, email:u.email||'', sub:acctSub(u), focusFirst:e.detail===0,
       items:[ !masterAll()&&canView('users')?{label:'Users & permissions',icon:'users',href:'#users'}:null,
         {label:'Your account',icon:'user',run:()=>accountModal(u)},
         {label:'Sync now',icon:ICON.sync,run:()=>doSync(false)},
         {label:'Sign out',icon:'logout',run:()=>signOut(),sep:true} ].filter(Boolean) }); };
 }
+const meInitials=(u)=>u.email?P.initials(String(u.email).split('@')[0]):P.initials(u.name);
 const acctSub=(u)=>[u.role==='master'?'Proview master':u.rawRole==='owner'?'Owner':P.ROLES[u.role], u.role!=='master'||curOrg()?(curOrg()?orgName(curOrg()):visibleOrgs().length===1?visibleOrgs()[0].name:''):''].filter(Boolean).join(' · ');
 function accountModal(u){
-  const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(P.initials(u.name))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open any business or location from Locations or the location dropdown, one business at a time.':'You can see '+mySiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
+  const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(meInitials(u))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?'Proview master: you can open any business or location from Locations or the location dropdown, one business at a time.':'You can see '+mySiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
     m.querySelector('#mo').onclick=()=>{closeModal();signOut();}; m.querySelector('#msync').onclick=()=>{closeModal();doSync(false);}; }
 // ---------- header tray: status dot (sync), search, chat, inbox and notifications ----------
 let SYNC_STATE='ok';
