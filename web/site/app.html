@@ -340,6 +340,8 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
 .pairwait{display:flex;align-items:center;gap:10px;margin-top:16px;color:#9a9aa4;font-size:14px}
 .pairerr{margin-top:12px;background:#3a1f1f;color:#f2b8be;border-radius:10px;padding:10px 14px;font-size:14px;max-width:340px}
 .pairscreen .langBtn{position:absolute;top:calc(14px + var(--safe-t));right:14px}
+.bulkBtn{flex:none;height:36px;padding:0 12px 0 10px;border-radius:18px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.bulkBtn:active{background:#26262e}
 /* ---------- language ---------- */
 .hdr{gap:6px}
 .langBtn{flex:none;width:36px;height:36px;border-radius:50%;overflow:hidden;padding:0;box-shadow:0 0 0 2px rgba(255,255,255,.55);background:#fff}
@@ -3543,6 +3545,7 @@ var qrcode = function() {
     'Products': ['Ürünler', 'Produse', 'Продукти'],
     'Search': ['Ara', 'Căutare', 'Търсене'],
     'Storage Location': ['Saklama Yeri', 'Loc de depozitare', 'Място на съхранение'],
+    'Bulk': ['Toplu', 'În masă', 'Масов'],
     'Bulk Print': ['Toplu Yazdır', 'Tipărire în masă', 'Масов печат'],
     'Scan to Print': ['Tarayıp Yazdır', 'Scanează și tipărește', 'Сканирай и печатай'],
     'Logs': ['Kayıtlar', 'Jurnale', 'Дневници'],
@@ -4235,12 +4238,14 @@ function renderHeader(){
     <h1>${esc(title)}</h1>
     ${['home','products'].includes(ui.screen)&&ui.mode!=='easy'?`<button class="ic" id="hSearch" aria-label="Search">${I.search}</button>`:''}
     ${ui.mode!=='easy'?`<button class="ic" id="hSync" aria-label="Sync">${I.sync}</button>`:''}
+    ${ui.screen!=='bulk'?`<button class="bulkBtn" id="hBulk" aria-label="Bulk Print">${I.stack.replace('width="24" height="24"','width="18" height="18"')}<span>Bulk</span></button>`:''}
     <button class="langBtn" id="hLang" aria-label="Language" data-notr>${T.FLAGS[T.lang()]}</button>
 `;
   $('#hNav').onclick = isRoot ? openDrawer : back;
   const hs=$('#hSearch'); if(hs) hs.onclick=()=>go('search',{search:''});
   const hy=$('#hSync'); if(hy) hy.onclick = doSync;
   $('#hLang').onclick = openLang;
+  const hb=$('#hBulk'); if(hb) hb.onclick=()=>go('bulk');
   if(ui.syncing) $('#hSync svg').style.animation='sp 1s linear infinite';
 }
 // on-screen language: English, Türkçe, Română, Български. Prints always stay in English (see i18n.js).

@@ -29,6 +29,7 @@
     'Products': ['Ürünler', 'Produse', 'Продукти'],
     'Search': ['Ara', 'Căutare', 'Търсене'],
     'Storage Location': ['Saklama Yeri', 'Loc de depozitare', 'Място на съхранение'],
+    'Bulk': ['Toplu', 'În masă', 'Масов'],
     'Bulk Print': ['Toplu Yazdır', 'Tipărire în masă', 'Масов печат'],
     'Scan to Print': ['Tarayıp Yazdır', 'Scanează și tipărește', 'Сканирай и печатай'],
     'Logs': ['Kayıtlar', 'Jurnale', 'Дневници'],
