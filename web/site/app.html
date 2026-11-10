@@ -1062,7 +1062,7 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
 const P = window.PVL;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.3.2';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -1166,6 +1166,8 @@ function renderHeader(){
 }
 function renderStatus(){
   const st=$('#status'); const cfg=S.settings.sync;
+  // the strip only appears while syncing, offline or locked; otherwise it's hidden
+  st.style.display=(ui.syncing||(connected()&&LOCK)||!navigator.onLine)?'':'none';
   if(ui.syncing){ st.className='status'; st.innerHTML='<span class="spin" style="border-color:rgba(255,255,255,.3);border-top-color:#fff"></span> Syncing…'; return; }
   if(connected()&&LOCK){ st.className='status off'; st.textContent=LOCK.title+' · syncing paused · '+site().name; st.onclick=()=>showLock(); return; }
   st.onclick=null;
