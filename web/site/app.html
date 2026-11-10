@@ -759,7 +759,7 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     const lines = String(text).split(/\n+/).map((l) => l.trim()).filter(Boolean);
     const out = [];
     for (const line of lines) {
-      if (/^(starters?|mains?|desserts?|sides?|drinks?|menu|breakfast|lunch|dinner)\b[:\s]*$/i.test(line)) continue;
+      if (/^(starters?|mains?|main courses?|desserts?|puddings?|sides?|side orders?|drinks?|soft drinks|hot drinks|wines?|beers?|cocktails?|specials?|sharers?|sharing|small plates|large plates|kids|children'?s menu|sandwiches|salads?|burgers?|pizzas?|pasta|grill|sauces?|extras?|vegetarian|vegan|menu|breakfast|brunch|lunch|dinner)\b[:\s]*$/i.test(line)) continue;
       const m = line.match(/^(.*?)\s*[-–—:|]\s*(.+)$/);
       let name = m ? m[1] : line, desc = m ? m[2] : '';
       const priceM = (desc || name).match(/£?\s?(\d+(?:\.\d{1,2})?)\s*$/);
@@ -767,7 +767,8 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
       if (priceM) { price = parseFloat(priceM[1]); if (desc) desc = desc.slice(0, priceM.index).trim(); else name = name.slice(0, priceM.index).trim(); }
       name = name.replace(/[.·]+$/, '').trim();
       if (!name) continue;
-      out.push({ name, description: desc, price, allergens: detectAllergens(name + ' ' + desc) });
+      // no description and no price: probably a title or heading, so it starts unticked
+      out.push({ name, description: desc, price, allergens: detectAllergens(name + ' ' + desc), inc: !(price == null && !desc) });
     }
     return out;
   }

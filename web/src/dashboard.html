@@ -154,7 +154,7 @@ a{color:var(--pri)}
 .btn.ghost:hover{border-color:#cfccc4;background:#fbfaf8;filter:none}
 .btn.red{background:var(--bad)}
 .btn.sm{padding:5px 10px;font-size:12.5px;border-radius:8px}
-.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn:disabled,.btn.dis{opacity:.5;cursor:not-allowed;pointer-events:none}
 .btns{display:flex;gap:8px;flex-wrap:wrap}
 .sel{border:1px solid var(--line);border-radius:9px;padding:8px 11px;background:var(--card)}
 /* stats */
@@ -970,10 +970,34 @@ VIEWS.matrix=(el)=>{
 };
 
 let analysed=null;
+// ---------- PDF menus: pdf.js is loaded only when someone uploads a PDF ----------
+const PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+let pdfjsP=null;
+function loadPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return pdfjsP||(pdfjsP=new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src=PDFJS+'pdf.min.js';
+    sc.onload=()=>{ window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'; res(window.pdfjsLib); };
+    sc.onerror=()=>{ pdfjsP=null; rej(new Error('Could not load the PDF reader – check your internet connection')); }; document.head.appendChild(sc); }));
+}
+// text of every page, rebuilt into lines (items on the same baseline joined left to right)
+async function pdfMenuText(file){
+  const lib=await loadPdfJs(); const doc=await lib.getDocument({data:await file.arrayBuffer()}).promise; const out=[];
+  for(let n=1;n<=Math.min(doc.numPages,30);n++){
+    const pg=await doc.getPage(n); const tc=await pg.getTextContent(); const rows=[];
+    tc.items.forEach(it=>{ if(!it.str||!it.str.trim()) return; const y=it.transform[5], x=it.transform[4], h=Math.abs(it.transform[3])||10;
+      let r=rows.find(r=>Math.abs(r.y-y)<h*0.45); if(!r){ r={y,parts:[]}; rows.push(r); } r.parts.push({x,s:it.str,w:it.width||0}); });
+    rows.sort((a,b)=>b.y-a.y).forEach(r=>{ r.parts.sort((a,b)=>a.x-b.x); let line='', end=null;
+      r.parts.forEach(p=>{ const gap=end==null?0:p.x-end; line+=(line&&gap>2&&!/\s$/.test(line)&&!/^\s/.test(p.s)?(gap>40?'  ':' '):'')+p.s; end=p.x+p.w; });
+      line=line.replace(/\s+/g,' ').trim(); if(line) out.push(line); });
+    out.push('');
+  }
+  return out.join('\n').replace(/\n{3,}/g,'\n\n').trim();
+}
+
 VIEWS.analyser=(el)=>{
   const cats=byOrg(P.live('categories'));
-  el.innerHTML=`<div class="ph"><div><h1>Menu <span>analyser</span></h1><p>Paste a menu. We pull out each dish and flag likely allergens for your team to check before importing.</p></div></div>
-  <div class="card"><div class="fld"><label>Menu text (one dish per line: <i>Name – description £price</i>)</label><textarea class="inp" id="mt" style="min-height:160px">${esc(analysed?analysed.text:`STARTERS
+  el.innerHTML=`<div class="ph"><div><h1>Menu <span>analyser</span></h1><p>Upload a PDF menu or paste the text. We pull out each dish and flag likely allergens for your team to check before importing.</p></div><div class="btns"><label class="btn ghost" id="pdfLbl">Upload PDF menu<input type="file" id="pdfIn" accept="application/pdf,.pdf,.txt,text/plain" hidden></label></div></div>
+  <div class="card"><div class="fld"><label>Menu text (one dish per line: <i>Name – description £price</i>) <span class="hint" id="pdfMsg"></span></label><textarea class="inp" id="mt" style="min-height:160px">${esc(analysed?analysed.text:`STARTERS
 Prawn cocktail – king prawns, marie rose sauce, gem lettuce £7.50
 Houmous & flatbread – chickpeas, tahini, wheat flatbread £6.00
 MAINS
@@ -999,6 +1023,20 @@ Sticky toffee pudding – dates, butter, cream, toffee sauce £6.50`)}</textarea
       if(sel==='__new') withOrg(o=>go(P.upsert('categories',{id:P.uid('c_'),orgId:o,name:'Menu',type:'sale',color:'#00897B'}).id)); else go(sel); };
   };
   el.querySelector('#go').onclick=()=>{ const t=el.querySelector('#mt').value; analysed={text:t,items:P.analyseMenu(t)}; draw(); };
+  el.querySelector('#pdfIn').onchange=async e=>{
+    const f=e.target.files[0]; e.target.value=''; if(!f) return;
+    const lbl=el.querySelector('#pdfLbl'), msg=el.querySelector('#pdfMsg');
+    if(f.size>20*1024*1024) return toast('That file is over 20 MB');
+    lbl.classList.add('dis'); msg.textContent='Reading '+f.name+'…';
+    try{
+      const text=/\.txt$/i.test(f.name)||f.type==='text/plain' ? await f.text() : await pdfMenuText(f);
+      if(!text.trim()) throw new Error('No text found in this PDF. It may be a scanned picture of a menu – type or paste the dishes instead.');
+      el.querySelector('#mt').value=text; analysed={text,items:P.analyseMenu(text)}; draw();
+      msg.textContent='From '+f.name+' · check the text, edit if needed, then press Analyse again';
+      toast(`Read ${f.name} · ${analysed.items.length} dishes found`);
+    }catch(err){ msg.textContent=''; toast(err.message||'Could not read that PDF',true); }
+    lbl.classList.remove('dis');
+  };
   draw();
 };
 
