@@ -278,25 +278,32 @@ public class LabelPrinterPlugin extends Plugin {
         }
     }
 
-    /** Download a newer APK and open Android's installer. Rejects with code PERMISSION when
-     *  "Install unknown apps" isn't allowed yet (and opens that setting for the user). */
+    /** Download a newer APK and install it.
+     *  Android 12+: asks Android to update without a tap (works once Proview Label installed the current version itself;
+     *  otherwise Android shows its Install screen this one time). Older Android: Android's Install screen.
+     *  auto=true (background update): never opens Settings; rejects with code PERMISSION instead.
+     *  Rejects with code PERMISSION when "Install unknown apps" isn't allowed yet. */
     @PluginMethod
     public void installUpdate(PluginCall call) {
         final String url = call.getString("url", null);
+        final boolean auto = Boolean.TRUE.equals(call.getBoolean("auto", false));
         if (url == null || !url.startsWith("https://")) { call.reject("bad update address"); return; }
         final Context ctx = getContext();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !ctx.getPackageManager().canRequestPackageInstalls()) {
-            Intent s = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + ctx.getPackageName()));
-            s.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            try { ctx.startActivity(s); } catch (Exception ignored) {}
+            if (!auto) {
+                Intent s = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + ctx.getPackageName()));
+                s.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                try { ctx.startActivity(s); } catch (Exception ignored) {}
+            }
             call.reject("Allow installs from Proview Label first", "PERMISSION");
             return;
         }
         new Thread(() -> {
             HttpURLConnection c = null;
+            File apk = null;
             try {
                 File dir = new File(ctx.getCacheDir(), "update"); dir.mkdirs();
-                File apk = new File(dir, "ProviewLabel.apk"); if (apk.exists()) apk.delete();
+                apk = new File(dir, "ProviewLabel.apk"); if (apk.exists()) apk.delete();
                 c = (HttpURLConnection) new URL(url).openConnection();
                 c.setConnectTimeout(15000); c.setReadTimeout(60000); c.setInstanceFollowRedirects(true);
                 c.setRequestProperty("Cache-Control", "no-cache");
@@ -305,15 +312,37 @@ public class LabelPrinterPlugin extends Plugin {
                     byte[] buf = new byte[65536]; int n; while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
                 }
                 if (apk.length() < 100000) throw new Exception("download incomplete");
-                Uri uri = FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", apk);
-                Intent i = new Intent(Intent.ACTION_VIEW);
-                i.setDataAndType(uri, "application/vnd.android.package-archive");
-                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-                ctx.startActivity(i);
-                call.resolve();
             } catch (Exception e) {
                 call.reject(e.getMessage() != null ? e.getMessage() : "update failed", e);
+                return;
             } finally { if (c != null) c.disconnect(); }
+            try {
+                sessionInstall(ctx, apk);
+                JSObject r = new JSObject(); r.put("silent", Build.VERSION.SDK_INT >= 31); call.resolve(r);
+            } catch (Exception e) {
+                // the package installer route isn't available: Android's classic Install screen, as before
+                UpdateReceiver.classicInstall(ctx, apk);
+                JSObject r = new JSObject(); r.put("silent", false); call.resolve(r);
+            }
         }).start();
+    }
+
+    private static void sessionInstall(Context ctx, File apk) throws Exception {
+        android.content.pm.PackageInstaller pi = ctx.getPackageManager().getPackageInstaller();
+        android.content.pm.PackageInstaller.SessionParams p =
+            new android.content.pm.PackageInstaller.SessionParams(android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+        p.setAppPackageName(ctx.getPackageName());
+        if (Build.VERSION.SDK_INT >= 31) p.setRequireUserAction(android.content.pm.PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
+        int id = pi.createSession(p);
+        try (android.content.pm.PackageInstaller.Session s = pi.openSession(id)) {
+            try (InputStream in = new java.io.FileInputStream(apk); OutputStream out = s.openWrite("base.apk", 0, apk.length())) {
+                byte[] buf = new byte[65536]; int n; while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                s.fsync(out);
+            }
+            Intent cb = new Intent(ctx, UpdateReceiver.class).setAction(UpdateReceiver.ACTION_STATUS).putExtra(UpdateReceiver.EXTRA_APK, apk.getAbsolutePath());
+            int flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? android.app.PendingIntent.FLAG_MUTABLE : 0);
+            android.app.PendingIntent pend = android.app.PendingIntent.getBroadcast(ctx, id, cb, flags);
+            s.commit(pend.getIntentSender());
+        }
     }
 }

@@ -4136,7 +4136,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.4.5';
+const APP_VERSION = '1.4.6';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -5084,8 +5084,7 @@ document.addEventListener('ionBackButton', ev=>{ ev.detail && ev.detail.register
 // handheld hardware: built-in printer + barcode scanner (Android app only)
 // ---------- app updates ----------
 // The latest version is described at label.proviewcrm.co.uk/apk/version.json. The app checks when it opens,
-// every few hours, and from "Check for app updates" in Settings. Installing downloads the APK and opens
-// Android's installer (staff tap Install; Android doesn't allow a silent update).
+// every minute (installing by itself when idle, see autoUpdate), and from "Check for app updates" in Settings.
 const UPDATE_URL='https://label.proviewcrm.co.uk/apk/version.json';
 const vnum=v=>String(v||'0').split('.').slice(0,3).reduce((a,n)=>a*1000+(parseInt(n,10)||0),0)*(String(v||'').split('.').length<3?1000:1);
 let UPDATE_SKIP='';
@@ -5111,7 +5110,24 @@ async function installUpdate(info){
     else toast('Update failed: '+((e&&e.message)||e));
   }
 }
-if(isNative){ setTimeout(()=>checkUpdate(false),4000); setInterval(()=>checkUpdate(false),4*60*60*1000); }
+// Automatic updates: every minute the handheld looks for a newer version. When it's idle (not printing, nothing
+// open, nobody has touched it for 2 minutes) it downloads and installs it by itself. Android 12+ installs it with
+// no tap (after the first update done this way); older Android shows its Install screen. If installing from the
+// app isn't allowed yet, it falls back to the "Update available" message.
+let lastTouch=Date.now(), autoTried={};
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{ lastTouch=Date.now(); },true));
+async function autoUpdate(){
+  const N=Native().LabelPrinter; if(!isNative||!N||!N.installUpdate||!navigator.onLine) return;
+  let info=null; try{ const r=await fetch(UPDATE_URL+'?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; info=await r.json(); }catch(e){ return; }
+  if(!info||!info.version||vnum(info.version)<=vnum(APP_VERSION)) return;
+  const busy=ui.printing||ui.queue.length||ui.syncing||$('#modal').innerHTML||$('#sheet').classList.contains('on')||Date.now()-lastTouch<120000;
+  if(busy) return;
+  if(autoTried[info.version]&&Date.now()-autoTried[info.version]<30*60*1000) return;   // tried recently (e.g. Install was cancelled)
+  autoTried[info.version]=Date.now();
+  try{ await N.installUpdate({url:info.url||'https://label.proviewcrm.co.uk/ProviewLabel.apk',auto:true}); }
+  catch(e){ if(e&&e.code==='PERMISSION') checkUpdate(false); }
+}
+if(isNative){ setTimeout(autoUpdate,8000); setInterval(autoUpdate,60*1000); }
 
 if(Native().LabelPrinter && Native().LabelPrinter.addListener){ try{ Native().LabelPrinter.addListener('scan', onHardwareScan); }catch(e){} checkBuiltin(); }
 if(Native().App && Native().App.addListener) Native().App.addListener('backButton',()=>{ if(pairing){ Native().App.exitApp(); return; } if(connected()&&LOCK&&!$('#modal').innerHTML){ Native().App.exitApp(); return; } if($('#modal').innerHTML) $('#modal').innerHTML=''; else if($('#sheet').classList.contains('on')) closeSheet(); else if($('#drawer').classList.contains('on')) closeDrawer(); else if(ui.screen!=='home') back(); else Native().App.exitApp(); });
