@@ -2014,9 +2014,10 @@ function loadPdfJs(){
     sc.onerror=()=>{ pdfjsP=null; rej(new Error('Could not load the PDF reader – check your internet connection')); }; document.head.appendChild(sc); }));
 }
 // text of every page, rebuilt into lines (items on the same baseline joined left to right)
+let setPdfMsg=null;
 async function pdfMenuText(file){
   const lib=await loadPdfJs(); const doc=await lib.getDocument({data:await file.arrayBuffer()}).promise; const out=[];
-  for(let n=1;n<=Math.min(doc.numPages,30);n++){
+  for(let n=1;n<=doc.numPages;n++){ if(n%5===0) setPdfMsg&&setPdfMsg(`Reading page ${n} of ${doc.numPages}…`);
     const pg=await doc.getPage(n); const tc=await pg.getTextContent(); const rows=[];
     tc.items.forEach(it=>{ if(!it.str||!it.str.trim()) return; const y=it.transform[5], x=it.transform[4], h=Math.abs(it.transform[3])||10;
       let r=rows.find(r=>Math.abs(r.y-y)<h*0.45); if(!r){ r={y,parts:[]}; rows.push(r); } r.parts.push({x,s:it.str,w:it.width||0}); });
@@ -2060,8 +2061,7 @@ Sticky toffee pudding – dates, butter, cream, toffee sauce £6.50`)}</textarea
   el.querySelector('#pdfIn').onchange=async e=>{
     const f=e.target.files[0]; e.target.value=''; if(!f) return;
     const lbl=el.querySelector('#pdfLbl'), msg=el.querySelector('#pdfMsg');
-    if(f.size>20*1024*1024) return toast('That file is over 20 MB');
-    lbl.classList.add('dis'); msg.textContent='Reading '+f.name+'…';
+    lbl.classList.add('dis'); msg.textContent='Reading '+f.name+'…'; setPdfMsg=(t)=>{ msg.textContent=t; };
     try{
       const text=/\.txt$/i.test(f.name)||f.type==='text/plain' ? await f.text() : await pdfMenuText(f);
       if(!text.trim()) throw new Error('No text found in this PDF. It may be a scanned picture of a menu – type or paste the dishes instead.');
