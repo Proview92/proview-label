@@ -369,7 +369,7 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
 const P = window.PVL;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.3.6';
+const APP_VERSION = '1.3.7';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -1034,8 +1034,8 @@ function labelHTML(j){
   return `<div class="lab"><div class="ln">${esc(j.name)}</div>
     <div class="ub"><span>USE BY:</span><span>${P.fmtDay(j.expiry).toUpperCase()}</span><span>${P.fmtDate(j.expiry,hrs)}</span></div>
     <div class="r2"><span>PRINTED: ${P.fmtDate(new Date(),true)}</span><span>${j.ruleName==='Manual'?'MANUAL':esc((j.rule?P.ruleText(j.rule).replace('+',''):'')).toUpperCase()}</span></div>
-    ${al?`<div class="al">ALLERGENS: ${esc(al)}</div>`:''}${j.mayContain?`<div class="al">M/C: ${esc(j.mayContain)}</div>`:''}
-    <div class="bt"><div>${j.defrost||j.useFirst?`<span class="flag">${j.defrost?'DEFROSTED':''}${j.defrost&&j.useFirst?' | ':''}${j.useFirst?'USE FIRST':''}</span>`:''}<div style="font-size:10px;font-weight:700;margin-top:3px">${j.batch?esc(j.batch)+' | ':''}${esc(P.initials(u.name))} · ${esc(j.ruleName||'')}</div></div></div></div>`;
+    ${al?`<div class="al" style="margin-top:8px">ALLERGENS: ${esc(al)}</div>`:''}${j.mayContain?`<div class="al">M/C: ${esc(j.mayContain)}</div>`:''}
+    <div class="bt"><div>${j.defrost||j.useFirst?`<span class="flag">${j.defrost?'DEFROSTED':''}${j.defrost&&j.useFirst?' | ':''}${j.useFirst?'USE FIRST':''}</span>`:''}${j.batch?`<div style="font-size:10px;font-weight:700;margin-top:3px">BATCH: ${esc(j.batch)}</div>`:''}<div style="font-size:10px;font-weight:700;margin-top:10px;text-align:center">${esc(site().name)}</div></div></div></div>`;
 }
 function renderBarcodes(root){ if(!window.JsBarcode) return; root.querySelectorAll('svg[data-bc]').forEach(s=>{ try{ JsBarcode(s, s.dataset.bc, {format:'CODE128',displayValue:true,fontSize:11,height:34,margin:0,width:1.3,textMargin:0}); }catch(e){} }); }
 
@@ -1090,13 +1090,13 @@ function escpos(j){
   push(0x1B,0x40); push(0x1B,0x61,1); push(0x1D,0x21,0x11,0x1B,0x45,1); txt(j.name.toUpperCase().slice(0,16)+'\n'); push(0x1D,0x21,0,0x1B,0x45,0);
   if(j.type==='prep'||j.includeDate){ push(0x1D,0x42,1,0x1B,0x45,1); txt(' '+(j.dateType==='best-before'?'BEST BEFORE':'USE BY')+': '+P.fmtDay(j.expiry).toUpperCase()+' '+P.fmtDate(j.expiry, j.rule&&j.rule.period==='hours')+' \n'); push(0x1D,0x42,0,0x1B,0x45,0); }
   push(0x1B,0x61,0);
-  if(j.type==='prep'){ txt('Printed: '+P.fmtDate(new Date(),true)+'  '+(j.ruleName||'')+'\n'); }
+  if(j.type==='prep'){ txt('PRINTED: '+P.fmtDate(new Date(),true)+'  '+(j.ruleName==='Manual'?'MANUAL':(j.rule?P.ruleText(j.rule).replace('+',''):'')).toUpperCase()+'\n\n'); }
   if(j.type==='sale'){ if(j.price!=null) txt('Price: GBP '+Number(j.price).toFixed(2)+'\n'); if(j.ingredients){ txt('Ingredients: '); const html=j.ingredients; html.split(/(<b>.*?<\/b>)/i).forEach(part=>{ if(/^<b>/i.test(part)){ push(0x1B,0x45,1,0x1B,0x2D,1); txt(P.stripHtml(part).toUpperCase()); push(0x1B,0x45,0,0x1B,0x2D,0);} else txt(P.stripHtml(part)); }); txt('\n'); } }
   if(al){ push(0x1B,0x45,1); txt('ALLERGENS: '+al.toUpperCase()+'\n'); push(0x1B,0x45,0); }
   if(j.mayContain) txt('M/C: '+j.mayContain+'\n');
   if(j.defrost||j.useFirst){ push(0x1D,0x42,1); txt(' '+[j.defrost?'DEFROSTED':'',j.useFirst?'USE FIRST':''].filter(Boolean).join(' | ')+' \n'); push(0x1D,0x42,0); }
   if(j.batch) txt('Batch: '+j.batch+'\n');
-  txt(P.initials(user().name)+' - '+site().name+'\n');
+  if(j.type==='prep'){ push(0x0A,0x0A,0x1B,0x61,1,0x1B,0x45,1); txt(site().name+'\n'); push(0x1B,0x45,0,0x1B,0x61,0); } else txt(P.initials(user().name)+' - '+site().name+'\n');
   push(0x0A,0x0A,0x0A,0x1D,0x56,0x42,0x00);
   return out;
 }
@@ -1156,18 +1156,23 @@ function labelBitmap(j){
     pair(st.name, j.batch?'Batch '+j.batch:'', 18, {bold:true});
     if(st.address) text(st.address,16);
   } else {
-    text(j.name,32,{bold:true,align:'center',max:2});
-    gap(8);
-    band('USE BY', nice(j.expiry,hrs), 28);
-    gap(8);
-    { const n=new Date(); pair('Prepared '+n.getDate()+' '+MON[n.getMonth()]+' '+P.fmtTime(n), life, 18); }
-    gap(4); rule(1); gap(8);
-    caption('Allergens'); text(al?al.toUpperCase():'NONE', al?22:18, {bold:!!al});
-    if(j.mayContain){ gap(2); text('May contain: '+j.mayContain,18); }
-    const fl=[j.defrost?'DEFROSTED':'',j.useFirst?'USE FIRST':''].filter(Boolean);
-    if(fl.length){ gap(8); tags(fl,18); }
-    gap(8); rule(1); gap(6);
-    pair('By '+P.initials(u.name)+' · '+st.name, (j.batch?'Batch '+j.batch:''), 17, {bold:false});
+    // prep label: name, USE BY bar, printed line, a space, allergens, then the site name at the bottom.
+    // The label stays as long as it was when it carried a barcode (that space is now left blank).
+    const inv=(t,size)=>{ layout([{t,b:true}],size,W-2*PAD).forEach(line=>{ const h=Math.round(size*1.25); x.fillRect(0,y,W,h+2); x.fillStyle='#fff'; x.font=F(800,size);
+      const s=line.map(tk=>tk.t).join(' '), tw=x.measureText(s).width; x.fillText(s,Math.round((W-tw)/2),y+Math.round(size*0.98)+1); x.fillStyle='#000'; y+=h+2; }); };
+    const shelf=(j.ruleName==='Manual'?'MANUAL':(j.rule?P.ruleText(j.rule).replace('+',''):'')).toUpperCase();
+    text(j.name,32,{bold:true,align:'center',max:2,lh:1.25});
+    gap(2); inv('USE BY: '+P.fmtDay(j.expiry).toUpperCase()+' '+P.fmtDate(j.expiry,hrs),26); gap(4);
+    text('PRINTED: '+P.fmtDate(new Date(),true)+'   '+shelf,18,{lh:1.25});
+    const SPACE=16; gap(SPACE);
+    if(al) text('ALLERGENS: '+al.toUpperCase(),21,{bold:true,lh:1.25});
+    if(j.mayContain) text('M/C: '+j.mayContain,18,{lh:1.25});
+    if(j.defrost||j.useFirst){ gap(2); inv([j.defrost?'DEFROSTED':'',j.useFirst?'USE FIRST':''].filter(Boolean).join(' | '),22); }
+    const contentEnd=y-SPACE;                      // where the old label's content ended
+    if(j.batch) text('BATCH: '+j.batch,17,{bold:true,lh:1.25});
+    const foot=Math.round(17*1.25), oldEnd=contentEnd+foot+4+90;   // old footer line + gap + barcode
+    y=Math.max(y+10, oldEnd-foot);
+    text(st.name,17,{bold:true,align:'center',lh:1.25});
   }
   gap(10); for(let i=PAD;i<W-PAD;i+=12) x.fillRect(i,y,6,2); y+=6; // dashed tear line
   const out=document.createElement('canvas'); out.width=W; out.height=y; const o=out.getContext('2d'); o.drawImage(c,0,0);
