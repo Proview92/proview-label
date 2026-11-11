@@ -1257,8 +1257,8 @@ function applyLock(){
   if(!(connected()&&LOCK)){ el.innerHTML=''; return; }
   ui.queue=[]; ui.printing=false; ui.printFail=false; $('#printout').innerHTML=''; { const pf=$('#printfail'); if(pf) pf.innerHTML=''; }
   closeSheet&&$('#sheet').classList.contains('on')&&closeSheet(); closeDrawer&&closeDrawer();
-  const sp=(Cloud.SUPPORT||{}), url=Cloud.LICENCE_URL||'https://license.proviewcrm.co.uk';
-  el.innerHTML=`<div class="lockscreen"><div style="font-size:44px">🔒</div><h2>${esc(LOCK.title)}</h2><p>${esc(LOCK.text)}</p><p>This handheld is locked: printing and syncing are paused until the licence is active.</p><p>Buy a licence at <b>${esc(url.replace(/^https?:\/\//,''))}</b> or contact Proview: <b>${esc(sp.phone||'020 8935 5495')}</b> · ${esc(sp.email||'info@proviewtechgroup.co.uk')}</p><div class="row"><button class="btn blue" data-chk>Check again</button><button class="btn ghost" data-disc style="color:#d92d20">Unpair this handheld</button></div></div>`;
+  const sp=(Cloud.SUPPORT||{});
+  el.innerHTML=`<div class="lockscreen"><div style="font-size:44px">🔒</div><h2>${esc(LOCK.title)}</h2><p>${esc(LOCK.text)}</p><p>This handheld is locked: printing and syncing are paused until the licence is active.</p><p>Call Proview on <b>${esc(sp.phone||'020 8935 5495')}</b> · ${esc(sp.email||'info@proviewtechgroup.co.uk')}, or the business owner can buy a licence online in the Proview Label dashboard.</p><div class="row"><button class="btn blue" data-chk>Check again</button><button class="btn ghost" data-disc style="color:#d92d20">Unpair this handheld</button></div></div>`;
   el.querySelector('[data-chk]').onclick=async()=>{ const b=el.querySelector('[data-chk]'); b.disabled=true; b.textContent='Checking…'; await checkLock(); if(LOCK){ applyLock(); toast(LOCK.title+' – still locked'); } };
   el.querySelector('[data-disc]').onclick=()=>unpair(false);
 }

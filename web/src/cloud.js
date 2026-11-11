@@ -35,7 +35,7 @@
     return t || 'Something went wrong. Please try again.';
   };
 
-  const LICENCE_URL = 'https://license.proviewcrm.co.uk';
+  const LICENCE_URL = 'https://license.proviewcrm.co.uk';   // licence portal: master-only links (dashboard All sites / Add business)
   const SUPPORT = { phone: '020 8935 5495', email: 'info@proviewtechgroup.co.uk' };
   // Licence state of a business from whoami: 'suspended', 'nolicence' (never licensed: every new business starts
   // like this, migration 007), 'expired' (trial ended), 'trial' (a trial end date, set by hand) or 'active'

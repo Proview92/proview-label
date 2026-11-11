@@ -1107,7 +1107,7 @@ button.ov-loc:hover,button.ov-li:hover{background:#f8f7f4}
     return t || 'Something went wrong. Please try again.';
   };
 
-  const LICENCE_URL = 'https://license.proviewcrm.co.uk';
+  const LICENCE_URL = 'https://license.proviewcrm.co.uk';   // licence portal: master-only links (dashboard All sites / Add business)
   const SUPPORT = { phone: '020 8935 5495', email: 'info@proviewtechgroup.co.uk' };
   // Licence state of a business from whoami: 'suspended', 'nolicence' (never licensed: every new business starts
   // like this, migration 007), 'expired' (trial ended), 'trial' (a trial end date, set by hand) or 'active'
@@ -2095,8 +2095,11 @@ function applyWho(w){ WHO=w; S=P.get(); S.orgs=(w.orgs||[]).map(o=>({id:o.id,nam
 // locked = suspended or no location licensed. Pages work per location: siteState / siteLockMsg below.
 const orgState=(o)=>Cloud.orgState?Cloud.orgState(o):(o&&o.suspended?'suspended':'active');
 const lockMsgOf=(o)=>Cloud.lockMsg?Cloud.lockMsg(o):null;
+// LIC_URL (the licence portal) is for the MASTER's links only (All sites "Licences ↗", Add business "Set licence ↗").
+// Customers never see it: they buy with Stripe (buyHtml below) or call Proview.
 const LIC_URL=Cloud.LICENCE_URL||'https://license.proviewcrm.co.uk', SUP=Cloud.SUPPORT||{phone:'020 8935 5495',email:'info@proviewtechgroup.co.uk'};
-const contactHtml=()=>`Buy a licence at <a href="${LIC_URL}" target="_blank" rel="noopener">license.proviewcrm.co.uk</a> or call <a href="tel:${SUP.phone.replace(/\s/g,'')}">${esc(SUP.phone)}</a> · <a href="mailto:${esc(SUP.email)}">${esc(SUP.email)}</a>.`;
+const supHtml=()=>`<a href="tel:${SUP.phone.replace(/\s/g,'')}">${esc(SUP.phone)}</a> · <a href="mailto:${esc(SUP.email)}">${esc(SUP.email)}</a>`;
+const contactHtml=()=>`Call Proview on ${supHtml()}.`;
 const LIC_TYPES={trial:'Trial (set by hand)',m1:'1 month',m3:'3 months',m6:'6 months',m12:'12 months',m24:'24 months',m36:'36 months',lifetime:'Lifetime',custom:'Custom end date'};
 const orgOfSite=(id)=>{ const s=P.byId('sites',id); return s&&(S.orgs||[]).find(o=>o.id===s.orgId); };
 // a location's licence { licence_type, licence_starts_at, licence_expires_at }. Demo, or a server before 009: the business's licence.
@@ -2150,7 +2153,7 @@ function buyHtml(siteId){ if(!canBuy(siteId)) return `<p class="hint" style="mar
   const st=siteState(siteId), buying=st==='nolicence', list=buyPlans();
   if(!list.length) return `<p class="hint" style="margin:8px 0 0" data-buyfor="${esc(siteId)}">Online payment isn’t available yet. ${contactHtml()}</p>`;
   return `<div class="buy-plans" data-buyfor="${esc(siteId)}">${list.map(p=>`<a class="buy-card" href="${esc(buyUrl(p,siteId))}" target="_blank" rel="noopener" data-plan="${esc(p.plan)}"><b>${esc(p.label||LIC_TYPES[p.plan]||p.plan)}</b><span class="bp">${esc(money(p))}</span><small>${buying?'Buy online':'Renew online'}</small></a>`).join('')}</div>
-    <p class="hint" style="margin:8px 0 0">${buying?'You pay securely with Stripe; the location is licensed within about 5 minutes.':'Time is added on top of the current licence. You pay securely with Stripe; it updates within about 5 minutes.'} Or ${contactHtml().replace(/^Buy/,'buy')}</p>`; }
+    <p class="hint" style="margin:8px 0 0">${buying?'You pay securely with Stripe; the location is licensed within about 5 minutes.':'Time is added on top of the current licence. You pay securely with Stripe; it updates within about 5 minutes.'} Or call Proview on ${supHtml()}.</p>`; }
 document.addEventListener('click',e=>{ const a=e.target.closest&&e.target.closest('.buy-card'); if(a) setTimeout(()=>toast('Finish paying in the Stripe tab. The licence updates within about 5 minutes; then press Sync now.'),50); });
 // banner above the page: the locations in view that are locked (no licence / ended / suspended), each with Buy online;
 // or a trial / licence running out soon
@@ -2163,7 +2166,7 @@ function trialBanner(){
       :`<p style="margin:6px 0 0">Each location needs its own licence. ${isMaster()?'As master you can give them a licence from Locations (Licence… on each location).':'The others keep working.'}</p>${locked.map(id=>`<div class="lic-row"><div class="lic-h"><b>${esc(siteName(id))}</b> ${siteTag(id)}</div>${isMaster()?'':buyHtml(id)}</div>`).join('')}`;
     return `<div class="card lic-banner" role="alert" style="border-color:var(--bad);background:var(--badl);margin-bottom:16px"><h3 style="color:var(--bad)">${head}</h3>${body}</div>`; }
   if(soon.length&&!isMaster()){ const id=soon[0], l=siteLic(id)||{};
-    return `<div class="card" style="border-color:var(--warn);background:var(--warnl);margin-bottom:16px;padding:12px 16px"><b>${siteState(id)==='trial'?'Trial':'Licence ends soon'}</b> · ${esc(siteName(id))} · ends ${esc(P.fmtDate(l.licence_expires_at,true))}.${canBuy(id)?` <button class="btn sm" data-buy="${esc(id)}">Renew online</button>`:' '+contactHtml()}</div>`; }
+    return `<div class="card" style="border-color:var(--warn);background:var(--warnl);margin-bottom:16px;padding:12px 16px"><b>${siteState(id)==='trial'?'Trial':'Licence ends soon'}</b> · ${esc(siteName(id))} · ends ${esc(P.fmtDate(l.licence_expires_at,true))}.${canBuy(id)?` <button class="btn sm" data-buy="${esc(id)}">Renew online</button>`:` Ask your business owner to renew it, or call Proview on ${supHtml()}.`}</div>`; }
   return '';
 }
 // Buy / renew one location (owner's licence view, banners)
@@ -2185,7 +2188,7 @@ function renderTrialSetup(){
         <label for="ts">First location or kitchen</label><input class="inp" id="ts" placeholder="Same as the business name" maxlength="120">
         <button class="go" type="submit" id="tgo">Set up business</button>
         <button class="ghost2" type="button" id="tout">Sign out</button>
-        <p class="hint" style="margin:0;font-size:12.5px">Until it has a licence the business is read-only. Buy one at <a href="${LIC_URL}" target="_blank" rel="noopener">license.proviewcrm.co.uk</a> or call ${esc(SUP.phone)}. Joining an existing business? Ask its owner to add your email, then sign in again.</p>
+        <p class="hint" style="margin:0;font-size:12.5px">Until it has a licence the business is read-only. Once it’s set up you can buy a licence here online (paid securely with Stripe), or call Proview on ${esc(SUP.phone)}. Joining an existing business? Ask its owner to add your email, then sign in again.</p>
       </form></div></div></div>`;
   const tb=$('#tb'), ts=$('#ts'); let edited=false;
   tb.oninput=()=>{ if(!edited) ts.value=tb.value; }; ts.oninput=()=>{ edited=ts.value.trim()!==''&&ts.value!==tb.value; };
