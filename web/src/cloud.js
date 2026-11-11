@@ -60,6 +60,12 @@
     client: () => sb,
     async session() { if (!sb) return null; const { data } = await sb.auth.getSession(); return data.session; },
     async user() { const s = await Cloud.session(); return s ? s.user : null; },
+    // True only when the sign-in has really been ended by the server (the saved login was thrown away).
+    // A dropped connection never counts: supabase-js keeps the saved login when a refresh fails for network reasons.
+    loginGone() {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+      try { return !localStorage.getItem(C.STORAGE_KEY || 'pv-label-auth'); } catch (e) { return false; }
+    },
     async token() { const s = await Cloud.session(); return s ? s.access_token : null; },
     async signIn(email, password) { const { data, error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw error; return data.user; },
     async signUp(email, password, redirect) { const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: redirect } }); if (error) throw error; return data; },

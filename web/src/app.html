@@ -399,7 +399,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.4.7';
+const APP_VERSION = '1.4.8';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -1210,10 +1210,11 @@ async function checkLock(){
   try{ w=await Cloud.whoami(); }
   catch(e){   // no internet (or the server is down): keep working on what's saved here
     const m=String((e&&(e.code||''))+' '+(e&&e.message||''));
-    if(/42501|permission denied|JWT|not authenticated/i.test(m)&&!(await Cloud.session().catch(()=>undefined))){ unpair(true); return null; }   // server reached, but this handheld's login is gone
+    if(/42501|permission denied|JWT|not authenticated/i.test(m)&&Cloud.loginGone&&Cloud.loginGone()){ unpair(true); return null; }   // the server ended this handheld's login (never a dropped connection: the saved login is kept then)
     return LOCK; }
   if(!w) return LOCK;
-  if(!w.device){ unpair(true); return null; }   // removed in the back-office: pair again
+  if(!w.device){ if(!(await Cloud.session().catch(()=>null))) return LOCK;   // answered without our login (connection dropped mid-refresh): not a removal
+    unpair(true); return null; }   // removed in the back-office: pair again
   { const d=w.device; if(d.name!==CONN.name||d.mode!==CONN.mode||d.site_id!==CONN.siteId){   // renamed, moved or Easy/Detailed changed in the back-office
       const moved=d.site_id!==CONN.siteId; CONN={...CONN,name:d.name,mode:d.mode,siteId:d.site_id}; try{ localStorage.setItem(DEV_KEY,JSON.stringify(CONN)); }catch(e){}
       if(moved){ S.currentSiteId=d.site_id; P.save(); } render(); } }

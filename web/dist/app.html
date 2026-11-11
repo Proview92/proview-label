@@ -1124,6 +1124,12 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
     client: () => sb,
     async session() { if (!sb) return null; const { data } = await sb.auth.getSession(); return data.session; },
     async user() { const s = await Cloud.session(); return s ? s.user : null; },
+    // True only when the sign-in has really been ended by the server (the saved login was thrown away).
+    // A dropped connection never counts: supabase-js keeps the saved login when a refresh fails for network reasons.
+    loginGone() {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+      try { return !localStorage.getItem(C.STORAGE_KEY || 'pv-label-auth'); } catch (e) { return false; }
+    },
     async token() { const s = await Cloud.session(); return s ? s.access_token : null; },
     async signIn(email, password) { const { data, error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw error; return data.user; },
     async signUp(email, password, redirect) { const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: redirect } }); if (error) throw error; return data; },
@@ -4144,7 +4150,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.4.7';
+const APP_VERSION = '1.4.8';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -4955,10 +4961,11 @@ async function checkLock(){
   try{ w=await Cloud.whoami(); }
   catch(e){   // no internet (or the server is down): keep working on what's saved here
     const m=String((e&&(e.code||''))+' '+(e&&e.message||''));
-    if(/42501|permission denied|JWT|not authenticated/i.test(m)&&!(await Cloud.session().catch(()=>undefined))){ unpair(true); return null; }   // server reached, but this handheld's login is gone
+    if(/42501|permission denied|JWT|not authenticated/i.test(m)&&Cloud.loginGone&&Cloud.loginGone()){ unpair(true); return null; }   // the server ended this handheld's login (never a dropped connection: the saved login is kept then)
     return LOCK; }
   if(!w) return LOCK;
-  if(!w.device){ unpair(true); return null; }   // removed in the back-office: pair again
+  if(!w.device){ if(!(await Cloud.session().catch(()=>null))) return LOCK;   // answered without our login (connection dropped mid-refresh): not a removal
+    unpair(true); return null; }   // removed in the back-office: pair again
   { const d=w.device; if(d.name!==CONN.name||d.mode!==CONN.mode||d.site_id!==CONN.siteId){   // renamed, moved or Easy/Detailed changed in the back-office
       const moved=d.site_id!==CONN.siteId; CONN={...CONN,name:d.name,mode:d.mode,siteId:d.site_id}; try{ localStorage.setItem(DEV_KEY,JSON.stringify(CONN)); }catch(e){}
       if(moved){ S.currentSiteId=d.site_id; P.save(); } render(); } }
