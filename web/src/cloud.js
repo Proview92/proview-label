@@ -35,7 +35,8 @@
     return t || 'Something went wrong. Please try again.';
   };
 
-  const LICENCE_URL = 'https://license.proviewcrm.co.uk';   // licence portal: master-only links (dashboard All sites / Add business)
+  const LICENCE_URL = 'https://license.proviewcrm.co.uk';   // licence portal: the master's links only (Open a customer, Back to licence portal)
+  const OPEN_KEY = 'pvl-open';   // sessionStorage: the business the master opened from the licence portal
   const SUPPORT = { phone: '020 8935 5495', email: 'info@proviewtechgroup.co.uk' };
   // Licence state of a business from whoami: 'suspended', 'nolicence' (never licensed: every new business starts
   // like this, migration 007), 'expired' (trial ended), 'trial' (a trial end date, set by hand) or 'active'
@@ -67,17 +68,23 @@
       try { return !localStorage.getItem(C.STORAGE_KEY || 'pv-label-auth'); } catch (e) { return false; }
     },
     async token() { const s = await Cloud.session(); return s ? s.access_token : null; },
-    async signIn(email, password) { const { data, error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw error; return data.user; },
+    async signIn(email, password) { const { data, error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw error; Cloud.setOpenOrg(null); return data.user; },
     async signUp(email, password, redirect) { const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: redirect } }); if (error) throw error; return data; },
     async resetPassword(email, redirect) { const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: redirect }); if (error) throw error; },
     async setPassword(pw) { const { error } = await sb.auth.updateUser({ password: pw }); if (error) throw error; },
-    async signOut() { if (sb) await sb.auth.signOut(); },
+    async signOut() { Cloud.setOpenOrg(null); if (sb) await sb.auth.signOut(); },
     onRecovery(fn) { if (sb) sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') fn(); }); },
     // Send the person to their Proview account to sign in; they come back with #pv_sso=<token>
     proviewAccountUrl(returnUrl) { return PV_ACCOUNT + '?app=label&return=' + encodeURIComponent(returnUrl); },
     // If we've just come back from the Proview account page, swap the hand-off for a session.
+    // From the licence portal ("Open in Proview Label") the master's reply also names the business to open (j.open,
+    // checked by sso-login against the signed biz claim): it is kept for this tab only (sessionStorage), so a reload
+    // stays in that business and another tab can hold another customer. A hand-off without it (an old link, or the
+    // dashboard) forgets it: the master then sees "Open a customer from the licence portal". An open= in the address
+    // itself is never trusted; it is only removed.
     async consumeSsoHash() {
       const m = (g.location.hash || '').match(/[#&]pv_sso=([^&]+)/);
+      Cloud.cleanOpenParam();
       if (!m || !sb) return false;
       history.replaceState(null, '', g.location.pathname + g.location.search);
       const r = await fetch(C.SUPABASE_URL + '/functions/v1/sso-login', { method: 'POST', headers: { 'content-type': 'application/json', apikey: C.SUPABASE_KEY }, body: JSON.stringify({ assertion: decodeURIComponent(m[1]) }) });
@@ -87,7 +94,18 @@
       if (cur && String(cur.email || '').toLowerCase() !== j.email) await sb.auth.signOut();
       const v = await sb.auth.verifyOtp({ token_hash: j.token_hash, type: 'magiclink' });
       if (v.error) throw v.error;
+      Cloud.setOpenOrg(typeof j.open === 'string' && j.open ? j.open : null);
       return true;
+    },
+    // ----- the business the master opened from the licence portal (this tab only) -----
+    openOrg() { try { return sessionStorage.getItem(OPEN_KEY) || null; } catch (e) { return null; } },
+    setOpenOrg(id) { try { if (id) sessionStorage.setItem(OPEN_KEY, id); else sessionStorage.removeItem(OPEN_KEY); } catch (e) {} },
+    // drop ?open= / #open= from the address bar (the business comes from sso-login, never from the address)
+    cleanOpenParam() {
+      const L = g.location; if (!/[?&#]open=/.test(L.search + L.hash)) return;
+      const q = L.search.replace(/^\?/, '').split('&').filter((x) => x && !/^open=/.test(x)).join('&');
+      const h = L.hash.replace(/^#/, '').split('&').filter((x) => x && !/^open=/.test(x)).join('&');
+      history.replaceState(null, '', L.pathname + (q ? '?' + q : '') + (h ? '#' + h : ''));
     },
     // { email, master, orgs: [{ id, name, role, site_ids, settings, suspended }] }
     async whoami() { const { data, error } = await sb.rpc('pl_whoami'); if (error) throw error; return data; },
@@ -98,9 +116,7 @@
     // Returns the whoami result (or null if it couldn't be checked; then nothing is purged).
     async prune(P) { let w; try { w = await Cloud.whoami(); } catch (e) { return null; } if (!w) return null; P.prune((w.orgs || []).map((o) => o.id)); return w; },
     // ----- businesses & back-office logins -----
-    async createOrg(name, ownerEmail, ownerName) { const { data, error } = await sb.rpc('pl_create_org', { p_name: name, p_owner_email: ownerEmail || null, p_owner_name: ownerName || '' }); if (error) throw error; return data; },
-    // master: business + location + Owner / Admin login in one go (migration 006). Returns { org_id, site_id, user_id, email, existing }.
-    async addBusiness(business, name, email, mobile, password) { const { data, error } = await sb.rpc('pl_add_business', { p_business: business, p_name: name, p_email: email, p_mobile: mobile || '', p_password: password }); if (error) throw error; return data; },
+    // (Adding a business is done in the licence portal, New customer: the hub calls add_business. No button here.)
     // Self sign-up, "Set up your business" (migrations 003/007): the business starts with no licence. Returns { org_id, site_id }.
     // trialReady(who): the server has the set-up feature (whoami then reports trial_used, now always false).
     trialReady(who) { return !!who && Object.prototype.hasOwnProperty.call(who, 'trial_used'); },

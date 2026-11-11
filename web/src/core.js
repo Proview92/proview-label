@@ -500,15 +500,12 @@
   // opts: { url, key, token }  token = the signed-in user's access token (row-level security decides
   // what they can read and write). Records carry orgId (+ siteId for site data).
   // One business per request: changes are sent per business, each request naming it (x-pl-org header).
-  // opts.scoped (the Proview master): pull only the All sites list (sites + devices of every business) and,
-  // when a business is open (opts.org), that one business's data. Other businesses' data is dropped locally.
-  const LIST_KINDS = ['sites', 'devices'];
+  // opts.scoped (the Proview master): pull only the one business that is open (opts.org), opened from the licence
+  // portal (MASTER_OPEN_SPEC.md). No business open: nothing is pulled. Every other business's data is dropped locally.
   const siteOf = (kind, r) => (kind === 'sites' ? r.id : (r.siteId || null));
-  // The master's pull: the All sites list (sites + devices of every business) plus the open business, if any.
   async function pullScoped(s, base, headers, org, full) {
     const by = s.settings.sync.lastSyncBy = s.settings.sync.lastSyncBy || {};
-    const parts = [{ key: '*', q: '&kind=in.(' + LIST_KINDS.join(',') + ')', h: {} }];
-    if (org) parts.push({ key: org, q: '&org_id=eq.' + encodeURIComponent(org), h: { 'x-pl-org': org } });
+    const parts = org ? [{ key: org, q: '&org_id=eq.' + encodeURIComponent(org), h: { 'x-pl-org': org } }] : [];
     let pulled = 0, dropped = 0;
     for (const part of parts) {
       const started = new Date(Date.now() - 5000).toISOString(), since = by[part.key] || '1970-01-01T00:00:00Z';
@@ -524,7 +521,7 @@
         });
         if (rows.length < 1000) break;
       }
-      if (full) { // drop clean cached records of this part the server no longer returns
+      if (full) { // drop clean cached records of this business the server no longer returns
         const seen = new Set();
         for (let off = 0; ; off += 1000) {
           const r3 = await fetch(base + '?select=id' + part.q + '&order=id.asc&limit=1000&offset=' + off, { headers: { ...headers, ...part.h } });
@@ -532,16 +529,17 @@
           const ids = await r3.json(); ids.forEach((x) => seen.add(x.id));
           if (ids.length < 1000) break;
         }
-        COLLECTIONS.forEach((k) => { if (part.key === '*' && !LIST_KINDS.includes(k)) return; const n = s[k].length;
-          s[k] = s[k].filter((r) => r._dirty || !r.orgId || seen.has(r.id) || (part.key !== '*' && r.orgId !== part.key)); dropped += n - s[k].length; });
+        COLLECTIONS.forEach((k) => { const n = s[k].length;
+          s[k] = s[k].filter((r) => r._dirty || !r.orgId || seen.has(r.id) || r.orgId !== part.key); dropped += n - s[k].length; });
       }
       by[part.key] = started;
     }
-    // keep nothing of other businesses but the All sites list (unsent changes stay until they're sent)
+    // keep nothing of any other business (unsent changes stay until they're sent)
     const gone = new Set();
-    COLLECTIONS.forEach((k) => { if (LIST_KINDS.includes(k)) return; const n = s[k].length;
+    COLLECTIONS.forEach((k) => { const n = s[k].length;
       s[k] = s[k].filter((r) => { const keep = r._dirty || !r.orgId || r.orgId === org; if (!keep) gone.add(r.orgId); return keep; }); dropped += n - s[k].length; });
     gone.forEach((id) => { delete by[id]; });
+    delete by['*'];
     return { pulled, dropped };
   }
   async function sync(opts) {

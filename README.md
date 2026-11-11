@@ -10,7 +10,7 @@ Food labelling for UK kitchens, part of the Proview CRM family (Bookings, Employ
 
 | Who | Signs in with | Sees |
 |---|---|---|
-| **Master** (Proview) | Email, or "Sign in with Proview account" | Every business. A picker under the logo switches between all businesses, one business, or one site. Can add businesses. |
+| **Master** (Proview) | Opens a customer from the licence portal (**Open in Proview Label** on the customer's page) | One business at a time, exactly as its Owner sees it, with a "Viewing <Business> as Proview" bar. Signed in any other way, the master only sees "Open a customer from the licence portal". No master view, no Add business here. |
 | **Owner / Admin** | Email or Proview account | Their whole business: all its sites, menu, staff and settings. |
 | **Manager** | Email or Proview account | Only their own sites. No Settings page, and can't add sites or logins. |
 | **Device staff** | 4-digit PIN on the handheld | Print, scan, log wastage. A device manager can also edit products. |
@@ -23,7 +23,10 @@ Food labelling for UK kitchens, part of the Proview CRM family (Bookings, Employ
   3. Proview Label's `sso-login` function (`supabase/functions/sso-login`) checks the token and signs them in.
 
 ### Adding a customer
-1. As master: **Locations → + Add business**. Enter the name, plus the owner's name and email.
+1. In the licence portal: **New customer** (the hub's `add_business`). Enter the name, plus the owner's name and email.
+   To work inside it, open the customer in the portal and press **Open in Proview Label** (sso-assert adds a signed
+   `biz` claim; `sso-login` honours it only for the master and replies with `open`; the back-office then sends that
+   business in the `x-pl-org` header and keeps it for the tab in sessionStorage `pvl-open`).
 2. The owner signs in, either with "Sign in with Proview account" or "Create a login" using that email. They add their sites, menu, back-office logins and device staff.
 3. On each handheld: open Proview Label. It shows a 6-character pairing code and a QR code. In the back-office go to **Locations & devices → + Pair handheld**, enter the code (or scan the QR code with a phone, which opens that dialog with the code filled in), and pick the location, a name and **Easy** or **Detailed** mode. The handheld opens a few seconds later. Products and settings come down to the device. Labels, expiry and wastage go up to the server.
    - No email or password on the handheld. Pairing makes a login used only by that handheld (`supabase/functions/pl-device-pair`, migration `005_device_pairing.sql`). It can only see and change its own location.
