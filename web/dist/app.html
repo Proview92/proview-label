@@ -4151,7 +4151,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.5.5';
+const APP_VERSION = '1.5.6';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -4802,11 +4802,11 @@ async function processQueue(){
   if(connected()&&LOCK){ ui.queue=[]; ui.printing=false; renderFooter(); applyLock(); return; }
   if(!ui.queue.length||ui.printFail){ ui.printing=false; renderFooter(); return; }
   ui.printing=true; const j=ui.queue[0];
-  try { await Promise.race([sendToPrinter(j), new Promise((_,no)=>setTimeout(()=>no(new Error('no answer from the printer')),20000))]); }
+  let done=1;
+  try { done=(await Promise.race([sendToPrinter(j), new Promise((_,no)=>setTimeout(()=>no(new Error('no answer from the printer')),20000+4000*Math.min(j.qty||1,20)))]))||1; }
   catch(e){ ui.printing=false; printFailed(j, e&&e.message||String(e)); return; }
-  await new Promise(r=>setTimeout(r, 400));
-  logPrinted(j);
-  if(j.qty>1){ j.qty--; j._logged=true; } else ui.queue.shift();
+  if(done<2) await new Promise(r=>setTimeout(r, 400));
+  for(let i=0;i<done&&ui.queue[0]===j;i++){ logPrinted(j); if(j.qty>1){ j.qty--; j._logged=true; } else ui.queue.shift(); }
   renderFooter(); processQueue();
 }
 // A label didn't print: the queue waits, nothing is logged as printed, and the screen offers a reprint.
@@ -4953,7 +4953,8 @@ async function sendToPrinter(j){
   const N=Native().LabelPrinter;
   if(!N){ if(pr.mode==='builtin') return; throw new Error('printing to hardware needs the Android app'); }   // web preview: on screen only
   if(pr.mode==='builtin'){
-    printResult(await N.printBuiltin({image:labelBitmap({...j,qty:1}),feed:3,result:pr.checkPrint!==false})); return;
+    const n=Math.min(j.qty||1,20);   // identical labels go to the printer as one job, so there's no pause between them
+    printResult(await N.printBuiltin({image:labelBitmap({...j,qty:1}),feed:3,copies:n,result:pr.checkPrint!==false})); return n;
   }
   if(!pr.address) throw new Error('no printer set – see Settings');
   const bytes=escpos({...j,qty:1}); let bin=''; bytes.forEach(b=>bin+=String.fromCharCode(b));

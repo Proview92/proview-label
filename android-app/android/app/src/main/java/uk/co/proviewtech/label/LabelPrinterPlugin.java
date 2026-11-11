@@ -291,6 +291,7 @@ public class LabelPrinterPlugin extends Plugin {
         final int feed = call.getInt("feed", 4);
         final int dark = call.getInt("dark", -1);
         final boolean wantResult = Boolean.TRUE.equals(call.getBoolean("result", false));
+        final int copies = Math.max(1, Math.min(20, call.getInt("copies", 1)));   // several identical labels in one job: no pause between them
         new Thread(() -> {
             try {
                 PrinterInterface p = awaitBuiltin(4000);
@@ -305,20 +306,18 @@ public class LabelPrinterPlugin extends Plugin {
 
                 JSObject r = new JSObject();
                 if (!wantResult) {
-                    if (bmp != null) p.printBitmap(bmp); else p.printEpson(raw);
-                    if (feed > 0) p.nextLine(feed);
+                    for (int i = 0; i < copies; i++) { if (bmp != null) p.printBitmap(bmp); else p.printEpson(raw); if (feed > 0) p.nextLine(feed); }
                     r.put("reported", false); call.resolve(r); return;
                 }
                 final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
                 final int[] code = {0}; final String[] msg = {null};
                 boolean held = false;
                 try { held = p.beginWork(); } catch (Exception ignored) {}
-                if (bmp != null) p.printBitmap(bmp); else p.printEpson(raw);
-                if (feed > 0) p.nextLine(feed);
+                for (int i = 0; i < copies; i++) { if (bmp != null) p.printBitmap(bmp); else p.printEpson(raw); if (feed > 0) p.nextLine(feed); }
                 p.endWork(new PrintCallback.Stub() {
                     @Override public void onPrintResult(int c, String m) { code[0] = c; msg[0] = m; done.countDown(); }
                 });
-                boolean got = done.await(15, java.util.concurrent.TimeUnit.SECONDS);
+                boolean got = done.await(15 + 3L * copies, java.util.concurrent.TimeUnit.SECONDS);
                 r.put("reported", got); r.put("held", held);
                 if (got) { r.put("code", code[0]); r.put("msg", msg[0] == null ? "" : msg[0]); }
                 call.resolve(r);
