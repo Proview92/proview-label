@@ -45,10 +45,13 @@
     </application>
 
     <!-- the built-in printer service on Senraise handhelds (H10P / H10S) -->
-    <!-- Printer diagnostics (Settings): see which print-related services this handheld has -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <queries>
         <package android:name="recieptservice.com.recieptservice" />
+        <!-- other Senraise system apps, named so Printer diagnostics can read them without the all-apps permission -->
+        <package android:name="com.posmgt.base" />
+        <package android:name="com.sr.app" />
+        <package android:name="com.sr.ota" />
+        <package android:name="com.senraise.logger" />
     </queries>
 
     <!-- Permissions -->
