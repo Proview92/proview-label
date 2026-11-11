@@ -1,5 +1,5 @@
 {
-  "version": "1.5.4",
+  "version": "1.5.5",
   "url": "https://label.proviewcrm.co.uk/ProviewLabel.apk",
-  "notes": "Printer diagnostics: final detail for print error detection."
+  "notes": "The printer now reports when a label didn't print (paper out)."
 }
