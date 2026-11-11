@@ -382,6 +382,7 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
   <div id="pairscreen"></div>
   <div id="modal"></div>
   <div class="printout" id="printout"></div>
+  <div id="printfail"></div>
   <div class="toast" id="toast"></div>
 </div>
 
@@ -4150,7 +4151,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.4.9';
+const APP_VERSION = '1.5.0';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -4289,8 +4290,7 @@ function renderStatus(){
 function renderFooter(){
   if($('#qModal')){ if(ui.queue.length) showQueue(); else $('#modal').innerHTML=''; }
   const f=$('#ftr');
-  if(ui.mode==='easy'){ const qn=ui.queue.reduce((a,x)=>a+x.qty,0); if(!['home','ezprod'].includes(ui.screen)||!qn){ f.style.display='none'; return; }
-    f.style.display='flex'; f.innerHTML=`<button class="fb" id="fQueue" aria-label="Print queue" style="flex:1">${I.queue} ${qn} label${qn!==1?'s':''} printing<span class="badge">${qn}</span></button>`; $('#fQueue').onclick=showQueue; return; }
+  if(ui.mode==='easy'){ f.style.display='none'; return; }   // Easy mode: printing happens quietly in the background
   if(!['home','products','search'].includes(ui.screen)){ f.style.display='none'; return; }
   f.style.display='flex';
   const r=rule(ui.ruleId); const qn=ui.queue.reduce((a,x)=>a+x.qty,0);
@@ -4366,7 +4366,7 @@ function easyPrint(p){
   const upd=()=>{ sh.querySelector('#qv').textContent=qty; };
   sh.querySelector('#qm').onclick=()=>{ qty=Math.max(1,qty-1); upd(); };
   sh.querySelector('#qp').onclick=()=>{ qty=Math.min(99,qty+1); upd(); };
-  sh.querySelector('#ezGo').onclick=()=>{ enqueue({...buildJob(p,{}),qty}); closeSheet(); toast(`Printing ${qty} × ${p.name}`); };
+  sh.querySelector('#ezGo').onclick=()=>{ enqueue({...buildJob(p,{}),qty}); closeSheet(); };
 }
 
 screens.home = () => {
@@ -4792,20 +4792,30 @@ function renderBarcodes(root){ if(!window.JsBarcode) return; root.querySelectorA
 function enqueue(job){
   if(connected()&&LOCK){ applyLock(); return; }
   ui.queue.push(job); renderFooter();
-  if(!ui.printing) processQueue();
+  if(!ui.printing&&!ui.printFail) processQueue();
 }
+// Prints in the background: nothing covers the screen, so staff can carry on tapping while labels come out.
+// Only a failed print shows a message, with Print again.
 async function processQueue(){
-  if(connected()&&LOCK){ ui.queue=[]; ui.printing=false; $('#printout').innerHTML=''; renderFooter(); applyLock(); return; }
-  if(!ui.queue.length){ ui.printing=false; $('#printout').innerHTML=''; renderFooter(); return; }
+  if(connected()&&LOCK){ ui.queue=[]; ui.printing=false; renderFooter(); applyLock(); return; }
+  if(!ui.queue.length||ui.printFail){ ui.printing=false; renderFooter(); return; }
   ui.printing=true; const j=ui.queue[0];
-  const n=ui.queue.reduce((a,x)=>a+x.qty,0);
-  $('#printout').innerHTML=`<div class="slot"></div><div class="paper"><img alt="Label preview" style="display:block;width:100%;image-rendering:auto" src="data:image/png;base64,${labelBitmap({...j,qty:1})}"></div><div class="pq"><span class="spin"></span>${n} label${n!==1?'s':''} in queue · ${esc(j.name)}</div>`;
-  renderBarcodes($('#printout'));
-  try { await Promise.race([sendToPrinter(j), new Promise((_,no)=>setTimeout(()=>no(new Error('no answer from the printer')),20000))]); } catch(e){ toast('Printer: '+(e.message||e)); }
-  await new Promise(r=>setTimeout(r, 1500));
+  try { await Promise.race([sendToPrinter(j), new Promise((_,no)=>setTimeout(()=>no(new Error('no answer from the printer')),20000))]); }
+  catch(e){ ui.printing=false; printFailed(j, e&&e.message||String(e)); return; }
+  await new Promise(r=>setTimeout(r, 400));
   logPrinted(j);
   if(j.qty>1){ j.qty--; j._logged=true; } else ui.queue.shift();
   renderFooter(); processQueue();
+}
+// A label didn't print: the queue waits, nothing is logged as printed, and the screen offers a reprint.
+function printFailed(j, why){
+  ui.printFail=true; renderFooter();
+  const left=ui.queue.reduce((a,x)=>a+x.qty,0);
+  const el=$('#printfail');
+  el.innerHTML=`<div class="modal"><div class="box"><h3>Label didn’t print</h3><p class="hint" style="font-size:15px;color:#333"><b>${esc(j.name)}</b>${left>1?` (${left} labels waiting)`:''}<br><span data-notr>${esc(why)}</span><br><br>Check the paper roll and the printer, then print again.</p><div class="row" style="margin-top:18px"><button class="btn ghost" data-x>Cancel</button><button class="btn blue" data-ok>Print again</button></div></div></div>`;
+  if(navigator.vibrate) navigator.vibrate([80,60,80]);
+  el.querySelector('[data-ok]').onclick=()=>{ el.innerHTML=''; ui.printFail=false; processQueue(); };
+  el.querySelector('[data-x]').onclick=()=>{ el.innerHTML=''; ui.printFail=false; ui.queue=[]; renderFooter(); };
 }
 function logPrinted(j){
   if(j.test){ S.settings.labelsInStock=Math.max(0,S.settings.labelsInStock-1); P.save(); return; }
@@ -4823,7 +4833,6 @@ function reprintLabel(l){
   const p=l.productId?P.byId('products',l.productId):null;
   const r=L('rules').find(x=>x.name===l.ruleName)||rule(ui.ruleId);
   enqueue({id:P.uid('j'),productId:l.productId,name:l.name,type:l.type,qty:1,expiry:l.expiry,ruleName:l.ruleName,rule:r,allergens:l.allergens||[],mayContain:p?p.mayContain:'',customAllergens:p?p.customAllergens:'',ingredients:p?p.ingredients:'',price:p?p.price:null,batch:l.batch,useFirst:l.useFirst,defrost:l.defrost,includeDate:true,code:l.code,barcode:p?p.barcode:'',reprintOf:l.code,dateType:p?p.dateType:'use-by'});
-  toast('Identical copy queued');
 }
 function showQueue(){
   $('#modal').innerHTML=`<div class="modal" id="qModal"><div class="box"><h3>Print Queue</h3>${ui.queue.map((j,i)=>`<div class="kv"><span><b style="color:#000">${j.qty} ×</b> ${esc(j.name)}</span>${i===0?'<span class="spin"></span>':'<span class="hint">waiting</span>'}</div>`).join('')||'<p class="hint">Queue is empty.</p>'}<div class="row" style="margin-top:16px"><button class="btn ghost" id="qc">Close</button>${ui.queue.length>1?'<button class="btn red" id="qx">Cancel waiting</button>':''}</div></div></div>`;
@@ -4984,7 +4993,7 @@ function showLock(){ applyLock(); }
 function applyLock(){
   const el=$('#lockscreen'); if(!el) return;
   if(!(connected()&&LOCK)){ el.innerHTML=''; return; }
-  ui.queue=[]; ui.printing=false; $('#printout').innerHTML='';
+  ui.queue=[]; ui.printing=false; ui.printFail=false; $('#printout').innerHTML=''; { const pf=$('#printfail'); if(pf) pf.innerHTML=''; }
   closeSheet&&$('#sheet').classList.contains('on')&&closeSheet(); closeDrawer&&closeDrawer();
   const sp=(Cloud.SUPPORT||{}), url=Cloud.LICENCE_URL||'https://license.proviewcrm.co.uk';
   el.innerHTML=`<div class="lockscreen"><div style="font-size:44px">🔒</div><h2>${esc(LOCK.title)}</h2><p>${esc(LOCK.text)}</p><p>This handheld is locked: printing and syncing are paused until the licence is active.</p><p>Buy a licence at <b>${esc(url.replace(/^https?:\/\//,''))}</b> or contact Proview: <b>${esc(sp.phone||'020 8935 5495')}</b> · ${esc(sp.email||'info@proviewtechgroup.co.uk')}</p><div class="row"><button class="btn blue" data-chk>Check again</button><button class="btn ghost" data-disc style="color:#d92d20">Unpair this handheld</button></div></div>`;
