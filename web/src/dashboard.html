@@ -217,23 +217,12 @@ textarea.inp{min-height:76px;resize:vertical}
 .rte{min-height:110px;line-height:1.5}.rte b{font-weight:800}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .ab-cap{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:4px 0 10px}
-.ab-g2{gap:0 14px}.ab-pwrow{display:flex;gap:6px;align-items:center}.ab-pwrow .pw-wrap{flex:1;min-width:0}
 .pw-wrap{position:relative}.pw-wrap .inp{padding-right:44px}
 .pw-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:36px;height:32px;border:0;background:transparent;color:var(--mut);border-radius:8px;cursor:pointer;display:grid;place-items:center}
 .pw-eye:hover{color:var(--ink);background:rgba(0,0,0,.05)}.pw-eye svg{width:18px;height:18px}
 .ab-login{display:grid;gap:8px;background:#eef3ff;border:1px solid #cfdcff;color:#213a87;padding:10px 14px;border-radius:10px;font-size:14px}
 .ab-login>div{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.ab-login span{color:var(--mut)}.ab-login b{font-family:ui-monospace,monospace;word-break:break-all}
-@media (max-width:640px){.ab-g2{grid-template-columns:1fr}}
-.md.abz{max-width:660px}.md.abz .mf{align-items:center;flex-wrap:wrap}.abz-note{flex:1;font-size:12.5px;color:var(--mut)}
-.abz-set{border:0;margin:0 0 14px;padding:0;display:grid;gap:8px;min-width:0}.abz-set legend{padding:0 0 8px;font-size:13px;font-weight:600;color:var(--ink)}
-.abz-opt{display:flex;gap:12px;align-items:flex-start;padding:13px 14px;border:1px solid #d9d6ce;border-radius:12px;cursor:pointer;background:#fff;margin:0}
-.abz-opt.on{border:2px solid #3b7fd4;padding:12px 13px;background:#f3f7fd}.abz-opt input{margin:2px 0 0;width:18px;height:18px;flex:none;accent-color:#2f6fc4}
-.abz-opt .t{flex:1;min-width:0}.abz-opt .t b{display:block;font-size:14px;font-weight:600;color:var(--ink)}.abz-opt .t span{display:block;font-size:13px;line-height:18px;color:var(--mut)}
-.abz-badge{font-size:11px;font-weight:700;color:#1f4f96;background:#e2ecfa;border-radius:999px;padding:3px 8px;white-space:nowrap}
-.abz-lic{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.abz-lic .abz-opt{flex-wrap:wrap;gap:8px;padding:12px}.abz-lic .abz-opt.on{padding:11px}.abz-lic .abz-opt .t span{font-size:12px;line-height:17px}
-.abz-pw{margin:2px 0 0}
 .abz-ok{background:#ecf8f0;border:1px solid #bfe3cb;color:#17592f;border-radius:10px;padding:10px 12px;margin:12px 0 0}.abz-warn{background:#fff8e8;border:1px solid #f0dfb5;color:#4d3a10;border-radius:10px;padding:10px 12px;margin:12px 0 0}
-@media (max-width:640px){.abz-lic{grid-template-columns:1fr}.abz-note{flex-basis:100%}}
 .algrid{display:flex;flex-wrap:wrap;gap:6px}
 .algrid label{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);background:var(--card);border-radius:20px;padding:5px 11px;font-size:12.5px;margin:0;cursor:pointer;color:var(--ink);font-weight:500}
 .algrid label input{display:none}
@@ -413,6 +402,7 @@ button.ov-loc:hover,button.ov-li:hover{background:#f8f7f4}
 <script>/*CORE*/</script>
 <script>/*CLOUD*/</script>
 <script>/*HUB*/</script>
+<script>/*PVADDBIZ*/</script>
 <script>
 (function(){
 'use strict';
@@ -1403,42 +1393,16 @@ function licenceForm(siteId){ const x=P.byId('sites',siteId), o=orgOfSite(siteId
 // locks as "Trial ended". The location was only just created by pl_add_business with no licence, so this never
 // replaces a licence that was already set. Everything else
 // (self sign-up, staff, the portal's New customer) stays no-trial.
-function addBusiness(after){
-  const req=(t)=>`${t}<span style="color:#d92d20"> *</span>`;
+function addBusiness(after){   // the pop-up: src/pv-addbiz.js (the same file in all six Proview apps)
   const rand=(n)=>{ const a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', r=crypto.getRandomValues(new Uint32Array(n)); return [...r].map(x=>a[x%a.length]).join(''); };
-  const opt=(name,val,title,sub,on,badge)=>`<label class="abz-opt${on?' on':''}"><input type="radio" name="${name}" value="${val}"${on?' checked':''}><span class="t"><b>${title}</b><span>${sub}</span></span>${badge?`<span class="abz-badge">${badge}</span>`:''}</label>`;
-  const m=modal('Add business',`<div class="g2 ab-g2"><div class="fld"><label for="bn">${req('Business name')}</label><input class="inp" id="bn" type="text" placeholder="e.g. Tolians" autocomplete="off"></div>
-      <div class="fld"><label for="on">${req('Owner’s name')}</label><input class="inp" id="on" type="text" placeholder="e.g. Sam Taylor" autocomplete="off"></div>
-      <div class="fld"><label for="oe">${req('Owner’s email')}</label><input class="inp" id="oe" type="email" placeholder="name@company.com" autocomplete="off"></div>
-      <div class="fld"><label for="om">Mobile <span style="font-weight:400">(optional)</span></label><input class="inp" id="om" type="tel" placeholder="07…" autocomplete="off"></div></div>
-    <fieldset class="abz-set" style="margin-top:4px"><legend>How will they sign in?</legend>
-      ${opt('absi','invite','Email them an invite','They get an email link and choose their own password.',true,'Recommended')}
-      ${opt('absi','pw','Set a password now','No email is sent. You pass the password on yourself.',false)}
-      <div class="fld abz-pw" id="opRow" hidden><label for="op">${req('Password')}</label><div class="ab-pwrow"><div class="pw-wrap"><input class="inp" id="op" type="password" placeholder="At least 6 characters" autocomplete="new-password"><button class="pw-eye" id="opEye" type="button" tabindex="-1" aria-label="Show password" title="Show password">${ic('eye')}</button></div><button class="btn ghost sm" id="opSug" type="button">Suggest</button></div></div>
-    </fieldset>
-    <fieldset class="abz-set"><legend>Licence</legend><div class="abz-lic">
-      ${opt('ablic','none','None yet','They buy one when they sign in.',true)}
-      ${opt('ablic','trial','3-day trial','Full access for 3 days, then it locks.',false)}
-      ${opt('ablic','set','Set it now','Then set it in the licence portal.',false)}</div>
-    </fieldset>`,
-    `<span class="abz-note">Adds the business and a location with the same name.</span><button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Add and send invite</button>`);
-  m.classList.add('abz'); const xb=m.querySelector('.mh [data-x]'); if(xb){ xb.setAttribute('aria-label','Close'); xb.title='Close'; }
-  const f=(id)=>m.querySelector('#'+id), pass=f('op'), eye=f('opEye');
-  const pick=(n)=>(m.querySelector(`input[name="${n}"]:checked`)||{}).value;
-  m.addEventListener('change',(ev)=>{ const t=ev.target; if(!t||t.type!=='radio') return;
-    m.querySelectorAll(`input[name="${t.name}"]`).forEach(x=>x.closest('.abz-opt').classList.toggle('on',x.checked));
-    if(t.name==='absi'){ const pw=t.value==='pw'; f('opRow').hidden=!pw; f('sv').textContent=pw?'Add business':'Add and send invite'; if(pw) pass.focus(); } });
-  const showPw=(on)=>{ pass.type=on?'text':'password'; eye.innerHTML=ic(on?'eyeoff':'eye'); eye.title=on?'Hide password':'Show password'; eye.setAttribute('aria-label',eye.title); };
-  eye.onclick=()=>{ showPw(pass.type==='password'); pass.focus(); };
-  f('opSug').onclick=()=>{ pass.value=rand(10); showPw(true); };
   const need=(input,msg)=>{ toast(msg); input.focus(); };
-  f('sv').onclick=async()=>{ const bn=f('bn').value.trim(), on=f('on').value.trim(), mob=f('om').value.trim(), e=f('oe').value.trim().toLowerCase();
-    const invite=pick('absi')!=='pw', lic=pick('ablic')||'none', pw=invite?rand(24):pass.value;
-    if(bn.length<2) return need(f('bn'),'Enter the business name');
-    if(on.length<2) return need(f('on'),'Enter the owner’s name');
-    if(!/^\S+@\S+\.\S+$/.test(e)) return need(f('oe'),'Enter a valid email address');
-    if(!invite&&pw.length<6) return need(pass,'The password needs at least 6 characters');
-    const btn=f('sv'); btn.disabled=true; let r;
+  window.pvAddBiz({ onSubmit: async(v,ui)=>{ const bn=v.biz, on=v.name, mob=v.mobile, e=v.email;
+    const invite=v.invite, lic=v.lic, pw=invite?rand(24):v.password;
+    if(bn.length<2) return need(ui.input('biz'),'Enter the business name');
+    if(on.length<2) return need(ui.input('name'),'Enter the owner’s name');
+    if(!/^\S+@\S+\.\S+$/.test(e)) return need(ui.input('email'),'Enter a valid email address');
+    if(!invite&&pw.length<6) return need(ui.input('pw'),'The password needs at least 6 characters');
+    let r;
     try{
       if(CLOUD) r=await Cloud.addBusiness(bn,on,e,mob,pw);
       else { // demo: same result as the server
@@ -1446,7 +1410,7 @@ function addBusiness(after){
         S.orgs.push({id,name:bn,settings:{},licensed:false,no_licence:true,trial_ends_at:null}); P.upsert('sites',{id:sid,orgId:id,name:bn,address:'',region:''});
         P.upsert('users',{id:P.uid('u_'),orgId:id,name:on,email:e,mobile:mob,password:old?old.password:pw,role:'admin',pin:'0000',siteIds:[]}); P.save();
         r={org_id:id,site_id:sid,email:e,existing:!!old}; }
-    }catch(x){ btn.disabled=false; return toast(Cloud.friendly?Cloud.friendly(x):x.message); }
+    }catch(x){ return toast(Cloud.friendly?Cloud.friendly(x):x.message); }
     const fe=(x)=>esc(Cloud.friendly?Cloud.friendly(x):(x&&x.message)||String(x));
     // licence: a 3-day trial on the location that was just added (it has no licence yet; licences are per location, migration 009)
     let licLine='';
@@ -1463,7 +1427,7 @@ function addBusiness(after){
       signIn=me_?`<p class="abz-warn" style="margin-top:0">The business was added, but the invite email couldn’t be sent (${fe(me_)}). They can use “Forgot password?” on the sign-in page with ${esc(e)}.</p>`
         :`<p class="abz-ok" style="margin-top:0">Invite sent to <b>${esc(e)}</b>. They open the email link and choose their own password.</p>`; }
     if(CLOUD&&await checkAccess()){ applyScope(); try{ await Cloud.sync(P,{full:true}); }catch(x){} S=P.get(); }
-    P.ensureRules(r.org_id); closeModal(); if(after) after(r.org_id); else render();
+    P.ensureRules(r.org_id); ui.close(); if(after) after(r.org_id); else render();
     const site=location.origin+location.pathname, details=`PROVIEW LABEL login\n${site}\nEmail: ${e}\nPassword: ${pw}`;
     const pwCard=!r.existing&&!invite?`<p class="hint" style="margin:0 0 12px;font-size:14px">The owner can sign in now. No email was sent, so pass these on yourself:</p>
         <div class="ab-login"><div><span>Sign in at</span><b>${esc(site.replace(/^https?:\/\//,''))}</b></div><div><span>Email</span><b>${esc(e)}</b></div><div><span>Password</span><b>${esc(pw)}</b></div></div>
@@ -1472,8 +1436,8 @@ function addBusiness(after){
       `${lic==='set'?`<a class="btn ghost" href="${LIC_URL}" target="_blank" rel="noopener">Set licence ↗</a>`:''}<button class="btn ghost" data-x>Stay here</button><button class="btn" id="abOpen">Open business</button>`);
     const c=d.querySelector('#abCopy'); if(c) c.onclick=()=>(navigator.clipboard?navigator.clipboard.writeText(details):Promise.reject()).then(()=>toast('Copied')).catch(()=>{ window.prompt('Copy this:',details); });
     d.querySelector('#abOpen').onclick=()=>{ closeModal(); const has=P.live('sites').some(x=>x.id===r.site_id); setSite(has?r.site_id:'org:'+r.org_id); location.hash=has?'overview':'devices'; };
-  };
-  f('bn').focus();
+    return true;
+  } });
 }
 VIEWS.devices=(el)=>{
   const ss=P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(siteFilter==='all'||x.id===siteFilter||siteFilter==='org:'+x.orgId)), ds=bySite(P.live('devices'));
