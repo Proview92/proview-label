@@ -7,7 +7,7 @@
 --   * pl_records (pl_can_read_kind): the master no longer reads every business's sites and devices records (the old
 --     All sites list); every kind, only for the business in x-pl-org (pl_master_in, as every other master check).
 --   * pl_orgs (orgs read): the master reads only the business in x-pl-org.
--- Already scoped since 004/005 and unchanged: pl_devices, pl_members, writes (pl_can_write, pl_is_org_admin).
+-- Already scoped since 004/005: pl_devices, pl_members, writes (pl_can_write, pl_is_org_admin); now never null (0).
 -- Unchanged on purpose:
 --   * the licence portal: hub_call / hub_call_base / hub_plans / hub_private.* are SECURITY DEFINER, owned by postgres
 --     (RLS not forced), and use none of the functions changed here; add_business still runs pl_add_business as the master;
@@ -15,6 +15,11 @@
 --   * owners, admins, managers and handhelds: every branch for them is copied as it was (handhelds: pl_device_me()).
 -- Safe before or after the new back-office: the old master UI just loses its every-business view (it sends no header
 -- before a business is picked); the new one sends x-pl-org from its first request.
+
+-- 0) "master inside this business" is always true or false, never null. Before, with no x-pl-org it was null, and an
+--    RPC that tests "if not pl_is_org_admin(...)" / "if not pl_can_write(...)" let a null through. (RLS treats null as no.)
+create or replace function public.pl_master_in(p_org text) returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce(p_org = public.pl_req_org(), false) and public.pl_is_master() $$;
 
 -- 1) per-business records: the master only inside the business named in x-pl-org
 create or replace function public.pl_can_read_kind(p_org text, p_site text, p_kind text) returns boolean

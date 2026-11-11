@@ -88,6 +88,11 @@ begin
   rep := rep || case when t2->'records' = '["mo_d2","mo_p2","mo_s2"]'::jsonb and t2->'devices' = '["dev_mo_2"]'::jsonb and t2->'who'->'orgs'->0->>'id' = 'org_mo_t2'
                        and jsonb_array_length(t2->'who'->'orgs') = 1 then 'PASS' else 'FAIL' end || ' master + T2: T2 only (records, handheld, whoami)' || E'\n';
   rep := rep || case when bogus->'who'->'orgs' = '[]' and bogus->'records' = '[]' then 'PASS' else 'FAIL' end || ' master + unknown business: nothing' || E'\n';
+  -- 2b. no business open: the master's admin / write checks are false, not null (an "if not ..." RPC check must refuse)
+  perform pg_temp.as_(mu, null);
+  rep := rep || case when public.pl_is_org_admin('org_mo_t1') is false and public.pl_can_write('org_mo_t1', 'mo_s1a', 'labels') is false
+                       and public.pl_master_in('org_mo_t1') is false then 'PASS' else 'FAIL' end || ' master, no header: admin / write checks are false (not null)' || E'\n';
+  perform pg_temp.svc();
   -- 3. writes as before: the master inside T1 can write T1, not T2
   perform pg_temp.as_(mu, 'org_mo_t1');
   rep := rep || case when public.pl_can_write('org_mo_t1', 'mo_s1a', 'labels') and not public.pl_can_write('org_mo_t2', 'mo_s2', 'labels') then 'PASS' else 'FAIL' end || ' master writes only in the open business (unchanged)' || E'\n';
