@@ -1,5 +1,5 @@
 {
-  "version": "1.4.9",
+  "version": "1.5.0",
   "url": "https://label.proviewcrm.co.uk/ProviewLabel.apk",
-  "notes": "Handhelds stay paired when Wi-Fi drops. Only Settings > Unpair un-pairs."
+  "notes": "Printing no longer covers the screen. If a label fails, the app offers Print again."
 }
