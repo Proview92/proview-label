@@ -28,6 +28,7 @@ import android.util.Base64;
 
 import androidx.core.content.ContextCompat;
 
+import recieptservice.com.recieptservice.PrintCallback;
 import recieptservice.com.recieptservice.PrinterInterface;
 
 import com.getcapacitor.JSArray;
@@ -280,40 +281,51 @@ public class LabelPrinterPlugin extends Plugin {
         }).start();
     }
 
-    /** image: base64 PNG of the label (preferred) · data: base64 ESC/POS bytes · feed: blank lines after (tear-off space) */
+    /** image: base64 PNG of the label (preferred) · data: base64 ESC/POS bytes · feed: blank lines after (tear-off space)
+     *  result: true = print as one job and wait for the printer's own result (paper out, overheating).
+     *  Resolves { reported, code, msg }: reported=false when the print service never answered (older service). */
     @PluginMethod
     public void printBuiltin(PluginCall call) {
         final String image = call.getString("image", null);
         final String data = call.getString("data", null);
         final int feed = call.getInt("feed", 4);
         final int dark = call.getInt("dark", -1);
+        final boolean wantResult = Boolean.TRUE.equals(call.getBoolean("result", false));
         new Thread(() -> {
             try {
                 PrinterInterface p = awaitBuiltin(4000);
                 if (dark >= 0) try { p.setDark(dark); } catch (Exception ignored) {}
+                Bitmap bmp = null; byte[] raw = null;
                 if (image != null && !image.isEmpty()) {
                     byte[] png = Base64.decode(image, Base64.DEFAULT);
-                    Bitmap bmp = BitmapFactory.decodeByteArray(png, 0, png.length);
+                    bmp = BitmapFactory.decodeByteArray(png, 0, png.length);
                     if (bmp == null) throw new Exception("bad label image");
-                    p.printBitmap(bmp);
-                } else if (data != null && !data.isEmpty()) {
-                    p.printEpson(Base64.decode(data, Base64.DEFAULT));
-                } else throw new Exception("nothing to print");
+                } else if (data != null && !data.isEmpty()) raw = Base64.decode(data, Base64.DEFAULT);
+                else throw new Exception("nothing to print");
+
+                JSObject r = new JSObject();
+                if (!wantResult) {
+                    if (bmp != null) p.printBitmap(bmp); else p.printEpson(raw);
+                    if (feed > 0) p.nextLine(feed);
+                    r.put("reported", false); call.resolve(r); return;
+                }
+                final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+                final int[] code = {0}; final String[] msg = {null};
+                boolean held = false;
+                try { held = p.beginWork(); } catch (Exception ignored) {}
+                if (bmp != null) p.printBitmap(bmp); else p.printEpson(raw);
                 if (feed > 0) p.nextLine(feed);
-                call.resolve();
+                p.endWork(new PrintCallback.Stub() {
+                    @Override public void onPrintResult(int c, String m) { code[0] = c; msg[0] = m; done.countDown(); }
+                });
+                boolean got = done.await(15, java.util.concurrent.TimeUnit.SECONDS);
+                r.put("reported", got); r.put("held", held);
+                if (got) { r.put("code", code[0]); r.put("msg", msg[0] == null ? "" : msg[0]); }
+                call.resolve(r);
             } catch (Exception e) {
                 call.reject("Print failed: " + e.getMessage(), e);
             }
         }).start();
-    }
-
-    private boolean needsBtPermission() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && getPermissionState("bluetooth") != PermissionState.GRANTED;
-    }
-
-    private BluetoothAdapter adapter() {
-        BluetoothManager m = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
-        return m != null ? m.getAdapter() : null;
     }
 
     @PluginMethod

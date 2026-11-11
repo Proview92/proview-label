@@ -400,7 +400,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.5.4';
+const APP_VERSION = '1.5.5';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -1202,11 +1202,22 @@ async function sendToPrinter(j){
   const N=Native().LabelPrinter;
   if(!N){ if(pr.mode==='builtin') return; throw new Error('printing to hardware needs the Android app'); }   // web preview: on screen only
   if(pr.mode==='builtin'){
-    await N.printBuiltin({image:labelBitmap({...j,qty:1}),feed:3}); return;
+    printResult(await N.printBuiltin({image:labelBitmap({...j,qty:1}),feed:3,result:pr.checkPrint!==false})); return;
   }
   if(!pr.address) throw new Error('no printer set – see Settings');
   const bytes=escpos({...j,qty:1}); let bin=''; bytes.forEach(b=>bin+=String.fromCharCode(b));
   await N.print({mode:pr.mode,address:pr.address,port:pr.port||9100,data:btoa(bin)});
+}
+
+// What the handheld's printer said about the label it was just given ({reported, code, msg}).
+// Throws when the printer says it did not print, so the "Label didn't print" message appears.
+function printResult(r){
+  if(!r||!r.reported) return;
+  const m=String(r.msg||''), raw='code '+r.code+(m?' · '+m:'');
+  try{ const d=P.byId('devices',S.deviceId); if(d&&d.printResult!==raw){ d.printResult=raw; d.printResultAt=P.now(); d._dirty=true; d.updatedAt=P.now(); P.save(); } }catch(e){}
+  if(/no[ _-]?paper|paper[ _-]?not|out of paper|lack/i.test(m)) throw new Error('The printer is out of paper');
+  if(/overheat|over[ _-]?heat|too hot/i.test(m)) throw new Error('The printer is too hot. Wait a minute, then print again');
+  if(r.code<0||/fail|error/i.test(m)) throw new Error('The printer reported a problem ('+raw+')');
 }
 
 // ---------- sync & export ----------

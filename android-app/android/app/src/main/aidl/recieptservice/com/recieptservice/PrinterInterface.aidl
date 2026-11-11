@@ -3,6 +3,7 @@
 package recieptservice.com.recieptservice;
 
 import recieptservice.com.recieptservice.PSAMCallback;
+import recieptservice.com.recieptservice.PrintCallback;
 
 interface PrinterInterface {
      void printEpson(in byte[] data);
@@ -16,8 +17,10 @@ interface PrinterInterface {
      void nextLine(int line);
      void printTableText(in String[] text, in int[] weight, in int[] alignment);
      void setTextBold(boolean bold);
-     void beginWork();
-     void endWork();
+     // print service 8.x (read from an H10S, Nov 2026): beginWork holds the printer, endWork prints and reports the result.
+     // Older services ignore the callback and never answer it.
+     boolean beginWork();
+     void endWork(in PrintCallback callback);
      void setDark(int value);
      void setLineHeight(float lineHeight);
      void setTextDoubleWidth(boolean enable);
@@ -30,4 +33,5 @@ interface PrinterInterface {
      void activatePSAMCard(int timeout, in PSAMCallback callback);
      void deactivatePSAMCard(int timeout, in PSAMCallback callback);
      void transmitPSAMCard(int timeout, in byte[] data, PSAMCallback callback);
+     String getSN();
 }
