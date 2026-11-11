@@ -128,6 +128,69 @@ public class LabelPrinterPlugin extends Plugin {
         bound = false; builtin = null;
     }
 
+    /** Read-only look at what this handheld's print service offers (for Proview support). Prints nothing, changes nothing. */
+    @PluginMethod
+    public void printerDiagnostics(PluginCall call) {
+        new Thread(() -> {
+            StringBuilder o = new StringBuilder();
+            final Context ctx = getContext();
+            final android.content.pm.PackageManager pm = ctx.getPackageManager();
+            o.append("DEVICE ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append(" / ").append(Build.DEVICE)
+                .append(" · Android ").append(Build.VERSION.RELEASE).append(" (").append(Build.VERSION.SDK_INT).append(") · ").append(Build.DISPLAY).append('\n');
+            java.util.List<String> pkgs = new java.util.ArrayList<>();
+            pkgs.add(SR_PKG);
+            try {
+                for (android.content.pm.PackageInfo pi : pm.getInstalledPackages(0)) {
+                    String n = pi.packageName.toLowerCase();
+                    if (!pkgs.contains(pi.packageName) && (n.contains("print") || n.contains("reciept") || n.contains("receipt") || n.contains("senraise") || n.contains("serial") || n.contains("scanner") || n.contains(".sr.") || n.contains("pos")))
+                        pkgs.add(pi.packageName);
+                }
+            } catch (Exception e) { o.append("list packages: ").append(e).append('\n'); }
+            for (String pkg : pkgs) {
+                try {
+                    android.content.pm.PackageInfo pi = pm.getPackageInfo(pkg, android.content.pm.PackageManager.GET_SERVICES | android.content.pm.PackageManager.GET_RECEIVERS | android.content.pm.PackageManager.GET_PROVIDERS | android.content.pm.PackageManager.GET_PERMISSIONS);
+                    o.append("\nPKG ").append(pkg).append(" v").append(pi.versionName).append(" (").append(pi.versionCode).append(")\n");
+                    if (pi.permissions != null) for (android.content.pm.PermissionInfo x : pi.permissions) o.append("  perm ").append(x.name).append('\n');
+                    if (pi.receivers != null) for (android.content.pm.ActivityInfo x : pi.receivers) o.append("  rcv ").append(x.name).append(x.exported ? " [exported]" : "").append('\n');
+                    if (pi.providers != null) for (android.content.pm.ProviderInfo x : pi.providers) o.append("  prov ").append(x.authority).append(x.exported ? " [exported]" : "").append('\n');
+                    if (pi.services != null) for (android.content.pm.ServiceInfo si : pi.services) {
+                        o.append("  svc ").append(si.name).append(si.exported ? " [exported]" : "").append(si.permission != null ? " perm=" + si.permission : "");
+                        if (si.exported && !pkg.equals(ctx.getPackageName())) o.append(" -> ").append(describeService(ctx, pkg, si.name));
+                        o.append('\n');
+                    }
+                } catch (Exception e) { o.append("\nPKG ").append(pkg).append(": ").append(e.getMessage()).append('\n'); }
+            }
+            try { PrinterInterface p = awaitBuiltin(3000); o.append("\nprint service version: ").append(p.getServiceVersion()).append('\n'); } catch (Exception e) { o.append("\nprint service: ").append(e.getMessage()).append('\n'); }
+            for (String dir : new String[]{"/dev", "/sys/class", "/sys/class/gpio", "/sys/devices/platform"}) {
+                try { String[] names = new File(dir).list(); if (names == null) continue; StringBuilder b = new StringBuilder();
+                    for (String n : names) { String l = n.toLowerCase(); if (l.contains("print") || l.contains("paper") || l.contains("tty") || l.contains("spi") || l.contains("therm")) b.append(n).append(' '); }
+                    if (b.length() > 0) o.append(dir).append(": ").append(b).append('\n');
+                } catch (Exception ignored) {}
+            }
+            JSObject r = new JSObject(); r.put("text", o.toString()); call.resolve(r);
+        }).start();
+    }
+
+    /** Bind for a moment and read only the interface name the service answers with. Calls nothing on it. */
+    private String describeService(Context ctx, String pkg, String cls) {
+        final String[] out = {"no answer"};
+        final Object lock = new Object();
+        ServiceConnection c = new ServiceConnection() {
+            @Override public void onServiceConnected(ComponentName n, IBinder b) { try { out[0] = String.valueOf(b.getInterfaceDescriptor()); } catch (Exception e) { out[0] = "err " + e.getMessage(); } synchronized (lock) { lock.notifyAll(); } }
+            @Override public void onServiceDisconnected(ComponentName n) {}
+            @Override public void onNullBinding(ComponentName n) { out[0] = "null binding"; synchronized (lock) { lock.notifyAll(); } }
+        };
+        boolean ok = false;
+        try {
+            Intent i = new Intent(); i.setClassName(pkg, cls);
+            ok = ctx.bindService(i, c, Context.BIND_AUTO_CREATE);
+            if (!ok) return "can't bind";
+            synchronized (lock) { if ("no answer".equals(out[0])) lock.wait(1500); }
+        } catch (Exception e) { return "err " + e.getMessage(); }
+        finally { if (ok) try { ctx.unbindService(c); } catch (Exception ignored) {} }
+        return out[0];
+    }
+
     @PluginMethod
     public void builtinStatus(PluginCall call) {
         new Thread(() -> {

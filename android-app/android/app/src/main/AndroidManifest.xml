@@ -45,6 +45,8 @@
     </application>
 
     <!-- the built-in printer service on Senraise handhelds (H10P / H10S) -->
+    <!-- Printer diagnostics (Settings): see which print-related services this handheld has -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <queries>
         <package android:name="recieptservice.com.recieptservice" />
     </queries>

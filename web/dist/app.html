@@ -4151,7 +4151,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.5.1';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -4597,6 +4597,7 @@ screens.settings = () => {
     <div class="sect" style="margin-top:22px">App</div>
     <div class="kv" style="margin-top:-4px"><span>App version</span><b>${APP_VERSION}</b></div>
     <button class="btn ghost" id="chkUpd" style="width:100%;margin-top:10px">Check for app updates</button>
+    <button class="btn ghost" id="prDiag" style="width:100%;margin-top:10px">Printer diagnostics</button>
     <div class="sect" style="margin-top:22px">Proview Label cloud</div>
     ${connected()?`<div class="card" style="margin-bottom:10px"><b style="font-size:15px">Paired</b><div class="hint">${esc(CONN.name||'Handheld')} · ${esc(((S.orgs||[]).find(o=>o.id===ORG())||{}).name||'')}<br>Last sync ${S.settings.sync.lastSync?rel(S.settings.sync.lastSync):'—'}</div></div>
       <div class="row"><button class="btn blue sm" style="flex:1" id="synow">Sync now</button><button class="btn ghost sm" style="flex:1;color:#d92d20" id="disc">Unpair</button></div>`
@@ -4611,6 +4612,7 @@ screens.settings = () => {
       sel.onchange=()=>{ pr.address=sel.value; pr.name=(r.devices.find(d=>d.address===sel.value)||{}).name||''; P.save(); };
       if(r.devices[0]&&!pr.address){ pr.address=r.devices[0].address; pr.name=r.devices[0].name; P.save(); } }catch(e){ toast(e.message||'Bluetooth error'); } };
   $('#chkUpd').onclick=()=>checkUpdate(true);
+  $('#prDiag').onclick=printerDiag;
   $('#test').onclick=()=>enqueue({id:P.uid('j'),name:'Test label',type:'prep',qty:1,expiry:P.computeExpiry(rule('r_fridge')).toISOString(),ruleName:'Fridge',rule:rule('r_fridge'),allergens:['Milk'],mayContain:'',customAllergens:'',batch:'TEST',useFirst:true,defrost:false,code:P.labelCode(),test:true});
   const sn=$('#synow'); if(sn) sn.onclick=doSync;
   const dc=$('#disc'); if(dc) dc.onclick=()=>unpair(false);
@@ -5111,6 +5113,17 @@ window.addEventListener('online',renderStatus); window.addEventListener('offline
 document.addEventListener('ionBackButton', ev=>{ ev.detail && ev.detail.register && ev.detail.register(10,()=>{ if(pairing){ if(Native().App) Native().App.exitApp(); return; } if(connected()&&LOCK&&!$('#modal').innerHTML){ if(Native().App) Native().App.exitApp(); return; } if($('#modal').innerHTML) $('#modal').innerHTML=''; else if($('#sheet').classList.contains('on')) closeSheet(); else if($('#drawer').classList.contains('on')) closeDrawer(); else if(ui.screen!=='home') back(); else if(Native().App) Native().App.exitApp(); }); });
 // handheld hardware: built-in printer + barcode scanner (Android app only)
 // ---------- app updates ----------
+// Printer diagnostics: a read-only report of what this handheld's print service offers. It prints nothing and
+// changes nothing. The report is shown here and saved on this handheld's record so Proview support can read it.
+async function printerDiag(){
+  const N=Native().LabelPrinter; if(!N||!N.printerDiagnostics) return toast('Printer diagnostics need the Android app');
+  toast('Reading the printer…'); let text='';
+  try{ text=(await N.printerDiagnostics()).text||''; }catch(e){ text='Failed: '+(e&&e.message||e); }
+  let sent=false;
+  if(connected()){ try{ const d=P.byId('devices',S.deviceId); if(d){ P.upsert('devices',{...d,diag:text.slice(0,20000),diagAt:P.now()}); await Cloud.sync(P); S=P.get(); sent=true; } }catch(e){} }
+  $('#modal').innerHTML=`<div class="modal"><div class="box" style="max-height:88vh;display:flex;flex-direction:column"><h3>Printer diagnostics</h3><p class="hint">${sent?'Sent to Proview support.':'Not sent (offline or not paired). Take photos of this text.'}</p><pre data-notr style="flex:1;overflow:auto;font-size:11px;line-height:1.35;white-space:pre-wrap;word-break:break-all;background:#f4f3ef;border-radius:8px;padding:10px;margin:8px 0;user-select:text">${esc(text)}</pre><div class="row"><button class="btn blue" data-x style="flex:1">Close</button></div></div></div>`;
+  $('#modal [data-x]').onclick=()=>$('#modal').innerHTML='';
+}
 // The latest version is described at label.proviewcrm.co.uk/apk/version.json. The app checks when it opens,
 // every minute (installing by itself when idle, see autoUpdate), and from "Check for app updates" in Settings.
 const UPDATE_URL='https://label.proviewcrm.co.uk/apk/version.json';
