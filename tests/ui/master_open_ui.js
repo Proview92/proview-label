@@ -39,7 +39,9 @@ async function run(browser, opts, body) {
       if (p === '/auth/v1/verify') return res(200, session(O.email));
       if (p === '/rest/v1/rpc/pl_whoami') {
         // the live server: the master gets every business; others their own
-        const orgs = O.master ? Object.keys(ORGS).map((id) => org(id, ORGS[id], 'master', { sites: licOf(id) }))
+        // since migration 010 the master gets only the business named in x-pl-org (none without it)
+        if (O.master) st.whoHdr = (st.whoHdr || []).concat(hOrg);
+        const orgs = O.master ? Object.keys(ORGS).filter((id) => id === hOrg).map((id) => org(id, ORGS[id], 'master', { sites: licOf(id) }))
           : [org('org_a', 'Burger Barn', O.role, { site_ids: O.role === 'manager' ? ['site_a1'] : [], sites: licOf('org_a') })];
         return res(200, { email: O.email, master: !!O.master, trial_used: false, orgs });
       }
@@ -109,6 +111,7 @@ const recordCalls = (st) => st.calls.filter((c) => c.includes('/rest/v1/pl_recor
     ok('master biz: dropdown = the business\'s locations as the owner sees them', JSON.stringify(opts) === JSON.stringify(['All my locations (2)', 'Camden Kitchen', 'Soho Kitchen']), JSON.stringify(opts));
     const rc = recordCalls(st);
     ok('master biz: every record request names Burger Barn only', rc.length > 0 && rc.every((c) => c.includes('org_id=eq.org_a') && c.endsWith('[org_a]')), rc.join('\n'));
+    ok('master biz: whoami sent x-pl-org org_a (migration 010)', (st.whoHdr || []).length > 0 && st.whoHdr.every((h) => h === 'org_a'), JSON.stringify(st.whoHdr));
     ok('master biz: the address\'s open=org_b was ignored', !st.calls.some((c) => c.includes('org_b')));
     const h = await html(p), s = await store(p);
     ok('master biz: no other business on the page or device', !/Pizza Palace|Leeds|Margherita/.test(h) && !/Pizza Palace|Leeds|Margherita/.test(s));

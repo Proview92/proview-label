@@ -1054,9 +1054,13 @@ html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26
   // Every database request names it in the x-pl-org header, and the server only lets the master read and
   // change that business (plus the All sites list). Business logins don't need it.
   let scope = { master: false, org: null };
+  // Before whoami has said who this is (the first request after a reload), the business this tab opened from the
+  // licence portal is sent too: since migration 010 the server gives the master nothing without it. Ignored for anyone
+  // but the master.
   const scopedFetch = (url, init) => {
-    if (!scope.org || !/\/rest\/v1\//.test(String(url))) return fetch(url, init);
-    const h = new Headers((init && init.headers) || {}); h.set('x-pl-org', scope.org);
+    const org = scope.org || (g.PVLCloud && g.PVLCloud.openOrg && g.PVLCloud.openOrg());
+    if (!org || !/\/rest\/v1\//.test(String(url))) return fetch(url, init);
+    const h = new Headers((init && init.headers) || {}); h.set('x-pl-org', org);
     return fetch(url, { ...(init || {}), headers: h });
   };
   if (enabled) {
@@ -1140,7 +1144,7 @@ html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26
     },
     // ----- the business the master opened from the licence portal (this tab only) -----
     openOrg() { try { return sessionStorage.getItem(OPEN_KEY) || null; } catch (e) { return null; } },
-    setOpenOrg(id) { try { if (id) sessionStorage.setItem(OPEN_KEY, id); else sessionStorage.removeItem(OPEN_KEY); } catch (e) {} },
+    setOpenOrg(id) { try { if (id) sessionStorage.setItem(OPEN_KEY, id); else sessionStorage.removeItem(OPEN_KEY); } catch (e) {} scope = { master: scope.master, org: null }; },
     // drop ?open= / #open= from the address bar (the business comes from sso-login, never from the address)
     cleanOpenParam() {
       const L = g.location; if (!/[?&#]open=/.test(L.search + L.hash)) return;
