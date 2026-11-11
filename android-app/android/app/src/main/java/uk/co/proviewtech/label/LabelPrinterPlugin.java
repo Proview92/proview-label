@@ -328,6 +328,15 @@ public class LabelPrinterPlugin extends Plugin {
         }).start();
     }
 
+    private boolean needsBtPermission() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && getPermissionState("bluetooth") != PermissionState.GRANTED;
+    }
+
+    private BluetoothAdapter adapter() {
+        BluetoothManager m = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+        return m != null ? m.getAdapter() : null;
+    }
+
     @PluginMethod
     public void listPaired(PluginCall call) {
         if (needsBtPermission()) { requestPermissionForAlias("bluetooth", call, "btPermsList"); return; }
