@@ -1119,17 +1119,20 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
 
   const LICENCE_URL = 'https://license.proviewcrm.co.uk';
   const SUPPORT = { phone: '020 8935 5495', email: 'info@proviewtechgroup.co.uk' };
-  // Licence / trial state of a business from whoami: 'expired' (trial ended), 'suspended', 'trial' or 'active'
+  // Licence state of a business from whoami: 'suspended', 'nolicence' (never licensed: every new business starts
+  // like this, migration 007), 'expired' (trial ended), 'trial' (a trial end date, set by hand) or 'active'
   const orgState = (o) => {
     if (!o) return 'active';
     if (o.suspended) return 'suspended';
+    if (o.licensed === false || o.no_licence) return 'nolicence';
     if (o.trial_ends_at && (o.trial_expired || new Date(o.trial_ends_at) < new Date())) return 'expired';
     if (o.trial_ends_at) return 'trial';
     return 'active';
   };
   const lockMsg = (o) => {
     const st = orgState(o), n = (o && o.name) || 'This business';
-    if (st === 'expired') return { title: 'Trial ended', text: n + '’s free 3-day trial has ended. Your data is safe, but nothing can be changed or synced until you buy a licence.' };
+    if (st === 'nolicence') return { title: 'No licence yet', text: 'No licence yet: buy a licence to start using Proview Label at ' + n + '. Nothing can be changed or synced until it has one.' };
+    if (st === 'expired') return { title: 'Trial ended', text: n + '’s trial has ended. Your data is safe, but nothing can be changed or synced until you buy a licence.' };
     if (st === 'suspended') return { title: 'Account suspended', text: n + ' is suspended. Your data is safe, but nothing can be changed or synced until the licence is renewed.' };
     return null;
   };
@@ -1174,12 +1177,18 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     async createOrg(name, ownerEmail, ownerName) { const { data, error } = await sb.rpc('pl_create_org', { p_name: name, p_owner_email: ownerEmail || null, p_owner_name: ownerName || '' }); if (error) throw error; return data; },
     // master: business + location + Owner / Admin login in one go (migration 006). Returns { org_id, site_id, user_id, email, existing }.
     async addBusiness(business, name, email, mobile, password) { const { data, error } = await sb.rpc('pl_add_business', { p_business: business, p_name: name, p_email: email, p_mobile: mobile || '', p_password: password }); if (error) throw error; return data; },
-    // Self sign-up: 3-day free trial (migration 003). Returns { org_id, site_id, trial_ends_at }.
-    // trialReady(who): the server has the trial feature (whoami then reports trial_used).
+    // Self sign-up, "Set up your business" (migrations 003/007): the business starts with no licence. Returns { org_id, site_id }.
+    // trialReady(who): the server has the set-up feature (whoami then reports trial_used, now always false).
     trialReady(who) { return !!who && Object.prototype.hasOwnProperty.call(who, 'trial_used'); },
     async startTrial(business, site) { const { data, error } = await sb.rpc('pl_start_trial', { p_business: business, p_site: site || null }); if (error) throw error; return data; },
-    // master: extend (ISO date) or clear (null) a business's trial
+    // master: set (ISO date) or clear (null) a business's trial end; either way the business is licensed
     async setTrial(orgId, endsAt) { const { error } = await sb.rpc('pl_set_trial', { p_org: orgId, p_ends: endsAt || null }); if (error) throw error; },
+    // master: give (licensed, optionally ending on endsAt) or remove (no licence) a business's licence (migration 007)
+    async setLicence(orgId, licensed, endsAt) {
+      const { error } = await sb.rpc('pl_set_licence', { p_org: orgId, p_licensed: !!licensed, p_ends: endsAt || null });
+      if (error && licensed && (error.code === 'PGRST202' || /could not find the function/i.test(error.message || ''))) return Cloud.setTrial(orgId, endsAt);   // server before 007
+      if (error) throw error;
+    },
     async renameOrg(id, name) { const { error } = await sb.from('pl_orgs').update({ name }).eq('id', id); if (error) throw error; },
     async saveOrgSettings(id, settings) { const { error } = await sb.from('pl_orgs').update({ settings }).eq('id', id); if (error) throw error; },
     async members(orgIds) { let q = sb.from('pl_members').select('*').order('name'); if (orgIds) q = q.in('org_id', orgIds); const { data, error } = await q; if (error) throw error; return data || []; },
@@ -1797,7 +1806,7 @@ function attention(){
     if(d.lastSync&&Date.now()-new Date(d.lastSync)>24*3600e3) out.push({lvl:'warn',icon:'device',title:`${d.name} hasn’t synced since ${P.fmtDate(d.lastSync,true)}`,sub:siteName(d.siteId),at:d.lastSync,go:'devices'}); });
   const ids=scopeOrgIds(); (S.orgs||[]).filter(o=>ids.includes(o.id)).forEach(o=>{ const m=lockMsgOf(o);
     if(m) out.push({lvl:'bad',icon:'shield',title:`${o.name}: ${m.title}`,sub:m.text,go:isMaster()?'sites':null});
-    else if(orgState(o)==='trial') out.push({lvl:'warn',icon:'shield',title:`${o.name}: free trial`,sub:'Ends '+P.fmtDate(o.trial_ends_at,true),go:isMaster()?'sites':null}); });
+    else if(orgState(o)==='trial') out.push({lvl:'warn',icon:'shield',title:`${o.name}: trial`,sub:'Ends '+P.fmtDate(o.trial_ends_at,true),go:isMaster()?'sites':null}); });
   return out;
 }
 function bellBtn(){ const n=attention().filter(x=>x.lvl==='bad').length; const b=document.createElement('button'); b.type='button'; b.id='tbBell'; b.className='bell'; b.title='Notifications'; b.setAttribute('aria-label','Notifications');
@@ -1871,29 +1880,30 @@ async function checkAccess(){
   if(!w.master&&!(w.orgs||[]).length){ await signOut(NO_ACCESS); return false; }
   applyWho(w); return true;
 }
-function applyWho(w){ WHO=w; S=P.get(); S.orgs=(w.orgs||[]).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role,suspended:o.suspended,trial_ends_at:o.trial_ends_at||null,trial_expired:!!o.trial_expired})); P.prune(S.orgs.map(o=>o.id)); S=P.get(); }
-// ---------- licence / free trial ----------
+function applyWho(w){ WHO=w; S=P.get(); S.orgs=(w.orgs||[]).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role,suspended:o.suspended,licensed:o.licensed!==false,no_licence:!!o.no_licence,trial_ends_at:o.trial_ends_at||null,trial_expired:!!o.trial_expired})); P.prune(S.orgs.map(o=>o.id)); S=P.get(); }
+// ---------- licence (no free trials: a new business starts with no licence) ----------
 const orgState=(o)=>Cloud.orgState?Cloud.orgState(o):(o&&o.suspended?'suspended':'active');
 const lockMsgOf=(o)=>Cloud.lockMsg?Cloud.lockMsg(o):null;
 const LIC_URL=Cloud.LICENCE_URL||'https://license.proviewcrm.co.uk', SUP=Cloud.SUPPORT||{phone:'020 8935 5495',email:'info@proviewtechgroup.co.uk'};
-const contactHtml=()=>`Buy a licence at <a href="${LIC_URL}" target="_blank" rel="noopener">license.proviewcrm.co.uk</a> or contact Proview on <a href="tel:${SUP.phone.replace(/\s/g,'')}">${esc(SUP.phone)}</a> · <a href="mailto:${esc(SUP.email)}">${esc(SUP.email)}</a>.`;
+const contactHtml=()=>`Buy a licence at <a href="${LIC_URL}" target="_blank" rel="noopener">license.proviewcrm.co.uk</a> or call <a href="tel:${SUP.phone.replace(/\s/g,'')}">${esc(SUP.phone)}</a> · <a href="mailto:${esc(SUP.email)}">${esc(SUP.email)}</a>.`;
 function stateTag(o){ const st=orgState(o);
   if(st==='suspended') return '<span class="tag bad">Suspended</span>';
+  if(st==='nolicence') return '<span class="tag bad">No licence</span>';
   if(st==='expired') return `<span class="tag bad" title="Trial ended ${esc(P.fmtDate(o.trial_ends_at,true))}">Trial expired</span>`;
   if(st==='trial') return `<span class="tag warn">Trial – ends ${esc(P.fmtDate(o.trial_ends_at))}</span>`;
   return '<span class="tag ok">Active</span>'; }
-// banner above the page for the business in view: trial ended / suspended (writes blocked), or trial running
+// banner above the page for the business in view: no licence / trial ended / suspended (writes blocked), or trial running
 function trialBanner(){
   const ids=scopeOrgIds(); const orgs=(S.orgs||[]).filter(o=>ids.includes(o.id));
   const locked=orgs.filter(o=>lockMsgOf(o)), trial=orgs.filter(o=>orgState(o)==='trial');
   if(locked.length){ const m=lockMsgOf(locked[0]);
-    return `<div class="card" role="alert" style="border-color:var(--bad);background:var(--badl);margin-bottom:16px"><h3 style="color:var(--bad)">${esc(m.title)}${locked.length>1?' · '+locked.length+' businesses':''}</h3><p style="margin:6px 0 0">${esc(m.text)} ${isMaster()?'As master you can extend or clear the trial from Locations.':contactHtml()}</p></div>`; }
+    return `<div class="card" role="alert" style="border-color:var(--bad);background:var(--badl);margin-bottom:16px"><h3 style="color:var(--bad)">${esc(m.title)}${locked.length>1?' · '+locked.length+' businesses':''}</h3><p style="margin:6px 0 0">${esc(m.text)} ${isMaster()?'As master you can give it a licence from Locations (Licence…).':contactHtml()}</p></div>`; }
   if(trial.length&&!isMaster()){ const o=trial[0];
-    return `<div class="card" style="border-color:var(--warn);background:var(--warnl);margin-bottom:16px;padding:12px 16px"><b>Free trial</b> · ${esc(o.name)} · ends ${esc(P.fmtDate(o.trial_ends_at,true))}. ${contactHtml()}</div>`; }
+    return `<div class="card" style="border-color:var(--warn);background:var(--warnl);margin-bottom:16px;padding:12px 16px"><b>Trial</b> · ${esc(o.name)} · ends ${esc(P.fmtDate(o.trial_ends_at,true))}. ${contactHtml()}</div>`; }
   return '';
 }
 const anyLocked=()=>(S.orgs||[]).filter(o=>scopeOrgIds().includes(o.id)).some(o=>lockMsgOf(o));
-// Signed in, no business, no invite: "Set up your business" (start a free 3-day trial)
+// Signed in, no business, no invite: "Set up your business" (it starts with no licence: no free trials)
 let TRIAL={msg:''};
 function renderTrialSetup(){
   const em=TRIAL_EMAIL||'';
@@ -1901,13 +1911,13 @@ function renderTrialSetup(){
     <div class="auth2-form"><div>
       <form id="tf" novalidate>
         <div class="auth2-fbrand"><div class="auth2-logo"></div><div class="wordmark2">PROVIEW<span>LABEL</span></div></div>
-        <h1>Set up your business</h1><p class="auth2-mut">Start your free 3-day trial${em?' as '+esc(em):''}.</p>
+        <h1>Set up your business</h1><p class="auth2-mut">You’ll be the owner${em?' ('+esc(em)+')':''}. Your business starts with no licence: buy a licence to start using Proview Label.</p>
         <div id="terr">${TRIAL.msg?`<div class="lg-err" role="alert">${esc(TRIAL.msg)}</div>`:''}</div>
         <label for="tb">Business name</label><input class="inp" id="tb" placeholder="e.g. Pepe's Piri Piri" maxlength="120" autocomplete="organization">
         <label for="ts">First location or kitchen</label><input class="inp" id="ts" placeholder="Same as the business name" maxlength="120">
-        <button class="go" type="submit" id="tgo">Start free trial</button>
+        <button class="go" type="submit" id="tgo">Set up business</button>
         <button class="ghost2" type="button" id="tout">Sign out</button>
-        <p class="hint" style="margin:0;font-size:12.5px">After 3 days the business becomes read-only until you buy a licence at <a href="${LIC_URL}" target="_blank" rel="noopener">license.proviewcrm.co.uk</a>. Joining an existing business? Ask its owner to add your email, then sign in again.</p>
+        <p class="hint" style="margin:0;font-size:12.5px">Until it has a licence the business is read-only. Buy one at <a href="${LIC_URL}" target="_blank" rel="noopener">license.proviewcrm.co.uk</a> or call ${esc(SUP.phone)}. Joining an existing business? Ask its owner to add your email, then sign in again.</p>
       </form></div></div></div>`;
   const tb=$('#tb'), ts=$('#ts'); let edited=false;
   tb.oninput=()=>{ if(!edited) ts.value=tb.value; }; ts.oninput=()=>{ edited=ts.value.trim()!==''&&ts.value!==tb.value; };
@@ -1918,17 +1928,16 @@ function renderTrialSetup(){
     const go=$('#tgo'); go.disabled=true; go.textContent='Setting up…';
     try{ const r=await Cloud.startTrial(b,s); TRIAL={msg:''};
       if(r&&r.site_id) lsSet('pvl-site:'+em,r.site_id);
-      await boot(false,r&&r.org_id); toast('Your free trial has started');
+      await boot(false,r&&r.org_id); toast('Business set up. Buy a licence to start using Proview Label.');
     }catch(ex){ const t=String((ex&&ex.message)||ex);
       if(/ALREADY_MEMBER/.test(t)) return boot(false);
       if(/could not find the function|PGRST202|does not exist/i.test(t)||(ex&&ex.code==='PGRST202')){ WHO=null; return signOut(NO_ACCESS); }
-      go.disabled=false; go.textContent='Start free trial'; err(Cloud.friendly(ex)); }
+      go.disabled=false; go.textContent='Set up business'; err(Cloud.friendly(ex)); }
   };
   tb.focus();
 }
 function signIn(u){ sessionId=u.id; lsSet(SKEY,u.id); siteFilter=lsGet('pvl-site:'+u.id)||'all'; if(u.role==='master'){ siteFilter='all'; location.hash='sites'; } else if(!location.hash) location.hash='overview'; render(); toast('Signed in as '+u.name); }
 // cloud: after Supabase sign-in, find out what this person can see and load it
-const TRIAL_USED_MSG='The free trial for this email has already been used. Buy a licence at license.proviewcrm.co.uk or contact Proview on 020 8935 5495.';
 // Loading splash: just the app icon while the sign-in state is checked; never the sign-in form.
 // Failsafe: if the check hasn't finished after 8 seconds (offline, say), show the normal page (sign-in if signed out).
 const SPLASH='<div class="pv-splash" role="status" aria-label="Loading Proview Label"><div class="logo"></div></div>';
@@ -1940,8 +1949,8 @@ async function boot(fresh,newOrg){
   try{
     const w=await Cloud.whoami();
     if(!w||(!w.master&&!(w.orgs||[]).length)){ WHO=null;
-      // no business and no invite: offer a free 3-day trial (only once the server supports it, and once per email)
-      if(w&&w.email&&Cloud.trialReady&&Cloud.trialReady(w)){ if(w.trial_used) return signOut(TRIAL_USED_MSG);
+      // no business and no invite: "Set up your business" (once the server supports it; the business starts with no licence)
+      if(w&&w.email&&Cloud.trialReady&&Cloud.trialReady(w)){
         forgetCaches(null); TRIAL_SETUP=true; P.useStore('signed-out',{blank:true}); S=P.get(); WHO=null; TRIAL_EMAIL=w.email; return render(); }
       return signOut(NO_ACCESS); }
     TRIAL_SETUP=false;
@@ -1974,7 +1983,7 @@ function renderLogin(){
   const mode=LOGIN.mode, up=mode==='signup', reset=mode==='reset', newpw=mode==='newpw';
   const accts=CLOUD?[]:P.live('users').filter(u=>u.email&&u.password);
   const title=newpw?'Choose a new password':reset?'Reset your password':up?'Create your login':'Sign in';
-  const sub=newpw?'At least 8 characters.':reset?'We’ll email you a link to choose a new password.':up?'Use the email your business owner or Proview added for you. New to Proview Label? Create a login to start a free 3-day trial.':'Manage products, allergens, expiry and wastage across your locations.';
+  const sub=newpw?'At least 8 characters.':reset?'We’ll email you a link to choose a new password.':up?'Use the email your business owner or Proview added for you. New to Proview Label? Create a login to set up your business.':'Manage products, allergens, expiry and wastage across your locations.';
   $('#app').innerHTML=`<div class="auth2">${loginArt()}
     <div class="auth2-form"><div>
       <form id="lf" autocomplete="on" novalidate>
@@ -2376,12 +2385,13 @@ VIEWS.sites=(el)=>{
   const devLine=(ds)=>ds.length?`${ds.filter(isOn).length} of ${ds.length} device${s_(ds.length)} synced`:'No devices';
   const tone=(ds)=>!ds.length?'':ds.every(isOn)?'ok':ds.some(isOn)?'warn':'bad';
   const syncTxt=(d)=>isOn(d)?'Synced '+P.fmtDate(d.lastSync,true):d.lastSync?'Last synced '+P.fmtDate(d.lastSync,true):'Never synced';
-  // status pill: red = trial ended, suspended or every device offline; amber = free trial or some devices offline;
+  // status pill: red = no licence, trial ended, suspended or every device offline; amber = trial or some devices offline;
   // grey = nothing set up yet; green = licensed and every device synced
   const pill=(o,os,ds)=>{ const st=orgState(o);
     if(st==='suspended') return '<span class="badge bad">Suspended</span>';
+    if(st==='nolicence') return '<span class="badge bad" title="No licence yet: the business is locked until it has one">No licence</span>';
     if(st==='expired') return `<span class="badge bad" title="Trial ended ${esc(P.fmtDate(o.trial_ends_at,true))}">Trial expired</span>`;
-    if(st==='trial') return `<span class="badge warn" title="Ends ${esc(P.fmtDate(o.trial_ends_at,true))}">Free trial</span>`;
+    if(st==='trial') return `<span class="badge warn" title="Ends ${esc(P.fmtDate(o.trial_ends_at,true))}">Trial – ends ${esc(day(o.trial_ends_at))}</span>`;
     if(!os.length) return '<span class="badge">No locations yet</span>';
     if(!ds.length) return '<span class="badge">No devices yet</span>';
     const off=ds.filter(d=>!isOn(d)).length;
@@ -2389,7 +2399,8 @@ VIEWS.sites=(el)=>{
     return '<span class="badge ok">All good</span>'; };
   const licText=(o)=>{ const st=orgState(o);
     if(st==='suspended') return 'Licence suspended';
-    if(st==='expired') return 'Expired';
+    if(st==='nolicence') return 'No licence yet';
+    if(st==='expired') return 'Trial expired';
     if(st==='trial') return 'Trial ends '+day(o.trial_ends_at);
     return 'Licensed'; };   // Label licenses the business (not each device)
   const openBtn=(o,os,cls)=>os.length===1?`<button class="btn sm ${cls}" data-open="${esc(os[0].id)}">Open business</button>`:os.length?`<button class="btn sm ${cls}" data-openbiz="${esc(o.id)}">Open business</button>`:`<button class="btn sm ${cls}" data-openorg="${esc(o.id)}">Open business</button>`;
@@ -2398,7 +2409,7 @@ VIEWS.sites=(el)=>{
     const sub=!os.length?'No locations yet':single?[os[0].name!==o.name&&esc(os[0].name),devLine(ds)].filter(Boolean).join(' · '):`${os.length} locations · ${ds.length?ds.length+' device'+s_(ds.length):'no devices yet'}`;
     return `<article class="card ov-biz" data-q="${esc(q)}"><div class="ov-bh"><div style="flex:1;min-width:0"><h3>${esc(o.name)}</h3><div class="muted small">${sub}</div></div>${pill(o,os,ds)}</div>
       ${single?'':os.map(x=>{ const d=devsAt([x.id]); return `<button type="button" class="ov-loc" data-open="${esc(x.id)}" title="Open on this location"><span class="ov-dot ${tone(d)}"></span><span style="flex:1;min-width:0">${esc(x.name)}</span><span class="muted small">${devLine(d)}</span><span class="ov-chev" aria-hidden="true">›</span></button>`; }).join('')}
-      <div class="ov-bf"><span class="muted small">${licText(o)}</span><span class="ov-acts">${trialOk?`<button class="btn sm" data-trial="${esc(o.id)}" title="Extend, end or clear this business's free trial">Trial…</button>`:''}${openBtn(o,os,'primary')}</span></div></article>`; };
+      <div class="ov-bf"><span class="muted small">${licText(o)}</span><span class="ov-acts">${trialOk?`<button class="btn sm" data-trial="${esc(o.id)}" title="Give or remove this business's licence">Licence…</button>`:''}${openBtn(o,os,'primary')}</span></div></article>`; };
   const empty=`<div class="card" style="grid-column:1/-1"><div class="empty" style="padding:28px 12px"><h3 style="font-size:17px;color:var(--ink)">No businesses yet</h3><p class="hint" style="max-width:460px;margin:8px auto 16px">Add a customer business and invite its owner. They can then add their kitchens, menu and staff, or you can set it up for them.</p><div class="btns" style="justify-content:center"><button class="btn primary" data-addb>${ic('plus',16)}Add business</button><a class="btn" href="${LIC_URL}" target="_blank" rel="noopener">Open licence portal ↗</a><button class="btn" data-refresh>${ic('refresh',16)}Refresh</button></div></div></div>`;
   const stat=(key,label,v,t)=>`<button type="button" class="card ov-stat ${t||''}" data-stat="${key}" title="Show the list"><div class="tiny">${label}</div><div class="ov-v">${v}</div></button>`;
   el.innerHTML=`<div class="ovp"><div class="ph keep ov-head"><p class="muted">Every business on Proview Label with its locations. Open one to see it as its team does.</p><div class="btns"><button class="btn" data-refresh title="Refresh">${ic('refresh',16)}Refresh</button><a class="btn" href="${LIC_URL}" target="_blank" rel="noopener">Licences ↗</a><button class="btn primary" data-addb>${ic('plus',16)}Add business</button></div></div>
@@ -2432,20 +2443,24 @@ VIEWS.sites=(el)=>{
     b.disabled=true; try{ if(!(await checkAccess())) return; applyScope(); await Cloud.sync(P,{full:true}); S=P.get(); render(); toast('Up to date'); }catch(e){ b.disabled=false; toast(Cloud.friendly(e)); } });
 };
 
-// Master: extend, end now or clear (= licensed, no longer a trial) a business's free trial
+// Master: the business's licence (the button that was "Trial…"; it can give a licence, so it stays, renamed).
+// Give licence = licensed with no end date. Or set a trial by hand that ends on a date (licensed until then).
+// Remove licence = back to "No licence" (locked). Every new business starts with no licence (migration 007).
 function trialForm(orgId){ const o=(S.orgs||[]).find(x=>x.id===orgId); if(!o) return;
   const ymd=(d)=>{ const x=new Date(d); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); };
-  const base=Math.max(Date.now(),o.trial_ends_at?new Date(o.trial_ends_at).getTime():0);
-  const m=modal('Trial · '+o.name,`<p style="margin-top:0">Status: ${stateTag(o)}${o.trial_ends_at?` <span class="hint">ends ${esc(P.fmtDate(o.trial_ends_at,true))}</span>`:' <span class="hint">not a trial (licensed)</span>'}</p>
-    <div class="fld"><label>Trial ends on</label><input class="inp" type="date" id="te" value="${ymd(base+3*day)}"></div>
-    <div class="btns" style="margin-bottom:6px"><button class="btn ghost sm" data-add="3">+3 days</button><button class="btn ghost sm" data-add="7">+7 days</button><button class="btn ghost sm" data-add="30">+30 days</button></div>
-    <p class="hint">The trial ends at the end of that day. After it ends the business is read-only and its people see “Trial ended” with the licence portal and Proview contact details. Clear the trial once they have a licence.</p>`,
-    `<button class="btn ghost" data-x>Cancel</button>${o.trial_ends_at?'<button class="btn ghost" id="tclr">Clear trial (licensed)</button>':''}<button class="btn" id="tsv">Save end date</button>`);
+  const st=orgState(o), base=Math.max(Date.now(),o.trial_ends_at?new Date(o.trial_ends_at).getTime():0);
+  const now=st==='nolicence'?'<span class="hint">no licence yet: the business is locked</span>':o.trial_ends_at?` <span class="hint">ends ${esc(P.fmtDate(o.trial_ends_at,true))}</span>`:st==='active'?' <span class="hint">licensed, no end date</span>':'';
+  const m=modal('Licence · '+o.name,`<p style="margin-top:0">Status: ${stateTag(o)} ${now}</p>
+    <div class="fld"><label>Or a trial set by hand, ending on</label><input class="inp" type="date" id="te" value="${ymd(base+3*day)}"></div>
+    <div class="btns" style="margin-bottom:6px"><button class="btn ghost sm" data-add="3">+3 days</button><button class="btn ghost sm" data-add="7">+7 days</button><button class="btn ghost sm" data-add="30">+30 days</button><button class="btn ghost sm" id="tsv">Set trial end</button></div>
+    <p class="hint">Give licence once they have paid: the business opens with no end date. A trial set by hand ends at the end of that day; after it the business is read-only and its people see the licence portal and Proview contact details. Remove licence locks it again (“No licence”).</p>`,
+    `<button class="btn ghost" data-x>Cancel</button>${st!=='nolicence'?'<button class="btn ghost" id="tnone" style="color:var(--bad)">Remove licence</button>':''}${st==='active'&&!o.trial_ends_at?'':'<button class="btn" id="tclr">Give licence</button>'}`);
   m.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{ m.querySelector('#te').value=ymd(base+(+b.dataset.add)*day); });
-  const save=async(ends)=>{ try{ if(CLOUD){ await Cloud.setTrial(orgId,ends); await refreshWho(); } else { o.trial_ends_at=ends; o.trial_expired=!!ends&&new Date(ends)<new Date(); P.save(); }
-      closeModal(); toast(ends?'Trial now ends '+P.fmtDate(ends,true):'Trial cleared: '+o.name+' is licensed'); render(); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } };
-  m.querySelector('#tsv').onclick=()=>{ const v=m.querySelector('#te').value; if(!v) return toast('Pick a date'); const d=new Date(v+'T23:59:59'); if(isNaN(d)) return toast('Pick a date'); save(d.toISOString()); };
-  const c=m.querySelector('#tclr'); if(c) c.onclick=()=>save(null);
+  const save=async(licensed,ends)=>{ try{ if(CLOUD){ await Cloud.setLicence(orgId,licensed,ends); await refreshWho(); } else { o.licensed=licensed; o.no_licence=!licensed; o.trial_ends_at=licensed?ends:null; o.trial_expired=!!o.trial_ends_at&&new Date(o.trial_ends_at)<new Date(); P.save(); }
+      closeModal(); toast(!licensed?o.name+': licence removed':ends?'Trial now ends '+P.fmtDate(ends,true):o.name+' is licensed'); render(); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } };
+  m.querySelector('#tsv').onclick=()=>{ const v=m.querySelector('#te').value; if(!v) return toast('Pick a date'); const d=new Date(v+'T23:59:59'); if(isNaN(d)) return toast('Pick a date'); save(true,d.toISOString()); };
+  const c=m.querySelector('#tclr'); if(c) c.onclick=()=>save(true,null);
+  const nn=m.querySelector('#tnone'); if(nn) nn.onclick=()=>save(false,null);
 }
 // Master: add a business together with its Owner / Admin login (no invite email: they just sign in). Same as Proview Signage.
 function addBusiness(after){
@@ -2456,7 +2471,7 @@ function addBusiness(after){
       <div class="fld"><label for="om">Mobile</label><input class="inp" id="om" type="tel" placeholder="Optional" autocomplete="off"></div>
       <div class="fld"><label for="oe">${req('Email (they sign in with this)')}</label><input class="inp" id="oe" type="email" placeholder="name@company.com" autocomplete="off"></div>
       <div class="fld"><label for="op">${req('Password')}</label><div class="ab-pwrow"><div class="pw-wrap"><input class="inp" id="op" type="password" placeholder="At least 6 characters" autocomplete="new-password"><button class="pw-eye" id="opEye" type="button" tabindex="-1" aria-label="Show password" title="Show password">${ic('eye')}</button></div><button class="btn ghost sm" id="opSug" type="button">Suggest</button></div></div></div>
-    <p class="hint" style="margin:0">The business gets a location with the same name. This person becomes its Owner / Admin. No email is sent.</p>`,
+    <p class="hint" style="margin:0">The business gets a location with the same name. This person becomes its Owner / Admin. No email is sent. It starts with no licence: give it one with Licence… once they have paid.</p>`,
     `<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Add business</button>`,true);
   const f=(id)=>m.querySelector('#'+id), pass=f('op'), eye=f('opEye');
   const showPw=(on)=>{ pass.type=on?'text':'password'; eye.innerHTML=ic(on?'eyeoff':'eye'); eye.title=on?'Hide password':'Show password'; eye.setAttribute('aria-label',eye.title); };

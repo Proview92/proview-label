@@ -450,7 +450,7 @@ if (CONN && !CONN.device) {   // connected the old way (email + password): pair 
 if (Cloud.enabled && CONN) S = P.useStore('cloud:' + CONN.uid, { blank: true });
 const needsPairing = () => !!(Cloud.enabled && !CONN);
 const connected = () => !!(Cloud.enabled && CONN);
-// Trial ended / suspended business: the server blocks every write, so syncing pauses and the handheld says why.
+// No licence yet / trial ended / suspended business: the server blocks every write, so syncing pauses and the handheld says why.
 // The whole handheld locks, printing included (owner decision 8 Nov 2026). Remembered offline in pvl-lock.
 const LOCK_KEY = 'pvl-lock';
 let LOCK = null;   // { title, text } while this handheld's business is locked

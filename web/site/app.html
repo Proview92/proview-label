@@ -1115,17 +1115,20 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
 
   const LICENCE_URL = 'https://license.proviewcrm.co.uk';
   const SUPPORT = { phone: '020 8935 5495', email: 'info@proviewtechgroup.co.uk' };
-  // Licence / trial state of a business from whoami: 'expired' (trial ended), 'suspended', 'trial' or 'active'
+  // Licence state of a business from whoami: 'suspended', 'nolicence' (never licensed: every new business starts
+  // like this, migration 007), 'expired' (trial ended), 'trial' (a trial end date, set by hand) or 'active'
   const orgState = (o) => {
     if (!o) return 'active';
     if (o.suspended) return 'suspended';
+    if (o.licensed === false || o.no_licence) return 'nolicence';
     if (o.trial_ends_at && (o.trial_expired || new Date(o.trial_ends_at) < new Date())) return 'expired';
     if (o.trial_ends_at) return 'trial';
     return 'active';
   };
   const lockMsg = (o) => {
     const st = orgState(o), n = (o && o.name) || 'This business';
-    if (st === 'expired') return { title: 'Trial ended', text: n + '’s free 3-day trial has ended. Your data is safe, but nothing can be changed or synced until you buy a licence.' };
+    if (st === 'nolicence') return { title: 'No licence yet', text: 'No licence yet: buy a licence to start using Proview Label at ' + n + '. Nothing can be changed or synced until it has one.' };
+    if (st === 'expired') return { title: 'Trial ended', text: n + '’s trial has ended. Your data is safe, but nothing can be changed or synced until you buy a licence.' };
     if (st === 'suspended') return { title: 'Account suspended', text: n + ' is suspended. Your data is safe, but nothing can be changed or synced until the licence is renewed.' };
     return null;
   };
@@ -1170,12 +1173,18 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     async createOrg(name, ownerEmail, ownerName) { const { data, error } = await sb.rpc('pl_create_org', { p_name: name, p_owner_email: ownerEmail || null, p_owner_name: ownerName || '' }); if (error) throw error; return data; },
     // master: business + location + Owner / Admin login in one go (migration 006). Returns { org_id, site_id, user_id, email, existing }.
     async addBusiness(business, name, email, mobile, password) { const { data, error } = await sb.rpc('pl_add_business', { p_business: business, p_name: name, p_email: email, p_mobile: mobile || '', p_password: password }); if (error) throw error; return data; },
-    // Self sign-up: 3-day free trial (migration 003). Returns { org_id, site_id, trial_ends_at }.
-    // trialReady(who): the server has the trial feature (whoami then reports trial_used).
+    // Self sign-up, "Set up your business" (migrations 003/007): the business starts with no licence. Returns { org_id, site_id }.
+    // trialReady(who): the server has the set-up feature (whoami then reports trial_used, now always false).
     trialReady(who) { return !!who && Object.prototype.hasOwnProperty.call(who, 'trial_used'); },
     async startTrial(business, site) { const { data, error } = await sb.rpc('pl_start_trial', { p_business: business, p_site: site || null }); if (error) throw error; return data; },
-    // master: extend (ISO date) or clear (null) a business's trial
+    // master: set (ISO date) or clear (null) a business's trial end; either way the business is licensed
     async setTrial(orgId, endsAt) { const { error } = await sb.rpc('pl_set_trial', { p_org: orgId, p_ends: endsAt || null }); if (error) throw error; },
+    // master: give (licensed, optionally ending on endsAt) or remove (no licence) a business's licence (migration 007)
+    async setLicence(orgId, licensed, endsAt) {
+      const { error } = await sb.rpc('pl_set_licence', { p_org: orgId, p_licensed: !!licensed, p_ends: endsAt || null });
+      if (error && licensed && (error.code === 'PGRST202' || /could not find the function/i.test(error.message || ''))) return Cloud.setTrial(orgId, endsAt);   // server before 007
+      if (error) throw error;
+    },
     async renameOrg(id, name) { const { error } = await sb.from('pl_orgs').update({ name }).eq('id', id); if (error) throw error; },
     async saveOrgSettings(id, settings) { const { error } = await sb.from('pl_orgs').update({ settings }).eq('id', id); if (error) throw error; },
     async members(orgIds) { let q = sb.from('pl_members').select('*').order('name'); if (orgIds) q = q.in('org_id', orgIds); const { data, error } = await q; if (error) throw error; return data || []; },
@@ -4189,7 +4198,7 @@ if (CONN && !CONN.device) {   // connected the old way (email + password): pair 
 if (Cloud.enabled && CONN) S = P.useStore('cloud:' + CONN.uid, { blank: true });
 const needsPairing = () => !!(Cloud.enabled && !CONN);
 const connected = () => !!(Cloud.enabled && CONN);
-// Trial ended / suspended business: the server blocks every write, so syncing pauses and the handheld says why.
+// No licence yet / trial ended / suspended business: the server blocks every write, so syncing pauses and the handheld says why.
 // The whole handheld locks, printing included (owner decision 8 Nov 2026). Remembered offline in pvl-lock.
 const LOCK_KEY = 'pvl-lock';
 let LOCK = null;   // { title, text } while this handheld's business is locked
