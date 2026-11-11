@@ -375,6 +375,11 @@ html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26
 .ov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:18px;align-items:start}
 .ov-biz{display:flex;flex-direction:column;overflow:hidden;padding:0;margin:0}
 .ov-bh{display:flex;align-items:flex-start;gap:10px;padding:16px 18px 12px}.ov-bh h3{font-size:17px;font-weight:700;letter-spacing:-.015em;margin:0 0 2px}
+.ov-locrow{display:flex;align-items:center;border-top:1px solid var(--line)}.ov-locrow .ov-loc{border-top:0;flex:1;min-width:0}.ov-locrow .ov-licb{margin-right:14px;flex:none}
+.buy-plans{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:12px}
+.buy-card{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);text-decoration:none}
+.buy-card:hover{border-color:var(--pri);box-shadow:0 2px 10px rgba(0,0,0,.06)}.buy-card .bp{font-size:20px;font-weight:700}.buy-card small{color:var(--pri);font-weight:600}
+.lic-banner .lic-row{margin-top:12px;padding-top:12px;border-top:1px solid rgba(217,45,32,.18)}.lic-banner .lic-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ov-loc{display:flex;align-items:center;gap:10px;width:100%;padding:11px 18px;border:0;border-top:1px solid var(--line);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
 button.ov-loc:hover,button.ov-li:hover{background:#f8f7f4}
 .ov-bf{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;border-top:1px solid var(--line);margin-top:auto}
@@ -662,9 +667,9 @@ function attention(){
   if(canView('devices')) bySite(P.live('devices')).forEach(d=>{
     if(d.labelsLeft<60) out.push({lvl:'bad',icon:'print',title:`${d.name} is low on labels`,sub:`${siteName(d.siteId)} · ${d.labelsLeft} left on the roll`,go:canView('orders')?'orders':'devices'});
     if(d.lastSync&&Date.now()-new Date(d.lastSync)>24*3600e3) out.push({lvl:'warn',icon:'device',title:`${d.name} hasn’t synced since ${P.fmtDate(d.lastSync,true)}`,sub:siteName(d.siteId),at:d.lastSync,go:'devices'}); });
-  const ids=scopeOrgIds(); (S.orgs||[]).filter(o=>ids.includes(o.id)).forEach(o=>{ const m=lockMsgOf(o);
-    if(m) out.push({lvl:'bad',icon:'shield',title:`${o.name}: ${m.title}`,sub:m.text,go:isMaster()?'sites':null});
-    else if(orgState(o)==='trial') out.push({lvl:'warn',icon:'shield',title:`${o.name}: trial`,sub:'Ends '+P.fmtDate(o.trial_ends_at,true),go:isMaster()?'sites':null}); });
+  allowedSiteIds().forEach(id=>{ const m=siteLockMsg(id), st=siteState(id), l=siteLic(id)||{};
+    if(m) out.push({lvl:'bad',icon:'shield',title:`${siteName(id)}: ${m.title}`,sub:m.text,go:isMaster()?'sites':'devices'});
+    else if(st==='trial'||st==='expiring') out.push({lvl:'warn',icon:'shield',title:`${siteName(id)}: ${st==='trial'?'trial':'licence ends soon'}`,sub:'Ends '+P.fmtDate(l.licence_expires_at,true),go:isMaster()?'sites':'devices'}); });
   return out;
 }
 function bellBtn(){ const n=attention().filter(x=>x.lvl==='bad').length; const b=document.createElement('button'); b.type='button'; b.id='tbBell'; b.className='bell'; b.title='Notifications'; b.setAttribute('aria-label','Notifications');
@@ -711,7 +716,7 @@ async function doSync(quiet){ applyScope();
   if(syncing){ SYNC_AGAIN=true; return; } syncing=true; SYNC_STATE='saving'; paintDot();
   try{ let changed=false; if(!quiet){ if(!(await checkAccess())) return; changed=true; }
     const r=await Cloud.sync(P,{full:!quiet}); S=P.get(); SYNC_STATE='ok'; if(!quiet) toast(`Synced · ${r.pushed} sent, ${r.pulled} received`); if(r.pulled||r.dropped||changed) render(); }
-  catch(e){ SYNC_STATE=navigator.onLine?'error':'ok'; const lo=(S.orgs||[]).find(o=>lockMsgOf(o)); if(lo&&!isMaster()){ if(!quiet||!lockToastShown){ lockToastShown=true; toast(lockMsgOf(lo).title+': changes can’t be saved. Buy a licence at license.proviewcrm.co.uk.'); } } else toast(Cloud.friendly(e)); }
+  catch(e){ SYNC_STATE=navigator.onLine?'error':'ok'; const lo=allowedSiteIds().find(siteLocked); if(lo&&!isMaster()){ if(!quiet||!lockToastShown){ lockToastShown=true; toast(siteName(lo)+': '+siteLockMsg(lo).title+'. Changes there can’t be saved until it has a licence (Locations & devices → Buy online).'); } } else toast(Cloud.friendly(e)); }
   finally{ syncing=false; if(SYNC_STATE==='saving') SYNC_STATE='ok'; paintDot(); if(SYNC_AGAIN){ SYNC_AGAIN=false; setTimeout(()=>doSync(true),0); } }
 }
 // push changes shortly after any edit; pull every minute
@@ -738,29 +743,88 @@ async function checkAccess(){
   if(!w.master&&!(w.orgs||[]).length){ await signOut(NO_ACCESS); return false; }
   applyWho(w); return true;
 }
-function applyWho(w){ WHO=w; S=P.get(); S.orgs=(w.orgs||[]).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role,suspended:o.suspended,licensed:o.licensed!==false,no_licence:!!o.no_licence,trial_ends_at:o.trial_ends_at||null,trial_expired:!!o.trial_expired})); P.prune(S.orgs.map(o=>o.id)); S=P.get(); }
-// ---------- licence (no free trials: a new business starts with no licence) ----------
+function applyWho(w){ WHO=w; S=P.get(); S.orgs=(w.orgs||[]).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role,suspended:o.suspended,licensed:o.licensed!==false,no_licence:!!o.no_licence,trial_ends_at:o.trial_ends_at||null,trial_expired:!!o.trial_expired,sites:Array.isArray(o.sites)?o.sites:null})); P.prune(S.orgs.map(o=>o.id)); S=P.get(); }
+// ---------- licence: one per LOCATION (migration 009; no free trials: a new location starts with no licence) ----------
+// The business-level state (orgState / lockMsg, shared with the handheld) is derived by the server from its locations:
+// locked = suspended or no location licensed. Pages work per location: siteState / siteLockMsg below.
 const orgState=(o)=>Cloud.orgState?Cloud.orgState(o):(o&&o.suspended?'suspended':'active');
 const lockMsgOf=(o)=>Cloud.lockMsg?Cloud.lockMsg(o):null;
 const LIC_URL=Cloud.LICENCE_URL||'https://license.proviewcrm.co.uk', SUP=Cloud.SUPPORT||{phone:'020 8935 5495',email:'info@proviewtechgroup.co.uk'};
 const contactHtml=()=>`Buy a licence at <a href="${LIC_URL}" target="_blank" rel="noopener">license.proviewcrm.co.uk</a> or call <a href="tel:${SUP.phone.replace(/\s/g,'')}">${esc(SUP.phone)}</a> · <a href="mailto:${esc(SUP.email)}">${esc(SUP.email)}</a>.`;
+const LIC_TYPES={trial:'Trial (set by hand)',m1:'1 month',m3:'3 months',m6:'6 months',m12:'12 months',m24:'24 months',m36:'36 months',lifetime:'Lifetime',custom:'Custom end date'};
+const orgOfSite=(id)=>{ const s=P.byId('sites',id); return s&&(S.orgs||[]).find(o=>o.id===s.orgId); };
+// a location's licence { licence_type, licence_starts_at, licence_expires_at }. Demo, or a server before 009: the business's licence.
+function siteLic(id){ const o=orgOfSite(id); if(!o) return null;
+  if(Array.isArray(o.sites)) return o.sites.find(x=>x.id===id)||{id,licence_type:null};
+  if(o.no_licence||o.licensed===false) return {id,licence_type:null,legacy:true};
+  return {id,licence_type:o.trial_ends_at?'trial':'lifetime',licence_expires_at:o.trial_ends_at||null,legacy:true}; }
+// 'suspended' | 'nolicence' | 'expired' (locked) · 'trial' | 'expiring' (ends within 30 days) | 'active'
+function siteState(id){ const o=orgOfSite(id); if(!o) return 'active'; if(o.suspended) return 'suspended';
+  const l=siteLic(id); if(!l||!l.licence_type) return 'nolicence'; if(l.licence_type==='lifetime') return 'active';
+  const left=new Date(l.licence_expires_at).getTime()-Date.now(); if(!(left>0)) return 'expired';
+  return l.licence_type==='trial'?'trial':left<30*day?'expiring':'active'; }
+const siteLocked=(id)=>['suspended','nolicence','expired'].includes(siteState(id));
+function siteLockMsg(id){ const st=siteState(id), s=P.byId('sites',id)||{}, n=s.name||'This location', l=siteLic(id)||{}, tr=l.licence_type==='trial';
+  if(st==='nolicence') return {title:'No licence yet',text:`${n} has no licence yet: buy one to start using Proview Label there (each location needs its own licence). Nothing can be changed or synced at ${n} until it has one.`};
+  if(st==='expired') return {title:tr?'Trial ended':'Licence expired',text:`${n}’s ${tr?'trial':'licence'} ended ${P.fmtDate(l.licence_expires_at,true)}. Your data is safe, but nothing can be changed or synced at ${n} until it’s renewed.`};
+  if(st==='suspended') return {title:'Account suspended',text:`${orgName(s.orgId)} is suspended. Your data is safe, but nothing can be changed or synced until the licence is renewed.`};
+  return null; }
+function siteTag(id,cls){ const st=siteState(id), l=siteLic(id)||{}, k=cls||'tag', d=(t)=>P.fmtDate(t);
+  if(st==='suspended') return `<span class="${k} bad">Suspended</span>`;
+  if(st==='nolicence') return `<span class="${k} bad" title="No licence yet: this location is locked until it has one">No licence</span>`;
+  if(st==='expired') return `<span class="${k} bad" title="Ended ${esc(P.fmtDate(l.licence_expires_at,true))}">${l.licence_type==='trial'?'Trial ended':'Expired'}</span>`;
+  if(st==='trial') return `<span class="${k} warn">Trial – ends ${esc(d(l.licence_expires_at))}</span>`;
+  if(st==='expiring') return `<span class="${k} warn">Renew by ${esc(d(l.licence_expires_at))}</span>`;
+  return `<span class="${k} ok">${l.licence_type==='lifetime'||!l.licence_expires_at?'Lifetime':'Licensed to '+esc(d(l.licence_expires_at))}</span>`; }
+const siteLicText=(id)=>{ const st=siteState(id), l=siteLic(id)||{};
+  return st==='nolicence'?'No licence yet':st==='suspended'?'Suspended':st==='expired'?(l.licence_type==='trial'?'Trial ended ':'Expired ')+P.fmtDate(l.licence_expires_at)
+    :l.licence_type==='lifetime'||!l.licence_expires_at?'Lifetime':(st==='trial'?'Trial ends ':'Licensed to ')+P.fmtDate(l.licence_expires_at); };
 function stateTag(o){ const st=orgState(o);
   if(st==='suspended') return '<span class="tag bad">Suspended</span>';
   if(st==='nolicence') return '<span class="tag bad">No licence</span>';
-  if(st==='expired') return `<span class="tag bad" title="Trial ended ${esc(P.fmtDate(o.trial_ends_at,true))}">Trial expired</span>`;
+  if(st==='expired') return '<span class="tag bad">Licence ended</span>';
   if(st==='trial') return `<span class="tag warn">Trial – ends ${esc(P.fmtDate(o.trial_ends_at))}</span>`;
   return '<span class="tag ok">Active</span>'; }
-// banner above the page for the business in view: no licence / trial ended / suspended (writes blocked), or trial running
+// ----- Buy online (prices and Stripe links come from the licence portal: hub_plans -> pl_plans) -----
+// client_reference_id = pvl__<location id>__<plan>; the portal's payment check applies it within about 5 minutes.
+let PLANS=null, PLANS_AT=0;
+const DEMO_PLANS={m1:{label:'1 month',amount:1500,currency:'gbp',link:'https://buy.stripe.com/demo-m1',ref:'pvl',kind:'location',plan:'m1'},m12:{label:'12 months',amount:15000,currency:'gbp',link:'https://buy.stripe.com/demo-m12',ref:'pvl',kind:'location',plan:'m12'}};
+function loadPlans(force){ if(!CLOUD){ PLANS=DEMO_PLANS; return Promise.resolve(PLANS); }
+  if(!force&&PLANS&&Date.now()-PLANS_AT<300e3) return Promise.resolve(PLANS);
+  return (Cloud.plans?Cloud.plans():Promise.resolve({})).then(p=>{ const was=JSON.stringify(PLANS); PLANS=p||{}; PLANS_AT=Date.now(); if(was!==JSON.stringify(PLANS)&&document.querySelector('[data-buyfor]')) render(); return PLANS; }).catch(()=>{ PLANS=PLANS||{}; return PLANS; }); }
+const BUY_ORDER=['m1','m3','m6','m12','m24','m36','lifetime'];
+const buyPlans=()=>Object.entries(PLANS||{}).map(([k,p])=>({...p,plan:p.plan||k})).filter(p=>(p.kind||'location')==='location'&&p.link&&p.amount>0&&BUY_ORDER.includes(p.plan)).sort((a,b)=>BUY_ORDER.indexOf(a.plan)-BUY_ORDER.indexOf(b.plan));
+const money=(p)=>new Intl.NumberFormat('en-GB',{style:'currency',currency:String(p.currency||'gbp').toUpperCase()}).format(p.amount/100);
+function buyUrl(p,siteId){ const u=new URL(p.link); u.searchParams.set('client_reference_id',`${p.ref||'pvl'}__${siteId}__${p.plan}`); const em=me()&&me().email; if(em) u.searchParams.set('prefilled_email',em); return u.toString(); }
+// owners and admins of the business buy for its locations (the master gives licences from Locations)
+const canBuy=(siteId)=>{ const s=P.byId('sites',siteId); return !!s&&!isMaster()&&['owner','admin'].includes(orgRole(s.orgId)); };
+// the plan list (cards) for one location: "Buy online" with no licence yet, "Renew online" otherwise
+function buyHtml(siteId){ if(!canBuy(siteId)) return `<p class="hint" style="margin:8px 0 0">Ask your business owner to buy it, or call Proview on ${esc(SUP.phone)}.</p>`;
+  if(PLANS===null) loadPlans();
+  const st=siteState(siteId), buying=st==='nolicence', list=buyPlans();
+  if(!list.length) return `<p class="hint" style="margin:8px 0 0" data-buyfor="${esc(siteId)}">Online payment isn’t available yet. ${contactHtml()}</p>`;
+  return `<div class="buy-plans" data-buyfor="${esc(siteId)}">${list.map(p=>`<a class="buy-card" href="${esc(buyUrl(p,siteId))}" target="_blank" rel="noopener" data-plan="${esc(p.plan)}"><b>${esc(p.label||LIC_TYPES[p.plan]||p.plan)}</b><span class="bp">${esc(money(p))}</span><small>${buying?'Buy online':'Renew online'}</small></a>`).join('')}</div>
+    <p class="hint" style="margin:8px 0 0">${buying?'You pay securely with Stripe; the location is licensed within about 5 minutes.':'Time is added on top of the current licence. You pay securely with Stripe; it updates within about 5 minutes.'} Or ${contactHtml().replace(/^Buy/,'buy')}</p>`; }
+document.addEventListener('click',e=>{ const a=e.target.closest&&e.target.closest('.buy-card'); if(a) setTimeout(()=>toast('Finish paying in the Stripe tab. The licence updates within about 5 minutes; then press Sync now.'),50); });
+// banner above the page: the locations in view that are locked (no licence / ended / suspended), each with Buy online;
+// or a trial / licence running out soon
 function trialBanner(){
-  const ids=scopeOrgIds(); const orgs=(S.orgs||[]).filter(o=>ids.includes(o.id));
-  const locked=orgs.filter(o=>lockMsgOf(o)), trial=orgs.filter(o=>orgState(o)==='trial');
-  if(locked.length){ const m=lockMsgOf(locked[0]);
-    return `<div class="card" role="alert" style="border-color:var(--bad);background:var(--badl);margin-bottom:16px"><h3 style="color:var(--bad)">${esc(m.title)}${locked.length>1?' · '+locked.length+' businesses':''}</h3><p style="margin:6px 0 0">${esc(m.text)} ${isMaster()?'As master you can give it a licence from Locations (Licence…).':contactHtml()}</p></div>`; }
-  if(trial.length&&!isMaster()){ const o=trial[0];
-    return `<div class="card" style="border-color:var(--warn);background:var(--warnl);margin-bottom:16px;padding:12px 16px"><b>Trial</b> · ${esc(o.name)} · ends ${esc(P.fmtDate(o.trial_ends_at,true))}. ${contactHtml()}</div>`; }
+  const ids=allowedSiteIds(), inView=siteFilter!=='all'&&!siteFilter.startsWith('org:')?[siteFilter]:ids;
+  const locked=inView.filter(siteLocked), soon=inView.filter(id=>['trial','expiring'].includes(siteState(id)));
+  if(locked.length){ const one=locked.length===1, m=siteLockMsg(locked[0]);
+    const head=one?m.title+(inView.length>1?' · '+esc(siteName(locked[0])):''):`${locked.length} of ${inView.length} locations need a licence`;
+    const body=one?`<p style="margin:6px 0 0">${esc(m.text)}${isMaster()?' As master you can give it a licence from Locations (Licence… on the location).':''}</p>${isMaster()?'':buyHtml(locked[0])}`
+      :`<p style="margin:6px 0 0">Each location needs its own licence. ${isMaster()?'As master you can give them a licence from Locations (Licence… on each location).':'The others keep working.'}</p>${locked.map(id=>`<div class="lic-row"><div class="lic-h"><b>${esc(siteName(id))}</b> ${siteTag(id)}</div>${isMaster()?'':buyHtml(id)}</div>`).join('')}`;
+    return `<div class="card lic-banner" role="alert" style="border-color:var(--bad);background:var(--badl);margin-bottom:16px"><h3 style="color:var(--bad)">${head}</h3>${body}</div>`; }
+  if(soon.length&&!isMaster()){ const id=soon[0], l=siteLic(id)||{};
+    return `<div class="card" style="border-color:var(--warn);background:var(--warnl);margin-bottom:16px;padding:12px 16px"><b>${siteState(id)==='trial'?'Trial':'Licence ends soon'}</b> · ${esc(siteName(id))} · ends ${esc(P.fmtDate(l.licence_expires_at,true))}.${canBuy(id)?` <button class="btn sm" data-buy="${esc(id)}">Renew online</button>`:' '+contactHtml()}</div>`; }
   return '';
 }
-const anyLocked=()=>(S.orgs||[]).filter(o=>scopeOrgIds().includes(o.id)).some(o=>lockMsgOf(o));
+// Buy / renew one location (owner's licence view, banners)
+function buyModal(siteId){ loadPlans(true).then(()=>{ const st=siteState(siteId);
+  modal((st==='nolicence'?'Buy a licence':'Renew licence')+' · '+siteName(siteId),`<p style="margin-top:0">Status: ${siteTag(siteId)} <span class="hint">${esc(siteLicText(siteId))}</span></p>${buyHtml(siteId)}`,`<button class="btn ghost" data-x>Close</button>`); }); }
+document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closest('[data-buy]'); if(b){ e.preventDefault(); buyModal(b.dataset.buy); } });
+const anyLocked=()=>allowedSiteIds().some(siteLocked);
 // Signed in, no business, no invite: "Set up your business" (it starts with no licence: no free trials)
 let TRIAL={msg:''};
 function renderTrialSetup(){
@@ -929,7 +993,7 @@ VIEWS.overview=(el)=>{
   const reasons={}; waste.forEach(w=>reasons[w.reason]=(reasons[w.reason]||0)+(+w.cost||0));
   const multi=(siteFilter==='all'||siteFilter.startsWith('org:'))&&bySite(P.live('sites').map(x=>({...x,siteId:x.id}))).length>1;
   const sitesHtml=multi?`<div class="card" style="padding:16px 16px 4px"><div class="row" style="justify-content:space-between;margin-bottom:10px"><div><h3>${isMaster()?'Locations':'Your locations'}</h3><div class="sub" style="margin:0">Click a location to open it. You can also switch from the location dropdown.</div></div></div>
-    <div class="sitegrid">${P.live('sites').filter(x=>allowedSiteIds().includes(x.id)).sort((a,b)=>siteStats(b.id).expired-siteStats(a.id).expired||a.name.localeCompare(b.name)).map(x=>{const st=siteStats(x.id);return `<button class="sc" data-site="${x.id}"><div class="t"><b>${esc(x.name)}</b>${st.expired?`<span class="tag bad">${st.expired} expired</span>`:st.soon?`<span class="tag warn">${st.soon} due</span>`:'<span class="tag ok">All good</span>'}</div><div class="meta"><span class="dot" style="background:${st.online?'#12a150':'#8b8b95'}"></span>${st.devices} device${st.devices!==1?'s':''} · ${st.lastSync?'synced '+P.fmtDate(st.lastSync,true):'never synced'}${st.low?' · <span style="color:#d92d20">'+st.low+' low on labels</span>':''}</div><div class="nums"><div><span>${st.today}</span>labels today</div><div><span>${st.soon}</span>due 24 hrs</div><div><span>${P.money(st.waste7)}</span>waste 7d</div></div><div class="go">Open location →</div></button>`;}).join('')}</div></div>`:'';
+    <div class="sitegrid">${P.live('sites').filter(x=>allowedSiteIds().includes(x.id)).sort((a,b)=>siteStats(b.id).expired-siteStats(a.id).expired||a.name.localeCompare(b.name)).map(x=>{const st=siteStats(x.id);return `<button class="sc" data-site="${x.id}"><div class="t"><b>${esc(x.name)}</b>${siteLocked(x.id)?siteTag(x.id):st.expired?`<span class="tag bad">${st.expired} expired</span>`:st.soon?`<span class="tag warn">${st.soon} due</span>`:'<span class="tag ok">All good</span>'}</div><div class="meta"><span class="dot" style="background:${st.online?'#12a150':'#8b8b95'}"></span>${st.devices} device${st.devices!==1?'s':''} · ${st.lastSync?'synced '+P.fmtDate(st.lastSync,true):'never synced'}${st.low?' · <span style="color:#d92d20">'+st.low+' low on labels</span>':''}</div><div class="nums"><div><span>${st.today}</span>labels today</div><div><span>${st.soon}</span>due 24 hrs</div><div><span>${P.money(st.waste7)}</span>waste 7d</div></div><div class="go">Open location →</div></button>`;}).join('')}</div></div>`:'';
   el.innerHTML=`<div class="ph keep"><div class="head-chips"><span class="chip">${multi?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):visibleOrgs().length>1?'All businesses':isMaster()?'Locations':'Your locations'):siteFilter==='all'||siteFilter.startsWith('org:')?(siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):isMaster()?'All businesses':'Your locations'):esc(siteName(siteFilter))}</span><span class="chip">${P.fmtDay(new Date())} ${P.fmtDate(new Date())}</span>${multi?`<span class="chip">${allowedSiteIds().length} locations combined</span>`:''}${(()=>{ const v=!multi&&siteInView(); if(!v) return ''; const on=siteStats(v.id).online; return `<span class="chip${on?' ok':''}">${on?'<span class="chip-dot"></span>Devices online':'Devices offline'}</span>`; })()}</div></div><div class="btns"><a class="btn ghost" href="#analyser">Menu analyser</a><a class="btn" href="#products">+ Add product</a></div></div>
   ${expired?`<div class="banner">${ic('clock',20)}<div><b>${expired} expired item${expired!==1?'s':''} still marked active</b><span class="hint">Mark each as used or wasted so the expiry log stays accurate.</span></div><div class="sp"></div><a class="btn ghost sm" href="#expiry">Review</a></div>`:''}
   ${!allowedSiteIds().length?`<div class="card" style="text-align:center;padding:34px 20px"><h3 style="font-size:18px">${isMaster()&&!visibleOrgs().length?'Add your first business':'Add your first location'}</h3><p class="hint" style="max-width:520px;margin:8px auto 16px">${isMaster()&&!visibleOrgs().length?'Create a customer business and invite its owner. They can then add their kitchens, menu and staff, or you can set it up for them.':'Add a kitchen, then connect a handheld to it (Menu → Settings → Connect to Proview Label on the device).'}</p><a class="btn" href="#devices">${isMaster()&&!visibleOrgs().length?'+ Add business':'+ Add location'}</a></div>`:''}
@@ -1236,38 +1300,36 @@ VIEWS.sites=(el)=>{
   // online = synced in the last 6 hours: the same threshold as Label's device status (siteStats().online)
   const isOn=(d)=>!!d.lastSync&&Date.now()-new Date(d.lastSync)<6*3600e3;
   const online=devs.filter(isOn), offline=devs.filter(d=>!isOn(d));
-  const needs=orgs.filter(o=>orgState(o)!=='active');
+  // "Licences need attention": every location with no licence, an ended one or a suspended business (each location needs its own)
+  const needs=allSites.filter(r=>siteLocked(r.s.id));
   const trialOk=!CLOUD||(WHO&&Cloud.trialReady&&Cloud.trialReady(WHO));
   const s_=(n)=>n===1?'':'s';
   const day=(t)=>new Date(t).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
   const devLine=(ds)=>ds.length?`${ds.filter(isOn).length} of ${ds.length} device${s_(ds.length)} synced`:'No devices';
   const tone=(ds)=>!ds.length?'':ds.every(isOn)?'ok':ds.some(isOn)?'warn':'bad';
   const syncTxt=(d)=>isOn(d)?'Synced '+P.fmtDate(d.lastSync,true):d.lastSync?'Last synced '+P.fmtDate(d.lastSync,true):'Never synced';
-  // status pill: red = no licence, trial ended, suspended or every device offline; amber = trial or some devices offline;
-  // grey = nothing set up yet; green = licensed and every device synced
-  const pill=(o,os,ds)=>{ const st=orgState(o);
-    if(st==='suspended') return '<span class="badge bad">Suspended</span>';
-    if(st==='nolicence') return '<span class="badge bad" title="No licence yet: the business is locked until it has one">No licence</span>';
-    if(st==='expired') return `<span class="badge bad" title="Trial ended ${esc(P.fmtDate(o.trial_ends_at,true))}">Trial expired</span>`;
-    if(st==='trial') return `<span class="badge warn" title="Ends ${esc(P.fmtDate(o.trial_ends_at,true))}">Trial – ends ${esc(day(o.trial_ends_at))}</span>`;
+  // status pill: red = suspended, a location with no licence / an ended one, or every device offline; amber = a trial or a
+  // licence ending within 30 days, or some devices offline; grey = nothing set up yet; green = licensed and every device synced
+  const pill=(o,os,ds)=>{ if(o.suspended) return '<span class="badge bad">Suspended</span>';
+    const bad=os.filter(x=>siteLocked(x.id)), soon=os.filter(x=>['trial','expiring'].includes(siteState(x.id)));
+    if(bad.length) return os.length===1?siteTag(bad[0].id,'badge'):`<span class="badge bad" title="Each location needs its own licence">${bad.length} of ${os.length} unlicensed</span>`;
+    if(soon.length) return os.length===1?siteTag(soon[0].id,'badge'):`<span class="badge warn">${soon.length} renewing soon</span>`;
     if(!os.length) return '<span class="badge">No locations yet</span>';
     if(!ds.length) return '<span class="badge">No devices yet</span>';
     const off=ds.filter(d=>!isOn(d)).length;
     if(off) return `<span class="badge ${off===ds.length?'bad':'warn'}">${off} offline</span>`;
     return '<span class="badge ok">All good</span>'; };
-  const licText=(o)=>{ const st=orgState(o);
-    if(st==='suspended') return 'Licence suspended';
-    if(st==='nolicence') return 'No licence yet';
-    if(st==='expired') return 'Trial expired';
-    if(st==='trial') return 'Trial ends '+day(o.trial_ends_at);
-    return 'Licensed'; };   // Label licenses the business (not each device)
+  // Label licenses each location (not the business, not each device)
+  const licText=(o,os)=>{ if(o.suspended) return 'Licence suspended'; if(!os.length) return 'No locations yet';
+    if(os.length===1) return siteLicText(os[0].id);
+    const n=os.filter(x=>!siteLocked(x.id)).length; return `${n} of ${os.length} locations licensed`; };
   const openBtn=(o,os,cls)=>os.length===1?`<button class="btn sm ${cls}" data-open="${esc(os[0].id)}">Open business</button>`:os.length?`<button class="btn sm ${cls}" data-openbiz="${esc(o.id)}">Open business</button>`:`<button class="btn sm ${cls}" data-openorg="${esc(o.id)}">Open business</button>`;
   const card=(o)=>{ const os=sitesOf(o), ds=devsAt(os.map(x=>x.id)), single=os.length===1;
     const q=(o.name+' '+os.map(x=>x.name+' '+(x.address||'')+' '+(x.region||'')).join(' ')).toLowerCase();
     const sub=!os.length?'No locations yet':single?[os[0].name!==o.name&&esc(os[0].name),devLine(ds)].filter(Boolean).join(' · '):`${os.length} locations · ${ds.length?ds.length+' device'+s_(ds.length):'no devices yet'}`;
     return `<article class="card ov-biz" data-q="${esc(q)}"><div class="ov-bh"><div style="flex:1;min-width:0"><h3>${esc(o.name)}</h3><div class="muted small">${sub}</div></div>${pill(o,os,ds)}</div>
-      ${single?'':os.map(x=>{ const d=devsAt([x.id]); return `<button type="button" class="ov-loc" data-open="${esc(x.id)}" title="Open on this location"><span class="ov-dot ${tone(d)}"></span><span style="flex:1;min-width:0">${esc(x.name)}</span><span class="muted small">${devLine(d)}</span><span class="ov-chev" aria-hidden="true">›</span></button>`; }).join('')}
-      <div class="ov-bf"><span class="muted small">${licText(o)}</span><span class="ov-acts">${trialOk?`<button class="btn sm" data-trial="${esc(o.id)}" title="Give or remove this business's licence">Licence…</button>`:''}${openBtn(o,os,'primary')}</span></div></article>`; };
+      ${single?'':os.map(x=>{ const d=devsAt([x.id]); return `<div class="ov-locrow"><button type="button" class="ov-loc" data-open="${esc(x.id)}" title="Open on this location"><span class="ov-dot ${siteLocked(x.id)?'bad':tone(d)}"></span><span style="flex:1;min-width:0">${esc(x.name)}</span><span class="muted small">${devLine(d)}</span>${siteTag(x.id)}<span class="ov-chev" aria-hidden="true">›</span></button>${trialOk?`<button class="btn sm ov-licb" data-licf="${esc(x.id)}" title="Give, extend or remove this location's licence">Licence…</button>`:''}</div>`; }).join('')}
+      <div class="ov-bf"><span class="muted small">${esc(licText(o,os))}</span><span class="ov-acts">${trialOk&&single?`<button class="btn sm" data-licf="${esc(os[0].id)}" title="Give, extend or remove this location's licence">Licence…</button>`:''}${openBtn(o,os,'primary')}</span></div></article>`; };
   const empty=`<div class="card" style="grid-column:1/-1"><div class="empty" style="padding:28px 12px"><h3 style="font-size:17px;color:var(--ink)">No businesses yet</h3><p class="hint" style="max-width:460px;margin:8px auto 16px">Add a customer business and invite its owner. They can then add their kitchens, menu and staff, or you can set it up for them.</p><div class="btns" style="justify-content:center"><button class="btn primary" data-addb>${ic('plus',16)}Add business</button><a class="btn" href="${LIC_URL}" target="_blank" rel="noopener">Open licence portal ↗</a><button class="btn" data-refresh>${ic('refresh',16)}Refresh</button></div></div></div>`;
   const stat=(key,label,v,t)=>`<button type="button" class="card ov-stat ${t||''}" data-stat="${key}" title="Show the list"><div class="tiny">${label}</div><div class="ov-v">${v}</div></button>`;
   el.innerHTML=`<div class="ovp"><div class="ph keep ov-head"><p class="muted">Every business on Proview Label with its locations. Open one to see it as its team does.</p><div class="btns"><button class="btn" data-refresh title="Refresh">${ic('refresh',16)}Refresh</button><a class="btn" href="${LIC_URL}" target="_blank" rel="noopener">Licences ↗</a><button class="btn primary" data-addb>${ic('plus',16)}Add business</button></div></div>
@@ -1287,7 +1349,7 @@ VIEWS.sites=(el)=>{
     dev:['Devices',()=>devs.slice().sort(devSort).map(devLi),'No handhelds paired yet.'],
     on:['Online now',()=>online.slice().sort(devSort).map(devLi),'No handhelds have synced in the last 6 hours.'],
     off:['Offline',()=>offline.slice().sort(devSort).map(devLi),'Every handheld synced in the last 6 hours.'],
-    att:['Licences needing attention',()=>needs.map(bizLi),'Every business is licensed.'] };
+    att:['Licences needing attention',()=>needs.map(r=>li(`data-ms="${esc(r.s.id)}"`,'bad',r.s.name,esc(r.o.name)+' · '+esc(siteLicText(r.s.id)),siteTag(r.s.id,'badge'))),'Every location is licensed.'] };
   el.querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>{ const [title,items,none]=lists[b.dataset.stat]; const it=items();
     const m=modal(title,it.length?`<div class="ov-list">${it.join('')}</div>`:`<p class="hint">${none}</p>`,`<button class="btn ghost" data-x>Close</button>`);
     m.querySelectorAll('[data-ms]').forEach(x=>x.onclick=()=>{ closeModal(); setSite(x.dataset.ms); location.hash='overview'; });
@@ -1296,38 +1358,50 @@ VIEWS.sites=(el)=>{
   el.querySelectorAll('[data-openorg]').forEach(b=>b.onclick=()=>{ setSite('org:'+b.dataset.openorg); location.hash='devices'; });
   el.querySelectorAll('[data-openbiz]').forEach(b=>b.onclick=(e)=>{ e.preventDefault(); setSite('org:'+b.dataset.openbiz); location.hash='overview'; });
   el.querySelectorAll('[data-addb]').forEach(b=>b.onclick=()=>addBusiness(()=>render()));
-  el.querySelectorAll('[data-trial]').forEach(b=>b.onclick=()=>trialForm(b.dataset.trial));
+  el.querySelectorAll('[data-licf]').forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); licenceForm(b.dataset.licf); });
   el.querySelectorAll('[data-refresh]').forEach(b=>b.onclick=async()=>{ if(!CLOUD){ render(); return toast('Up to date'); }
     b.disabled=true; try{ if(!(await checkAccess())) return; applyScope(); await Cloud.sync(P,{full:true}); S=P.get(); render(); toast('Up to date'); }catch(e){ b.disabled=false; toast(Cloud.friendly(e)); } });
 };
 
-// Master: the business's licence (the button that was "Trial…"; it can give a licence, so it stays, renamed).
-// Give licence = licensed with no end date. Or set a trial by hand that ends on a date (licensed until then).
-// Remove licence = back to "No licence" (locked). Every new business starts with no licence (migration 007).
-function trialForm(orgId){ const o=(S.orgs||[]).find(x=>x.id===orgId); if(!o) return;
-  const ymd=(d)=>{ const x=new Date(d); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); };
-  const st=orgState(o), base=Math.max(Date.now(),o.trial_ends_at?new Date(o.trial_ends_at).getTime():0);
-  const now=st==='nolicence'?'<span class="hint">no licence yet: the business is locked</span>':o.trial_ends_at?` <span class="hint">ends ${esc(P.fmtDate(o.trial_ends_at,true))}</span>`:st==='active'?' <span class="hint">licensed, no end date</span>':'';
-  const m=modal('Licence · '+o.name,`<p style="margin-top:0">Status: ${stateTag(o)} ${now}</p>
-    <div class="fld"><label>Or a trial set by hand, ending on</label><input class="inp" type="date" id="te" value="${ymd(base+3*day)}"></div>
-    <div class="btns" style="margin-bottom:6px"><button class="btn ghost sm" data-add="3">+3 days</button><button class="btn ghost sm" data-add="7">+7 days</button><button class="btn ghost sm" data-add="30">+30 days</button><button class="btn ghost sm" id="tsv">Set trial end</button></div>
-    <p class="hint">Give licence once they have paid: the business opens with no end date. A trial set by hand ends at the end of that day; after it the business is read-only and its people see the licence portal and Proview contact details. Remove licence locks it again (“No licence”).</p>`,
-    `<button class="btn ghost" data-x>Cancel</button>${st!=='nolicence'?'<button class="btn ghost" id="tnone" style="color:var(--bad)">Remove licence</button>':''}${st==='active'&&!o.trial_ends_at?'':'<button class="btn" id="tclr">Give licence</button>'}`);
-  m.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{ m.querySelector('#te').value=ymd(base+(+b.dataset.add)*day); });
-  const save=async(licensed,ends)=>{ try{ if(CLOUD){ await Cloud.setLicence(orgId,licensed,ends); await refreshWho(); } else { o.licensed=licensed; o.no_licence=!licensed; o.trial_ends_at=licensed?ends:null; o.trial_expired=!!o.trial_ends_at&&new Date(o.trial_ends_at)<new Date(); P.save(); }
-      closeModal(); toast(!licensed?o.name+': licence removed':ends?'Trial now ends '+P.fmtDate(ends,true):o.name+' is licensed'); render(); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } };
-  m.querySelector('#tsv').onclick=()=>{ const v=m.querySelector('#te').value; if(!v) return toast('Pick a date'); const d=new Date(v+'T23:59:59'); if(isNaN(d)) return toast('Pick a date'); save(true,d.toISOString()); };
-  const c=m.querySelector('#tclr'); if(c) c.onclick=()=>save(true,null);
-  const nn=m.querySelector('#tnone'); if(nn) nn.onclick=()=>save(false,null);
+// Master: a LOCATION's licence (Licence… on each location; migration 009). The same types as the licence portal, which
+// writes the same fields: 1 to 36 months (added on top of a licence that is still running when "add to the current
+// end" is ticked), lifetime, a custom end date, or a trial set by hand ending on a date. Remove licence locks the
+// location again ("No licence"). Every new location starts with no licence.
+function licenceForm(siteId){ const x=P.byId('sites',siteId), o=orgOfSite(siteId); if(!x||!o) return;
+  const ymd=(d)=>{ const t=new Date(d); return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); };
+  const l=siteLic(siteId)||{}, st=siteState(siteId), running=l.licence_type&&l.licence_type!=='lifetime'&&!siteLocked(siteId);
+  const opts=['m1','m3','m6','m12','m24','m36','lifetime','custom','trial'].map(k=>`<option value="${k}" ${k==='m12'?'selected':''}>${LIC_TYPES[k]}</option>`).join('');
+  const m=modal('Licence · '+x.name+(o.name!==x.name?' · '+o.name:''),`<p style="margin-top:0">Status: ${siteTag(siteId)} <span class="hint">${esc(siteLicText(siteId))}</span></p>
+    <div class="fld"><label>Licence</label><select class="inp" id="lt">${opts}</select></div>
+    <div class="fld" id="ldw" style="display:none"><label id="ldl">Ends on</label><input class="inp" type="date" id="ld" value="${ymd(Date.now()+3*day)}"></div>
+    <label class="row" id="lxw" style="gap:8px;margin:0 0 10px;${running?'':'display:none'}"><input type="checkbox" id="lx" checked> Add to the current end (${esc(P.fmtDate(l.licence_expires_at))})</label>
+    <p class="hint">Each location needs its own licence; the business’s other locations aren’t changed. A licence ends at the end of its last day; after it the location is read-only, its handhelds lock, and its people see Buy online and Proview’s contact details. Owners can also buy or renew online.</p>`,
+    `<button class="btn ghost" data-x>Cancel</button>${st!=='nolicence'?'<button class="btn ghost" id="lnone" style="color:var(--bad)">Remove licence</button>':''}<button class="btn" id="lsv">Save licence</button>`);
+  const sel=m.querySelector('#lt'), sync=()=>{ const v=sel.value; m.querySelector('#ldw').style.display=v==='custom'||v==='trial'?'':'none';
+    m.querySelector('#ldl').textContent=v==='trial'?'Trial ends on':'Ends on'; m.querySelector('#lxw').style.display=running&&/^m\d+$/.test(v)?'':'none'; };
+  sel.onchange=sync; sync();
+  const save=async(type)=>{ const dv=m.querySelector('#ld').value, ends=(type==='custom'||type==='trial')?(dv?new Date(dv+'T23:59:59'):null):null;
+    if((type==='custom'||type==='trial')&&(!ends||isNaN(ends))) return toast('Pick a date');
+    const extend=!!type&&/^m\d+$/.test(type)&&running&&m.querySelector('#lx').checked;
+    try{ if(CLOUD){ await Cloud.setSiteLicence(siteId,type,ends&&ends.toISOString(),extend); await refreshWho(); }
+      else { if(!Array.isArray(o.sites)) o.sites=P.live('sites').filter(z=>z.orgId===o.id).map(z=>({...siteLic(z.id),legacy:undefined}));
+        const r=o.sites.find(z=>z.id===siteId)||(o.sites.push({id:siteId}),o.sites[o.sites.length-1]);
+        const months={m1:1,m3:3,m6:6,m12:12,m24:24,m36:36}[type], base=extend?new Date(l.licence_expires_at):new Date();
+        if(months) base.setMonth(base.getMonth()+months);
+        Object.assign(r,{licence_type:type||null,licence_starts_at:type?new Date().toISOString():null,licence_expires_at:!type||type==='lifetime'?null:months?base.toISOString():ends.toISOString()}); P.save(); }
+      closeModal(); toast(!type?x.name+': licence removed':x.name+': '+siteLicText(siteId)); render(); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } };
+  m.querySelector('#lsv').onclick=()=>save(sel.value);
+  const nn=m.querySelector('#lnone'); if(nn) nn.onclick=()=>save(null);
 }
 // Master: "Add business", design D (11 Nov 2026, as Proview Employee). Business + owner in one grid, then two choices:
 //   How will they sign in?  invite (email link, they choose the password) | set a password now (no email)
 //   Licence                 none yet | 3-day trial | set it now (licence portal)
 // pl_add_business (migration 006) adds the business, its location and the Owner / Admin login, all or nothing. For an
 // invite the new login gets a random password nobody sees and Supabase emails a set-your-password link (the sign-in
-// page's PASSWORD_RECOVERY / "Choose a new password" flow). The 3-day trial reuses the master's pl_set_licence
-// (migration 007): licensed until now + 3 days, then the business locks as "Trial expired". The business was only just
-// created by pl_add_business with no licence, so this never replaces a licence that was already set. Everything else
+// page's PASSWORD_RECOVERY / "Choose a new password" flow). The 3-day trial is set on the new location with the
+// master's pl_set_site_licence (migration 009; licences are per location): trial until now + 3 days, then the location
+// locks as "Trial ended". The location was only just created by pl_add_business with no licence, so this never
+// replaces a licence that was already set. Everything else
 // (self sign-up, staff, the portal's New customer) stays no-trial.
 function addBusiness(after){
   const req=(t)=>`${t}<span style="color:#d92d20"> *</span>`;
@@ -1374,10 +1448,10 @@ function addBusiness(after){
         r={org_id:id,site_id:sid,email:e,existing:!!old}; }
     }catch(x){ btn.disabled=false; return toast(Cloud.friendly?Cloud.friendly(x):x.message); }
     const fe=(x)=>esc(Cloud.friendly?Cloud.friendly(x):(x&&x.message)||String(x));
-    // licence: a 3-day trial on the business that was just added (it has no licence yet)
+    // licence: a 3-day trial on the location that was just added (it has no licence yet; licences are per location, migration 009)
     let licLine='';
     if(lic==='trial'){ const ends=new Date(Date.now()+3*day).toISOString();
-      try{ if(CLOUD) await Cloud.setLicence(r.org_id,true,ends); else { const o=S.orgs.find(x=>x.id===r.org_id); if(o){ o.licensed=true; o.no_licence=false; o.trial_ends_at=ends; o.trial_expired=false; P.save(); } }
+      try{ if(CLOUD) await Cloud.setSiteLicence(r.site_id,'trial',ends,false); else { const o=S.orgs.find(x=>x.id===r.org_id); if(o){ o.licensed=true; o.no_licence=false; o.trial_ends_at=ends; o.trial_expired=false; P.save(); } }
         licLine=`<p class="abz-ok">On a 3-day trial until ${esc(new Date(ends).toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}.</p>`; }
       catch(x){ licLine=`<p class="abz-warn">The business was added, but the trial couldn’t be started: ${fe(x)}. Use Licence… on its card, or the licence portal.</p>`; } }
     else if(lic==='none') licLine='<p class="hint" style="margin:12px 0 0;font-size:14px">No licence yet: they buy one when they sign in.</p>';
@@ -1407,7 +1481,7 @@ VIEWS.devices=(el)=>{
   const orgs=visibleOrgs().filter(o=>scopeOrgIds().includes(o.id)); // the open business only
   el.innerHTML=`<div class="ph"><div><h1>Locations & devices</h1><p>${isMaster()?esc(orgName(curOrg()))+': its kitchens and the handhelds running Proview Label.':'Your kitchens and the handhelds running Proview Label.'}</p></div><div class="btns">${canAddSite?'<button class="btn ghost" id="addS">+ Add location</button>':''}<button class="btn" id="pairB">+ Pair handheld</button></div></div>
   ${isMaster()?`<div class="card"><h3>Business</h3><div class="sub">The business you're working in. New businesses are set up from Locations.</div><table><thead><tr><th>Business</th><th>Locations</th><th>Devices</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${orgs.map(o=>{ const os=P.live('sites').filter(x=>x.orgId===o.id); return `<tr><td><b>${esc(o.name)}</b>${orgState(o)!=='active'?' '+stateTag(o):''}</td><td>${os.length}</td><td>${P.live('devices').filter(d=>os.some(x=>x.id===d.siteId)).length}</td><td>${P.live('labels').filter(l=>os.some(x=>x.id===l.siteId)&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap"><button class="icbtn" data-eo="${o.id}" title="Rename">✎</button></td></tr>`; }).join('')||'<tr><td colspan="5" class="empty">No business open.</td></tr>'}</tbody></table></div>`:''}
-  <div class="card"><h3>Locations</h3><table><thead><tr><th>Location</th>${multiOrg()?'<th>Business</th>':''}<th>Address (printed on sale labels)</th><th>Device staff</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${ss.map(s=>`<tr><td><b>${esc(s.name)}</b><div class="hint">${esc(s.region||'')}</div></td>${multiOrg()?`<td class="hint">${esc(orgName(s.orgId))}</td>`:''}<td>${esc(s.address||'')}</td><td>${P.live('users').filter(u=>(u.siteIds||[]).includes(s.id)).length}</td><td>${P.live('labels').filter(l=>l.siteId===s.id&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap">${siteFilter!==s.id&&allowedSiteIds().length>1?`<button class="btn ghost sm" data-open="${s.id}">Open</button> `:''}${['master','owner','admin'].includes(orgRole(s.orgId))?`<button class="icbtn" data-es="${s.id}">✎</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No locations yet.</td></tr>'}</tbody></table></div>
+  <div class="card"><h3>Locations</h3><table><thead><tr><th>Location</th>${multiOrg()?'<th>Business</th>':''}<th>Address (printed on sale labels)</th><th>Device staff</th><th>Labels, last 7 days</th><th>Licence</th><th></th></tr></thead><tbody>${ss.map(s=>`<tr data-lic="${esc(s.id)}"><td><b>${esc(s.name)}</b><div class="hint">${esc(s.region||'')}</div></td>${multiOrg()?`<td class="hint">${esc(orgName(s.orgId))}</td>`:''}<td>${esc(s.address||'')}</td><td>${P.live('users').filter(u=>(u.siteIds||[]).includes(s.id)).length}</td><td>${P.live('labels').filter(l=>l.siteId===s.id&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="white-space:nowrap">${siteTag(s.id)}${isMaster()?` <button class="btn ghost sm" data-licf="${s.id}">Licence…</button>`:canBuy(s.id)&&(siteLocked(s.id)||(siteLic(s.id)||{}).licence_type!=='lifetime')?` <button class="btn sm ${siteLocked(s.id)?'':'ghost'}" data-buy="${s.id}">${siteState(s.id)==='nolicence'?'Buy online':'Renew online'}</button>`:''}</td><td style="text-align:right;white-space:nowrap">${siteFilter!==s.id&&allowedSiteIds().length>1?`<button class="btn ghost sm" data-open="${s.id}">Open</button> `:''}${['master','owner','admin'].includes(orgRole(s.orgId))?`<button class="icbtn" data-es="${s.id}">✎</button>`:''}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No locations yet.</td></tr>'}</tbody></table><p class="hint" style="margin:10px 0 0">Each location needs its own licence. A new location starts with no licence${isMaster()?'':': buy one here once it’s added'}.</p></div>
   <div class="card"><h3>Handhelds</h3><div class="sub">To add one, open Proview Label on the handheld: it shows a pairing code. Tap <b>+ Pair handheld</b> and enter it, or scan the QR code on the handheld with your phone. <b>Mode</b> sets what staff see: Easy (big product buttons, print only) or Detailed (logs, bulk print, wastage, label orders).</div><div id="devs"><div class="hint">Loading…</div></div></div>`;
   // handhelds: paired list from the server (live) or the sample devices (demo), with battery etc. from their sync records
   const devOrgs=scopeOrgIds();
@@ -1445,9 +1519,11 @@ VIEWS.devices=(el)=>{
   el.querySelector('#pairB').onclick=()=>withOrg(o=>pairForm(o));
   if(PENDING_PAIR){ const c=PENDING_PAIR; PENDING_PAIR=null; withOrg(o=>pairForm(o,c)); }
   const siteForm=(s,orgId)=>{ const isNew=!s; s=s||{id:'site_'+P.uid(''),orgId,name:'',address:'',region:''}; const m=modal((isNew?'Add location':'Edit location')+' · '+orgName(s.orgId),`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(s.name)}"></div><div class="fld"><label>Address</label><input class="inp" id="a" value="${esc(s.address||'')}"></div><div class="fld"><label>Area</label><input class="inp" id="g" value="${esc(s.region||'')}" placeholder="e.g. North London"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
-    m.querySelector('#sv').onclick=()=>{ s.name=m.querySelector('#n').value.trim(); s.address=m.querySelector('#a').value.trim(); s.region=m.querySelector('#g').value.trim(); if(!s.name) return toast('Enter a name'); P.upsert('sites',s); audit(isNew?'created':'updated','Site',s.name,s.orgId); closeModal(); render(); }; };
+    m.querySelector('#sv').onclick=()=>{ s.name=m.querySelector('#n').value.trim(); s.address=m.querySelector('#a').value.trim(); s.region=m.querySelector('#g').value.trim(); if(!s.name) return toast('Enter a name'); P.upsert('sites',s); audit(isNew?'created':'updated','Site',s.name,s.orgId); closeModal(); render();
+      if(isNew) toast(s.name+' added. It starts with no licence: '+(isMaster()?'give it one with Licence…':'buy one with Buy online')+'. Each location needs its own licence.'); }; };
   if(canAddSite&&el.querySelector('#addS')) el.querySelector('#addS').onclick=()=>withOrg(o=>{ if(!['master','owner','admin'].includes(orgRole(o))) return toast('Only an owner or admin can add locations.'); siteForm(null,o); });
   el.querySelectorAll('[data-es]').forEach(b=>b.onclick=()=>siteForm({...P.byId('sites',b.dataset.es)}));
+  el.querySelectorAll('[data-licf]').forEach(b=>b.onclick=()=>licenceForm(b.dataset.licf));
   el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ setSite(b.dataset.open); location.hash='overview'; });
   el.querySelectorAll('[data-openorg]').forEach(b=>b.onclick=()=>{ setSite('org:'+b.dataset.openorg); location.hash='overview'; });
   el.querySelectorAll('[data-eo]').forEach(b=>b.onclick=()=>{ const o=S.orgs.find(x=>x.id===b.dataset.eo); const m=modal('Rename business',`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(o.name)}"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);

@@ -1171,6 +1171,17 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
       if (error && licensed && (error.code === 'PGRST202' || /could not find the function/i.test(error.message || ''))) return Cloud.setTrial(orgId, endsAt);   // server before 007
       if (error) throw error;
     },
+    // master: a LOCATION's licence (migration 009): type m1..m36 | lifetime | custom (endsAt) | trial (endsAt) | null = remove
+    async setSiteLicence(siteId, type, endsAt, extend) {
+      const { data, error } = await sb.rpc('pl_set_site_licence', { p_site: siteId, p_type: type || null, p_expires: endsAt || null, p_extend: !!extend });
+      if (error) throw error; return data;
+    },
+    // the prices the licence portal sent (hub_plans): { m12: { label, amount, currency, link, ref, kind, plan }, ... }
+    async plans() {
+      const { data, error } = await sb.rpc('pl_plans');
+      if (error) { if (error.code === 'PGRST202' || /could not find the function/i.test(error.message || '')) return {}; throw error; }   // server before 009
+      return data || {};
+    },
     async renameOrg(id, name) { const { error } = await sb.from('pl_orgs').update({ name }).eq('id', id); if (error) throw error; },
     async saveOrgSettings(id, settings) { const { error } = await sb.from('pl_orgs').update({ settings }).eq('id', id); if (error) throw error; },
     async members(orgIds) { let q = sb.from('pl_members').select('*').order('name'); if (orgIds) q = q.in('org_id', orgIds); const { data, error } = await q; if (error) throw error; return data || []; },
