@@ -1,5 +1,5 @@
 {
-  "version": "1.4.7",
+  "version": "1.4.9",
   "url": "https://label.proviewcrm.co.uk/ProviewLabel.apk",
-  "notes": "Turkish flag icon centred."
+  "notes": "Handhelds stay paired when Wi-Fi drops. Only Settings > Unpair un-pairs."
 }
