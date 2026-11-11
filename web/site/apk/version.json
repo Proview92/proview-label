@@ -1,5 +1,5 @@
 {
-  "version": "1.5.5",
+  "version": "1.5.6",
   "url": "https://label.proviewcrm.co.uk/ProviewLabel.apk",
-  "notes": "The printer now reports when a label didn't print (paper out)."
+  "notes": "Printing several of the same label no longer pauses between labels."
 }
