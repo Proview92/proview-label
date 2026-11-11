@@ -167,8 +167,47 @@ public class LabelPrinterPlugin extends Plugin {
                     if (b.length() > 0) o.append(dir).append(": ").append(b).append('\n');
                 } catch (Exception ignored) {}
             }
+            o.append("\nSTRINGS in the print service (names only)\n").append(serviceStrings(pm));
             JSObject r = new JSObject(); r.put("text", o.toString()); call.resolve(r);
         }).start();
+    }
+
+    /** Names (method, action and status words) found inside the handheld's print service, read from its installed file. Read-only. */
+    private String serviceStrings(android.content.pm.PackageManager pm) {
+        java.util.LinkedHashSet<String> a = new java.util.LinkedHashSet<>(), b = new java.util.LinkedHashSet<>(), c = new java.util.LinkedHashSet<>();
+        try {
+            String apk = pm.getApplicationInfo(SR_PKG, 0).sourceDir;
+            java.util.zip.ZipFile z = new java.util.zip.ZipFile(apk);
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> en = z.entries();
+            while (en.hasMoreElements()) {
+                java.util.zip.ZipEntry e = en.nextElement();
+                if (!e.getName().matches("classes\\d*\\.dex")) continue;
+                java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                try (InputStream in = z.getInputStream(e)) { byte[] buf = new byte[65536]; int n; while ((n = in.read(buf)) > 0) bo.write(buf, 0, n); }
+                byte[] d = bo.toByteArray();
+                java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(d).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+                int count = bb.getInt(56), off = bb.getInt(60);
+                for (int i = 0; i < count; i++) {
+                    int p = bb.getInt(off + i * 4);
+                    int len = 0, shift = 0, x;
+                    do { x = d[p++] & 0xff; len |= (x & 0x7f) << shift; shift += 7; } while ((x & 0x80) != 0);
+                    if (len < 4 || len > 110) continue;
+                    int end = p; while (end < d.length && d[end] != 0) end++;
+                    String str = new String(d, p, end - p, java.nio.charset.StandardCharsets.UTF_8);
+                    String l = str.toLowerCase();
+                    if (str.startsWith("TRANSACTION_")) a.add(str);
+                    else if ((l.contains("action") || l.contains("intent") || l.contains("broadcast")) && (l.contains("print") || l.contains("paper") || l.contains("reciept") || l.contains("senraise") || l.contains("sr.") || l.contains("scanner"))) b.add(str);
+                    else if (l.startsWith("landroid") || l.startsWith("lcom/google") || l.startsWith("landroidx") || l.startsWith("lkotlin")) continue;
+                    else if (l.contains("paper") || l.contains("status") || l.contains("overheat") || l.contains("cover") || l.contains("recieptservice.") || l.contains("senraise") || l.contains("printer") || l.contains("callback") || l.contains("listener")) c.add(str);
+                }
+            }
+            z.close();
+        } catch (Exception e) { return "could not read: " + e + "\n"; }
+        StringBuilder o = new StringBuilder();
+        for (String x : a) o.append(x).append('\n');
+        o.append("-- actions\n"); for (String x : b) o.append(x).append('\n');
+        o.append("-- status / printer\n"); int n = 0; for (String x : c) { if (o.length() > 70000) break; o.append(x).append('\n'); n++; }
+        return o.toString();
     }
 
     /** Bind for a moment and read only the interface name the service answers with. Calls nothing on it. */

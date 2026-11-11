@@ -400,7 +400,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.5.2';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -1369,7 +1369,7 @@ async function printerDiag(){
   toast('Reading the printer…'); let text='';
   try{ text=(await N.printerDiagnostics()).text||''; }catch(e){ text='Failed: '+(e&&e.message||e); }
   let sent=false;
-  if(connected()){ try{ const d=P.byId('devices',S.deviceId); if(d){ P.upsert('devices',{...d,diag:text.slice(0,20000),diagAt:P.now()}); await Cloud.sync(P); S=P.get(); sent=true; } }catch(e){} }
+  if(connected()){ try{ const d=P.byId('devices',S.deviceId); if(d){ P.upsert('devices',{...d,diag:text.slice(0,90000),diagAt:P.now()}); await Cloud.sync(P); S=P.get(); sent=true; } }catch(e){} }
   $('#modal').innerHTML=`<div class="modal"><div class="box" style="max-height:88vh;display:flex;flex-direction:column"><h3>Printer diagnostics</h3><p class="hint">${sent?'Sent to Proview support.':'Not sent (offline or not paired). Take photos of this text.'}</p><pre data-notr style="flex:1;overflow:auto;font-size:11px;line-height:1.35;white-space:pre-wrap;word-break:break-all;background:#f4f3ef;border-radius:8px;padding:10px;margin:8px 0;user-select:text">${esc(text)}</pre><div class="row"><button class="btn blue" data-x style="flex:1">Close</button></div></div></div>`;
   $('#modal [data-x]').onclick=()=>$('#modal').innerHTML='';
 }
