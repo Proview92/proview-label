@@ -167,9 +167,42 @@ public class LabelPrinterPlugin extends Plugin {
                     if (b.length() > 0) o.append(dir).append(": ").append(b).append('\n');
                 } catch (Exception ignored) {}
             }
-            o.append("\nSTRINGS in the print service (names only)\n").append(serviceStrings(pm));
+            o.append("\nAPI of the print service (read by reflection, nothing is called)\n").append(serviceApi(ctx));
             JSObject r = new JSObject(); r.put("text", o.toString()); call.resolve(r);
         }).start();
+    }
+
+    /** Exact method signatures and constants of the print service's interfaces. Loads its classes read-only; calls none of them. */
+    private String serviceApi(Context ctx) {
+        StringBuilder o = new StringBuilder();
+        try {
+            Context pc = ctx.createPackageContext(SR_PKG, Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
+            ClassLoader cl = pc.getClassLoader();
+            String b = "recieptservice.com.recieptservice.";
+            String[] names = { b + "PrinterInterface", b + "PrinterInterface$Stub", b + "PrintCallback", b + "PrintCallback$Stub", b + "CallbackBundle", b + "VersionCallback", b + "VersionCallback$Stub",
+                b + "Sendlnterface", b + "Sendlnterface$Stub", b + "PSAMCallback", b + "PSAMData", b + "draw.PrinterException", b + "draw.PrinterSet", "com.sr.SrPrinter", b + "tools.PrinterSender", b + "tools.PrinterTransferMgr" };
+            for (String n : names) {
+                try {
+                    Class<?> c = Class.forName(n, false, cl);
+                    o.append("\nCLASS ").append(n).append(c.isInterface() ? " (interface)" : "").append(c.getSuperclass() != null ? " extends " + c.getSuperclass().getName() : "");
+                    for (Class<?> i : c.getInterfaces()) o.append(" implements ").append(i.getName());
+                    o.append('\n');
+                    for (java.lang.reflect.Field f : c.getDeclaredFields()) {
+                        o.append("  F ").append(java.lang.reflect.Modifier.toString(f.getModifiers())).append(' ').append(f.getType().getName()).append(' ').append(f.getName());
+                        if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) && java.lang.reflect.Modifier.isFinal(f.getModifiers()) && (f.getType().isPrimitive() || f.getType() == String.class)) {
+                            try { f.setAccessible(true); o.append(" = ").append(String.valueOf(f.get(null))); } catch (Throwable t) { o.append(" = ?"); }
+                        }
+                        o.append('\n');
+                    }
+                    for (java.lang.reflect.Method m : c.getDeclaredMethods()) {
+                        o.append("  M ").append(java.lang.reflect.Modifier.toString(m.getModifiers())).append(' ').append(m.getReturnType().getName()).append(' ').append(m.getName()).append('(');
+                        Class<?>[] ps = m.getParameterTypes(); for (int i = 0; i < ps.length; i++) o.append(i > 0 ? ", " : "").append(ps[i].getName());
+                        o.append(")\n");
+                    }
+                } catch (Throwable t) { o.append("\nCLASS ").append(n).append(": ").append(t).append('\n'); }
+            }
+        } catch (Throwable t) { o.append("could not load: ").append(t).append('\n'); }
+        return o.toString();
     }
 
     /** Names (method, action and status words) found inside the handheld's print service, read from its installed file. Read-only. */
