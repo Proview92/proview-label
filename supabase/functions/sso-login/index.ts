@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     // the business the master asked to open (licence portal "Open in Proview Label"); ignored for anyone else
     let open: string | null = null;
     const biz = typeof c.biz === "string" ? c.biz.trim() : "";
-    if (biz && biz.length <= 100) {
+    if (biz && biz.length <= 200) {
       const m = await db.from("pl_masters").select("email").eq("email", String(c.email).toLowerCase()).maybeSingle();
       if (m.error) throw m.error;
       if (m.data) {
