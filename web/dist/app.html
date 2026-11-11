@@ -4150,7 +4150,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.4.8';
+const APP_VERSION = '1.4.9';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -4277,10 +4277,11 @@ function openLang(){
 function renderStatus(){
   const st=$('#status'); const cfg=S.settings.sync;
   // the strip only appears while syncing, offline or locked; otherwise it's hidden
-  st.style.display=(ui.syncing||(connected()&&LOCK)||!navigator.onLine)?'':'none';
+  st.style.display=(ui.syncing||(connected()&&LOCK)||!navigator.onLine||(connected()&&ui.unlinked))?'':'none';
   if(ui.syncing){ st.className='status'; st.innerHTML='<span class="spin" style="border-color:rgba(255,255,255,.3);border-top-color:#fff"></span> Syncing…'; return; }
   if(connected()&&LOCK){ st.className='status off'; st.textContent=LOCK.title+' · syncing paused · '+site().name; st.onclick=()=>showLock(); return; }
   st.onclick=null;
+  if(connected()&&ui.unlinked&&navigator.onLine){ st.className='status off'; st.textContent='Removed in the back-office · not syncing · Settings → Unpair to pair again'; return; }
   if(!navigator.onLine){ st.className='status off'; st.textContent='Offline – printing still works · '+site().name; }
   else if(connected()){ st.className='status ok'; st.textContent=(cfg.lastSync?'Synced '+rel(cfg.lastSync):'Connected')+' · '+site().name; }
   else { st.className='status'; st.textContent='Demo data · '+site().name; }
@@ -4954,6 +4955,9 @@ function touchDevice(){
   const d=P.byId('devices',S.deviceId)||{id:S.deviceId,version:APP_VERSION};
   P.upsert('devices',{...d,name:CONN.name||d.name||'Handheld',orgId:ORG(),siteId:S.currentSiteId,labelsLeft:S.settings.labelsInStock,battery:ui.battery!=null?ui.battery:d.battery,version:APP_VERSION,lastSync:P.now()});
 }
+// The back-office no longer has this handheld (or its login was ended). It stays paired and keeps printing from
+// what's saved here; a strip says so. Only Settings → Unpair un-pairs it.
+function notLinked(on){ if(!!ui.unlinked===on) return; ui.unlinked=on; if(on) toast('This handheld was removed in the back-office. It still prints, but no longer syncs. To link it again: Settings → Unpair, then pair it.',true); renderStatus(); }
 // Ask the server whether this handheld's business is still open. Returns the lock (or null). Never throws.
 async function checkLock(){
   if(!connected()||!Cloud.whoami) return LOCK;
@@ -4961,11 +4965,11 @@ async function checkLock(){
   try{ w=await Cloud.whoami(); }
   catch(e){   // no internet (or the server is down): keep working on what's saved here
     const m=String((e&&(e.code||''))+' '+(e&&e.message||''));
-    if(/42501|permission denied|JWT|not authenticated/i.test(m)&&Cloud.loginGone&&Cloud.loginGone()){ unpair(true); return null; }   // the server ended this handheld's login (never a dropped connection: the saved login is kept then)
+    if(/42501|permission denied|JWT|not authenticated/i.test(m)&&Cloud.loginGone&&Cloud.loginGone()) notLinked(true);   // the server ended this handheld's login: say so, but never un-pair by itself
     return LOCK; }
   if(!w) return LOCK;
-  if(!w.device){ if(!(await Cloud.session().catch(()=>null))) return LOCK;   // answered without our login (connection dropped mid-refresh): not a removal
-    unpair(true); return null; }   // removed in the back-office: pair again
+  if(!w.device){ if(await Cloud.session().catch(()=>null)) notLinked(true); return LOCK; }   // removed in the back-office: say so, keep working; only a manual Unpair un-pairs
+  notLinked(false);
   { const d=w.device; if(d.name!==CONN.name||d.mode!==CONN.mode||d.site_id!==CONN.siteId){   // renamed, moved or Easy/Detailed changed in the back-office
       const moved=d.site_id!==CONN.siteId; CONN={...CONN,name:d.name,mode:d.mode,siteId:d.site_id}; try{ localStorage.setItem(DEV_KEY,JSON.stringify(CONN)); }catch(e){}
       if(moved){ S.currentSiteId=d.site_id; P.save(); } render(); } }
