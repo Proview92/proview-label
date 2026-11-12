@@ -1095,8 +1095,8 @@ html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26
   };
   const lockMsg = (o) => {
     const st = orgState(o), n = (o && o.name) || 'This business';
-    if (st === 'nolicence') return { title: 'No licence yet', text: 'No licence yet: buy a licence to start using Proview Label at ' + n + '. Nothing can be changed or synced until it has one.' };
-    if (st === 'expired') return { title: 'Trial ended', text: n + '’s trial has ended. Your data is safe, but nothing can be changed or synced until you buy a licence.' };
+    if (st === 'nolicence') return { title: 'No licence yet', text: 'This handheld has no licence yet (' + n + '). Each handheld needs its own licence: your business owner can buy it in the Proview Label back-office (Handhelds). Nothing can be printed or synced until it has one.' };
+    if (st === 'expired') return { title: 'Licence ended', text: 'This handheld’s licence has ended (' + n + '). Your data is safe, but nothing can be printed or synced until it is renewed in the back-office (Handhelds).' };
     if (st === 'suspended') return { title: 'Account suspended', text: n + ' is suspended. Your data is safe, but nothing can be changed or synced until the licence is renewed.' };
     return null;
   };
@@ -1177,6 +1177,11 @@ html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26
     // master: a LOCATION's licence (migration 009): type m1..m36 | lifetime | custom (endsAt) | trial (endsAt) | null = remove
     async setSiteLicence(siteId, type, endsAt, extend) {
       const { data, error } = await sb.rpc('pl_set_site_licence', { p_site: siteId, p_type: type || null, p_expires: endsAt || null, p_extend: !!extend });
+      if (error) throw error; return data;
+    },
+    // Label is licensed per handheld (migration 013): the master sets one handheld licence (id 'hl_…')
+    async setHandheldLicence(id, type, endsAt, extend) {
+      const { data, error } = await sb.rpc('pl_set_handheld_licence', { p_id: id, p_type: type || null, p_expires: endsAt || null, p_extend: !!extend });
       if (error) throw error; return data;
     },
     // the prices the licence portal sent (hub_plans): { m12: { label, amount, currency, link, ref, kind, plan }, ... }
@@ -1799,6 +1804,9 @@ function attention(){
   if(canView('handhelds')) bySite(P.live('devices')).forEach(d=>{
     if(d.labelsLeft<60) out.push({lvl:'bad',icon:'print',title:`${d.name} is low on labels`,sub:`${siteName(d.siteId)} · ${d.labelsLeft} left on the roll`,go:canView('orders')?'orders':'handhelds'});
     if(d.lastSync&&Date.now()-new Date(d.lastSync)>24*3600e3) out.push({lvl:'warn',icon:'device',title:`${d.name} hasn’t synced since ${P.fmtDate(d.lastSync,true)}`,sub:siteName(d.siteId),at:d.lastSync,go:'handhelds'}); });
+  hlAll().filter(l=>!l.spare).forEach(l=>{ const st=hlState(l);
+    if(hlLocked(l)) out.push({lvl:'bad',icon:'shield',title:`${l.name}: ${st==='nolicence'?'no licence':st==='suspended'?'suspended':'licence ended'}`,sub:'Each handheld needs its own licence. It can’t print or sync until licensed.',go:'handhelds'});
+    else if(st==='trial'||st==='expiring') out.push({lvl:'warn',icon:'shield',title:`${l.name}: ${st==='trial'?'trial':'licence ends soon'}`,sub:'Ends '+P.fmtDate(l.licence_expires_at,true),go:'handhelds'}); });
   allowedSiteIds().forEach(id=>{ const m=siteLockMsg(id), st=siteState(id), l=siteLic(id)||{};
     if(m) out.push({lvl:'bad',icon:'shield',title:`${siteName(id)}: ${m.title}`,sub:m.text,go:canView('settings')?'settings':'overview'});
     else if(st==='trial'||st==='expiring') out.push({lvl:'warn',icon:'shield',title:`${siteName(id)}: ${st==='trial'?'trial':'licence ends soon'}`,sub:'Ends '+P.fmtDate(l.licence_expires_at,true),go:canView('settings')?'settings':'overview'}); });
@@ -1876,7 +1884,7 @@ async function checkAccess(){
   applyWho(w); return true;
 }
 // the master keeps only the business opened from the licence portal: no other business is kept or shown
-function applyWho(w){ WHO=w; S=P.get(); const op=w.master?openOrgId():null; S.orgs=(w.orgs||[]).filter(o=>!w.master||o.id===op).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role,suspended:o.suspended,licensed:o.licensed!==false,no_licence:!!o.no_licence,trial_ends_at:o.trial_ends_at||null,trial_expired:!!o.trial_expired,locked:!!o.locked,sites:Array.isArray(o.sites)?o.sites:null})); P.prune(S.orgs.map(o=>o.id)); S=P.get(); }
+function applyWho(w){ WHO=w; S=P.get(); const op=w.master?openOrgId():null; S.orgs=(w.orgs||[]).filter(o=>!w.master||o.id===op).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role,suspended:o.suspended,licensed:o.licensed!==false,no_licence:!!o.no_licence,trial_ends_at:o.trial_ends_at||null,trial_expired:!!o.trial_expired,locked:!!o.locked,sites:Array.isArray(o.sites)?o.sites:null,per_handheld:!!o.per_handheld,handhelds:Array.isArray(o.handhelds)?o.handhelds:[]})); P.prune(S.orgs.map(o=>o.id)); S=P.get(); }
 // ---------- licence: one per LOCATION (migration 009; no free trials: a new location starts with no licence) ----------
 // The business-level state (orgState / lockMsg, shared with the handheld) is derived by the server from its locations:
 // locked = suspended or no location licensed. Pages work per location: siteState / siteLockMsg below.
@@ -1906,6 +1914,7 @@ function siteLockMsg(id){ const st=siteState(id), s=P.byId('sites',id)||{}, n=s.
   if(st==='suspended') return {title:'Account suspended',text:`${orgName(s.orgId)} is suspended. Your data is safe, but nothing can be changed or synced until the licence is renewed.`};
   return null; }
 function siteTag(id,cls){ const st=siteState(id), l=siteLic(id)||{}, k=cls||'tag', d=(t)=>P.fmtDate(t);
+  if(l.per_handheld) return st==='suspended'?`<span class="${k} bad">Suspended</span>`:'';
   if(st==='suspended') return `<span class="${k} bad">Suspended</span>`;
   if(st==='nolicence') return `<span class="${k} bad" title="No licence yet: this location is locked until it has one">No licence</span>`;
   if(st==='expired') return `<span class="${k} bad" title="Ended ${esc(P.fmtDate(l.licence_expires_at,true))}">${l.licence_type==='trial'?'Trial ended':'Expired'}</span>`;
@@ -1913,6 +1922,7 @@ function siteTag(id,cls){ const st=siteState(id), l=siteLic(id)||{}, k=cls||'tag
   if(st==='expiring') return `<span class="${k} warn">Renew by ${esc(d(l.licence_expires_at))}</span>`;
   return `<span class="${k} ok">${l.licence_type==='lifetime'||!l.licence_expires_at?'Lifetime':'Licensed to '+esc(d(l.licence_expires_at))}</span>`; }
 const siteLicText=(id)=>{ const st=siteState(id), l=siteLic(id)||{};
+  if(l.per_handheld) return st==='suspended'?'Suspended':'Each handheld needs its own licence';
   return st==='nolicence'?'No licence yet':st==='suspended'?'Suspended':st==='expired'?(l.licence_type==='trial'?'Trial ended ':'Expired ')+P.fmtDate(l.licence_expires_at)
     :l.licence_type==='lifetime'||!l.licence_expires_at?'Lifetime':(st==='trial'?'Trial ends ':'Licensed to ')+P.fmtDate(l.licence_expires_at); };
 function stateTag(o){ const st=orgState(o);
@@ -1921,6 +1931,61 @@ function stateTag(o){ const st=orgState(o);
   if(st==='expired') return '<span class="tag bad">Licence ended</span>';
   if(st==='trial') return `<span class="tag warn">Trial – ends ${esc(P.fmtDate(o.trial_ends_at))}</span>`;
   return '<span class="tag ok">Active</span>'; }
+// ---------- licences PER HANDHELD (migration 013, owner 12 Nov 2026): locations need no licence ----------
+// Each paired handheld has a licence (id 'hl_…'); a removed handheld's running licence becomes a spare that the next
+// handheld paired in the business takes. Stripe reference: pvl__<licence id>__<plan>.
+const perHandheld=()=>(S.orgs||[]).some(o=>o.per_handheld);
+const hlAll=()=>(S.orgs||[]).flatMap(o=>(o.handhelds||[]).map(l=>({...l,orgId:o.id})));
+const hlOf=(devId)=>hlAll().find(l=>l.device_id===devId)||null;
+function hlState(l){ if(!l) return 'nolicence'; const o=(S.orgs||[]).find(x=>x.id===l.orgId); if(o&&o.suspended) return 'suspended';
+  if(!l.licence_type) return 'nolicence'; if(l.licence_type==='lifetime') return 'active';
+  const left=new Date(l.licence_expires_at).getTime()-Date.now(); if(!(left>0)) return 'expired';
+  return l.licence_type==='trial'?'trial':left<30*day?'expiring':'active'; }
+const hlLocked=(l)=>['suspended','nolicence','expired'].includes(hlState(l));
+function hlTag(l){ const st=hlState(l), d=(t)=>P.fmtDate(t);
+  if(st==='suspended') return '<span class="tag bad">Suspended</span>';
+  if(st==='nolicence') return '<span class="tag bad" title="This handheld is locked until it has a licence">No licence</span>';
+  if(st==='expired') return `<span class="tag bad" title="Ended ${esc(d(l.licence_expires_at))}">${l.licence_type==='trial'?'Trial ended':'Expired'}</span>`;
+  if(st==='trial') return `<span class="tag warn">Trial – ends ${esc(d(l.licence_expires_at))}</span>`;
+  if(st==='expiring') return `<span class="tag warn">Renew by ${esc(d(l.licence_expires_at))}</span>`;
+  return `<span class="tag ok">${l.licence_type==='lifetime'?'Lifetime':'Licensed to '+esc(d(l.licence_expires_at))}</span>`; }
+const canBuyHl=(l)=>!!l&&!isMaster()&&['owner','admin'].includes(orgRole(l.orgId));
+function hlBuyBtn(l){ if(!l) return '';
+  if(isMaster()) return `<button class="btn ghost sm" data-hlset="${esc(l.id)}">Licence…</button>`;
+  if(!canBuyHl(l)||(l.licence_type==='lifetime'&&!hlLocked(l))) return '';
+  return `<button class="btn sm ${hlLocked(l)?'':'ghost'}" data-hlbuy="${esc(l.id)}">${hlState(l)==='nolicence'?'Buy online':'Renew online'}</button>`; }
+function hlBuyHtml(l){ if(!canBuyHl(l)) return `<p class="hint" style="margin:8px 0 0">Ask your business owner to buy it, or call Proview on ${esc(SUP.phone)}.</p>`;
+  if(PLANS===null) loadPlans();
+  const buying=hlState(l)==='nolicence', list=buyPlans();
+  if(!list.length) return `<p class="hint" style="margin:8px 0 0" data-buyfor="${esc(l.id)}">Online payment isn’t available yet. ${contactHtml()}</p>`;
+  return `<div class="buy-plans" data-buyfor="${esc(l.id)}">${list.map(p=>`<a class="buy-card" href="${esc(buyUrl(p,l.id))}" target="_blank" rel="noopener" data-plan="${esc(p.plan)}"><b>${esc(p.label||LIC_TYPES[p.plan]||p.plan)}</b><span class="bp">${esc(money(p))}</span><small>${buying?'Buy online':'Renew online'}</small></a>`).join('')}</div>
+    <p class="hint" style="margin:8px 0 0">${buying?'You pay securely with Stripe; the handheld is licensed within about 5 minutes.':'Time is added on top of the current licence. You pay securely with Stripe; it updates within about 5 minutes.'} Or call Proview on ${supHtml()}.</p>`; }
+function hlBuyModal(id){ loadPlans(true).then(()=>{ const l=hlAll().find(x=>x.id===id); if(!l) return;
+  modal((hlState(l)==='nolicence'?'Buy a licence':'Renew licence')+' · '+(l.spare?'Spare handheld licence':l.name),`<p style="margin-top:0">Status: ${hlTag(l)}${l.site_name?` <span class="hint">${esc(l.site_name)}</span>`:''}</p>${hlBuyHtml(l)}`,`<button class="btn ghost" data-x>Close</button>`); }); }
+// master: set a handheld's licence (same choices as the licence portal)
+function hlLicenceForm(id){ const l=hlAll().find(x=>x.id===id); if(!l) return;
+  const ymd=(d)=>{ const t=new Date(d); return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); };
+  const running=l.licence_type&&l.licence_type!=='lifetime'&&!hlLocked(l);
+  const opts=['m1','m3','m6','m12','m24','m36','lifetime','custom','trial'].map(k=>`<option value="${k}" ${k==='m12'?'selected':''}>${LIC_TYPES[k]}</option>`).join('');
+  const m=modal('Licence · '+(l.spare?'Spare handheld licence':l.name),`<p style="margin-top:0">Status: ${hlTag(l)}${l.site_name?` <span class="hint">${esc(l.site_name)}</span>`:''}</p>
+    <div class="fld"><label>Licence</label><select class="inp" id="lt">${opts}</select></div>
+    <div class="fld" id="ldw" style="display:none"><label id="ldl">Ends on</label><input class="inp" type="date" id="ld" value="${ymd(Date.now()+3*day)}"></div>
+    <label class="row" id="lxw" style="gap:8px;margin:0 0 10px;${running?'':'display:none'}"><input type="checkbox" id="lx" checked> Add to the current end (${esc(P.fmtDate(l.licence_expires_at))})</label>
+    <p class="hint">Proview Label is licensed per handheld. A handheld with no licence, or one that has ended, is locked: it can’t print or sync. The back-office always works.</p>`,
+    `<button class="btn ghost" data-x>Cancel</button>${l.licence_type?'<button class="btn ghost" id="lnone" style="color:var(--bad)">Remove licence</button>':''}<button class="btn" id="lsv">Save licence</button>`);
+  const sel=m.querySelector('#lt'), sync=()=>{ const v=sel.value; m.querySelector('#ldw').style.display=v==='custom'||v==='trial'?'':'none';
+    m.querySelector('#ldl').textContent=v==='trial'?'Trial ends on':'Ends on'; m.querySelector('#lxw').style.display=running&&/^m\d+$/.test(v)?'':'none'; };
+  sel.onchange=sync; sync();
+  const save=async(type)=>{ const dv=m.querySelector('#ld').value, ends=(type==='custom'||type==='trial')?(dv?new Date(dv+'T23:59:59'):null):null;
+    if((type==='custom'||type==='trial')&&(!ends||isNaN(ends))) return toast('Pick a date');
+    const extend=!!type&&/^m\d+$/.test(type)&&running&&m.querySelector('#lx').checked;
+    try{ await Cloud.setHandheldLicence(l.id,type,ends&&ends.toISOString(),extend); await refreshWho();
+      closeModal(); toast(!type?'Licence removed':'Licence saved'); render(); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } };
+  m.querySelector('#lsv').onclick=()=>save(sel.value);
+  const nn=m.querySelector('#lnone'); if(nn) nn.onclick=()=>save(null);
+}
+document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closest('[data-hlbuy],[data-hlset]'); if(!b) return; e.preventDefault();
+  if(b.dataset.hlbuy) hlBuyModal(b.dataset.hlbuy); else hlLicenceForm(b.dataset.hlset); });
 // ----- Buy online (prices and Stripe links come from the licence portal: hub_plans -> pl_plans) -----
 // client_reference_id = pvl__<location id>__<plan>; the portal's payment check applies it within about 5 minutes.
 let PLANS=null, PLANS_AT=0;
@@ -1929,7 +1994,7 @@ function loadPlans(force){ if(!CLOUD){ PLANS=DEMO_PLANS; return Promise.resolve(
   if(!force&&PLANS&&Date.now()-PLANS_AT<300e3) return Promise.resolve(PLANS);
   return (Cloud.plans?Cloud.plans():Promise.resolve({})).then(p=>{ const was=JSON.stringify(PLANS); PLANS=p||{}; PLANS_AT=Date.now(); if(was!==JSON.stringify(PLANS)&&document.querySelector('[data-buyfor]')) render(); return PLANS; }).catch(()=>{ PLANS=PLANS||{}; return PLANS; }); }
 const BUY_ORDER=['m1','m3','m6','m12','m24','m36','lifetime'];
-const buyPlans=()=>Object.entries(PLANS||{}).map(([k,p])=>({...p,plan:p.plan||k})).filter(p=>(p.kind||'location')==='location'&&p.link&&p.amount>0&&BUY_ORDER.includes(p.plan)).sort((a,b)=>BUY_ORDER.indexOf(a.plan)-BUY_ORDER.indexOf(b.plan));
+const buyPlans=()=>Object.entries(PLANS||{}).map(([k,p])=>({...p,plan:p.plan||k})).filter(p=>['location','handheld'].includes(p.kind||'location')&&p.link&&p.amount>0&&BUY_ORDER.includes(p.plan)).sort((a,b)=>BUY_ORDER.indexOf(a.plan)-BUY_ORDER.indexOf(b.plan));
 const money=(p)=>new Intl.NumberFormat('en-GB',{style:'currency',currency:String(p.currency||'gbp').toUpperCase()}).format(p.amount/100);
 function buyUrl(p,siteId){ const u=new URL(p.link); u.searchParams.set('client_reference_id',`${p.ref||'pvl'}__${siteId}__${p.plan}`); const em=me()&&me().email; if(em) u.searchParams.set('prefilled_email',em); return u.toString(); }
 // owners and admins of the business buy for its locations (the master gives licences from Locations)
@@ -1945,6 +2010,12 @@ document.addEventListener('click',e=>{ const a=e.target.closest&&e.target.closes
 // banner above the page: the locations in view that are locked (no licence / ended / suspended), each with Buy online;
 // or a trial / licence running out soon
 function trialBanner(){
+  if(perHandheld()&&CLOUD){ const need=hlAll().filter(l=>!l.spare&&hlLocked(l));
+    if(!need.length) return '';
+    const one=need.length===1, l=need[0];
+    return `<div class="card lic-banner" role="alert" style="border-color:var(--bad);background:var(--badl);margin-bottom:16px"><h3 style="color:var(--bad)">${one?esc(l.name)+': '+(hlState(l)==='nolicence'?'no licence yet':'licence ended'):need.length+' handhelds need a licence'}</h3>
+      <p style="margin:6px 0 0">Each handheld needs its own licence. ${one?'It':'They'} can’t print or sync until licensed; the back-office keeps working.</p>
+      ${need.map(x=>`<div class="lic-row"><div class="lic-h"><b>${esc(x.name)}</b> ${hlTag(x)} <span class="hint">${esc(x.site_name||'')}</span></div>${hlBuyBtn(x)||(isMaster()?'':`<p class="hint" style="margin:6px 0 0">Ask your business owner to buy it, or call Proview on ${supHtml()}.</p>`)}</div>`).join('')}</div>`; }
   const ids=allowedSiteIds(), inView=siteFilter!=='all'&&!siteFilter.startsWith('org:')?[siteFilter]:ids;
   const locked=inView.filter(siteLocked), soon=inView.filter(id=>['trial','expiring'].includes(siteState(id)));
   if(locked.length){ const one=locked.length===1, m=siteLockMsg(locked[0]);
@@ -1969,13 +2040,13 @@ function renderTrialSetup(){
     <div class="auth2-form"><div>
       <form id="tf" novalidate>
         <div class="auth2-fbrand"><div class="auth2-logo"></div><div class="wordmark2">PROVIEW<span>LABEL</span></div></div>
-        <h1>Set up your business</h1><p class="auth2-mut">You’ll be the owner${em?' ('+esc(em)+')':''}. Your business starts with no licence: buy a licence to start using Proview Label.</p>
+        <h1>Set up your business</h1><p class="auth2-mut">You’ll be the owner${em?' ('+esc(em)+')':''}. Each handheld you pair needs its own licence: you can buy it here online once it’s paired.</p>
         <div id="terr">${TRIAL.msg?`<div class="lg-err" role="alert">${esc(TRIAL.msg)}</div>`:''}</div>
         <label for="tb">Business name</label><input class="inp" id="tb" placeholder="e.g. Pepe's Piri Piri" maxlength="120" autocomplete="organization">
         <label for="ts">First location or kitchen</label><input class="inp" id="ts" placeholder="Same as the business name" maxlength="120">
         <button class="go" type="submit" id="tgo">Set up business</button>
         <button class="ghost2" type="button" id="tout">Sign out</button>
-        <p class="hint" style="margin:0;font-size:12.5px">Until it has a licence the business is read-only. Once it’s set up you can buy a licence here online (paid securely with Stripe), or call Proview on ${esc(SUP.phone)}. Joining an existing business? Ask its owner to add your email, then sign in again.</p>
+        <p class="hint" style="margin:0;font-size:12.5px">The back-office is free to use. Each handheld needs its own licence: once a handheld is paired you can buy it here online (paid securely with Stripe), or call Proview on ${esc(SUP.phone)}. Joining an existing business? Ask its owner to add your email, then sign in again.</p>
       </form></div></div></div>`;
   const tb=$('#tb'), ts=$('#ts'); let edited=false;
   tb.oninput=()=>{ if(!edited) ts.value=tb.value; }; ts.oninput=()=>{ edited=ts.value.trim()!==''&&ts.value!==tb.value; };
@@ -1986,7 +2057,7 @@ function renderTrialSetup(){
     const go=$('#tgo'); go.disabled=true; go.textContent='Setting up…';
     try{ const r=await Cloud.startTrial(b,s); TRIAL={msg:''};
       if(r&&r.site_id) lsSet('pvl-site:'+em,r.site_id);
-      await boot(false,r&&r.org_id); toast('Business set up. Buy a licence to start using Proview Label.');
+      await boot(false,r&&r.org_id); toast('Business set up. Pair a handheld, then buy its licence on the Handhelds page.');
     }catch(ex){ const t=String((ex&&ex.message)||ex);
       if(/ALREADY_MEMBER/.test(t)) return boot(false);
       if(/could not find the function|PGRST202|does not exist/i.test(t)||(ex&&ex.code==='PGRST202')){ WHO=null; return signOut(NO_ACCESS); }
@@ -2475,10 +2546,13 @@ VIEWS.handhelds=(el)=>{
     if(!CLOUD) return bySite(tele).map(d=>({...d,mode:d.mode||'easy'}));
     const rows=await Cloud.devices(devOrgs);
     return bySite(rows.map(r=>({...(tele.find(t=>t.id===r.id)||{}),id:r.id,name:r.name,mode:r.mode,siteId:r.site_id,orgId:r.org_id,pairedAt:r.paired_at}))); };
+  // licences whose handheld was removed: the next handheld paired in the business takes one automatically
+  const spareHtml=()=>{ const sp=hlAll().filter(l=>l.spare&&devOrgs.includes(l.orgId)); if(!CLOUD||!sp.length) return '';
+    return `<div class="sub" style="margin-top:14px"><b>Spare licences</b> · the next handheld you pair takes one automatically.</div><table><tbody>${sp.map(l=>`<tr><td><b>Spare handheld licence</b></td><td>${hlTag(l)}</td><td style="text-align:right">${hlBuyBtn(l)}</td></tr>`).join('')}</tbody></table>`; };
   const modeTag=(m)=>m==='detailed'?'<span class="tag blue">Detailed</span>':'<span class="tag mute">Easy</span>';
   (async()=>{ const box=el.querySelector('#devs'); let rows=[];
     try{ rows=await devRows(); }catch(e){ box.innerHTML=`<div class="lg-err">${esc(Cloud.friendly?Cloud.friendly(e):e.message)}</div>`; return; }
-    box.innerHTML=`<table><thead><tr><th>Handheld</th><th>Location</th><th>Mode</th><th>Battery</th><th>Labels left</th><th>App</th><th>Last sync</th><th></th></tr></thead><tbody>${rows.map(d=>`<tr><td><b>${esc(d.name||'Handheld')}</b></td><td>${esc(siteName(d.siteId))}</td><td>${modeTag(d.mode)}</td><td>${d.battery!=null?d.battery+'%':'—'}</td><td>${d.labelsLeft==null?'—':d.labelsLeft<60?`<span class="tag bad">${d.labelsLeft} – low</span>`:d.labelsLeft}</td><td>${d.version?'v'+esc(d.version):'—'}</td><td>${d.lastSync?P.fmtDate(d.lastSync,true):'—'}</td><td style="text-align:right;white-space:nowrap"><button class="icbtn" data-ed="${esc(d.id)}" title="Edit">✎</button><button class="icbtn" data-rm="${esc(d.id)}" title="Remove">🗑</button></td></tr>`).join('')||'<tr><td colspan="8" class="empty">No handhelds paired yet.</td></tr>'}</tbody></table>`;
+    box.innerHTML=`<table><thead><tr><th>Handheld</th><th>Location</th>${CLOUD?'<th>Licence</th>':''}<th>Mode</th><th>Battery</th><th>Labels left</th><th>App</th><th>Last sync</th><th></th></tr></thead><tbody>${rows.map(d=>`<tr><td><b>${esc(d.name||'Handheld')}</b></td><td>${esc(siteName(d.siteId))}</td>${CLOUD?`<td style="white-space:nowrap">${hlTag(hlOf(d.id))} ${hlBuyBtn(hlOf(d.id))}</td>`:''}<td>${modeTag(d.mode)}</td><td>${d.battery!=null?d.battery+'%':'—'}</td><td>${d.labelsLeft==null?'—':d.labelsLeft<60?`<span class="tag bad">${d.labelsLeft} – low</span>`:d.labelsLeft}</td><td>${d.version?'v'+esc(d.version):'—'}</td><td>${d.lastSync?P.fmtDate(d.lastSync,true):'—'}</td><td style="text-align:right;white-space:nowrap"><button class="icbtn" data-ed="${esc(d.id)}" title="Edit">✎</button><button class="icbtn" data-rm="${esc(d.id)}" title="Remove">🗑</button></td></tr>`).join('')||'<tr><td colspan="9" class="empty">No handhelds paired yet.</td></tr>'}</tbody></table>${spareHtml()}`;
     box.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>devForm(rows.find(x=>x.id===b.dataset.ed)));
     box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{ const d=rows.find(x=>x.id===b.dataset.rm); confirmM('Remove '+(d.name||'this handheld')+'?','It stops syncing straight away and shows a new pairing code. Labels it already sent stay here.','Remove',async()=>{
       try{ if(CLOUD) await Cloud.removeDevice(d.id); else P.remove('devices',d.id); audit('deleted','Handheld',d.name||d.id,d.orgId); toast('Handheld removed'); render(); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } }); });
@@ -2602,7 +2676,7 @@ function thisLocationCard(){
     <div class="g2"><div class="fld"><label for="tlName">Name</label><input class="inp" id="tlName" value="${esc(x.name)}"${dis}></div><div class="fld"><label for="tlArea">Area</label><input class="inp" id="tlArea" value="${esc(x.region||'')}" placeholder="e.g. North London"${dis}></div></div>
     <div class="fld"><label for="tlAddr">Address <span class="hint">printed on sale labels</span></label><input class="inp" id="tlAddr" value="${esc(x.address||'')}"${dis}></div>
     ${ed?'<div class="row" style="justify-content:flex-end"><button class="btn sm" id="tlSave">Save location</button></div>':''}
-    <div class="setrow" id="tlLic"><div><b>Licence</b><span class="hint">${siteTag(x.id)} ${esc(siteLicText(x.id))} · each business needs its own licence</span></div>${buy}</div>
+    ${lic.per_handheld?'':`<div class="setrow" id="tlLic"><div><b>Licence</b><span class="hint">${siteTag(x.id)} ${esc(siteLicText(x.id))} · each business needs its own licence</span></div>${buy}</div>`}
     ${isMaster()?`<div class="setrow"><div><b>Business</b><span class="hint">${esc(orgName(x.orgId))} · businesses are linked and unlinked in the licence portal</span></div><button class="btn ghost sm" data-eo="${esc(x.orgId)}">Rename</button></div>`:''}</div>`;
 }
 function bindThisLocation(el){

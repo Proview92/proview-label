@@ -1117,8 +1117,8 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
   };
   const lockMsg = (o) => {
     const st = orgState(o), n = (o && o.name) || 'This business';
-    if (st === 'nolicence') return { title: 'No licence yet', text: 'No licence yet: buy a licence to start using Proview Label at ' + n + '. Nothing can be changed or synced until it has one.' };
-    if (st === 'expired') return { title: 'Trial ended', text: n + '’s trial has ended. Your data is safe, but nothing can be changed or synced until you buy a licence.' };
+    if (st === 'nolicence') return { title: 'No licence yet', text: 'This handheld has no licence yet (' + n + '). Each handheld needs its own licence: your business owner can buy it in the Proview Label back-office (Handhelds). Nothing can be printed or synced until it has one.' };
+    if (st === 'expired') return { title: 'Licence ended', text: 'This handheld’s licence has ended (' + n + '). Your data is safe, but nothing can be printed or synced until it is renewed in the back-office (Handhelds).' };
     if (st === 'suspended') return { title: 'Account suspended', text: n + ' is suspended. Your data is safe, but nothing can be changed or synced until the licence is renewed.' };
     return null;
   };
@@ -1199,6 +1199,11 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
     // master: a LOCATION's licence (migration 009): type m1..m36 | lifetime | custom (endsAt) | trial (endsAt) | null = remove
     async setSiteLicence(siteId, type, endsAt, extend) {
       const { data, error } = await sb.rpc('pl_set_site_licence', { p_site: siteId, p_type: type || null, p_expires: endsAt || null, p_extend: !!extend });
+      if (error) throw error; return data;
+    },
+    // Label is licensed per handheld (migration 013): the master sets one handheld licence (id 'hl_…')
+    async setHandheldLicence(id, type, endsAt, extend) {
+      const { data, error } = await sb.rpc('pl_set_handheld_licence', { p_id: id, p_type: type || null, p_expires: endsAt || null, p_extend: !!extend });
       if (error) throw error; return data;
     },
     // the prices the licence portal sent (hub_plans): { m12: { label, amount, currency, link, ref, kind, plan }, ... }
