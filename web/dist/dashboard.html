@@ -358,7 +358,7 @@ html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26
 /* sign out: red button, white icon (as Proview Signage) */
 .top-me .top-out{background:#d92d20;border-color:#d92d20;color:#fff}
 .top-me .top-out:hover{background:#b42318;border-color:#b42318;color:#fff}
-/* the master inside a customer's business (opened from the licence portal) */
+/* the master inside a location's business (opened from the licence portal) */
 .master-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 14px;margin:0 0 16px;border-radius:12px;background:var(--pri-l);border:1px solid #c9d6f7;color:var(--ink);font-size:14px}
 .master-bar>span{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}.master-bar svg{color:var(--pri);flex:none}
 </style>
@@ -1080,7 +1080,7 @@ html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26
     return t || 'Something went wrong. Please try again.';
   };
 
-  const LICENCE_URL = 'https://license.proviewcrm.co.uk';   // licence portal: the master's links only (Open a customer, Back to licence portal)
+  const LICENCE_URL = 'https://license.proviewcrm.co.uk';   // licence portal: the master's links only (Open a location, Back to licence portal)
   const OPEN_KEY = 'pv_master_open';   // sessionStorage: the business the master opened from the licence portal (MASTER_OPEN_PROTOCOL.md)
   const SUPPORT = { phone: '020 8935 5495', email: 'info@proviewtechgroup.co.uk' };
   // Licence state of a business from whoami: 'suspended', 'nolicence' (never licensed: every new business starts
@@ -1124,8 +1124,8 @@ html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26
     // If we've just come back from the Proview account page, swap the hand-off for a session.
     // From the licence portal ("Open in Proview Label") the master's reply also names the business to open (j.open,
     // checked by sso-login against the signed biz claim): it is kept for this tab only (sessionStorage), so a reload
-    // stays in that business and another tab can hold another customer. A hand-off without it (an old link, or the
-    // dashboard) forgets it: the master then sees "Open a customer from the licence portal". An open= in the address
+    // stays in that business and another tab can hold another location. A hand-off without it (an old link, or the
+    // dashboard) forgets it: the master then sees "Open a location from the licence portal". An open= in the address
     // itself is never trusted; it is only removed.
     async consumeSsoHash() {
       const m = (g.location.hash || '').match(/[#&]pv_sso=([^&]+)/);
@@ -1161,7 +1161,7 @@ html .app.collapsed .side :is(.side-foot,#pv-x)>*{width:30px!important;height:26
     // Returns the whoami result (or null if it couldn't be checked; then nothing is purged).
     async prune(P) { let w; try { w = await Cloud.whoami(); } catch (e) { return null; } if (!w) return null; P.prune((w.orgs || []).map((o) => o.id)); return w; },
     // ----- businesses & back-office logins -----
-    // (Adding a business is done in the licence portal, New customer: the hub calls add_business. No button here.)
+    // (Adding a location is done in the licence portal, New location: the hub calls add_business. No button here.)
     // Self sign-up, "Set up your business" (migrations 003/007): the business starts with no licence. Returns { org_id, site_id }.
     // trialReady(who): the server has the set-up feature (whoami then reports trial_used, now always false).
     trialReady(who) { return !!who && Object.prototype.hasOwnProperty.call(who, 'trial_used'); },
@@ -1586,7 +1586,7 @@ function me(){
 }
 const isMaster=()=>!!me()&&me().role==='master';
 const visibleOrgs=()=>(S.orgs||[]).filter(o=>orgRole(o.id));
-// the master signed in without a business from the licence portal: only the "Open a customer" page, no business data
+// the master signed in without a business from the licence portal: only the "Open a location" page, no business data
 const masterNone=()=>isMaster()&&!visibleOrgs().length;
 // every site this person may open (the dropdown and access checks)
 function mySiteIds(){
@@ -1613,8 +1613,8 @@ function fixSite(){
 // the location choice is remembered per person (the master: per business opened)
 const siteKey=()=>'pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId)+(isMaster()?':'+openOrgId():'');
 function setSite(id){ siteFilter=id; lsSet(siteKey(),id); render(); }
-// the master without a business: every menu page is greyed out ("Open a customer from the licence portal")
-function openFromPortalFirst(){ toast('Open a customer from the licence portal first'); }
+// the master without a business: every menu page is greyed out ("Open a location from the licence portal")
+function openFromPortalFirst(){ toast('Open a location from the licence portal first'); }
 function goPage(k){ if(masterNone()) return openFromPortalFirst(); location.hash=k; }
 function pickSite(id){ setSite(id); }
 // A business must be chosen before creating catalogue items, sites or staff
@@ -1731,7 +1731,7 @@ function render(){
   const r=route(); const u=me(); const off=masterNone();
   const badge={expiry:expiredCount(),orders:bySite(P.live('orders')).filter(o=>o.status==='pending').length,products:byOrg(P.live('products')).filter(p=>p.approved===false).length};
   const title=r==='portal'?'Proview Label':(NAV.flatMap(([,i])=>i).find(x=>x[0]===r)||[])[1]||'Dashboard';
-  const link=([k,l,i])=>off?`<a class="off" role="link" tabindex="0" aria-disabled="true" data-off="${k}" title="${esc(l)} – open a customer from the licence portal first" aria-label="${esc(l)} – open a customer from the licence portal first">${ic(i)}<span class="lbl">${esc(l)}</span><span class="slbl">${esc(SHORT[k]||l)}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`
+  const link=([k,l,i])=>off?`<a class="off" role="link" tabindex="0" aria-disabled="true" data-off="${k}" title="${esc(l)} – open a location from the licence portal first" aria-label="${esc(l)} – open a location from the licence portal first">${ic(i)}<span class="lbl">${esc(l)}</span><span class="slbl">${esc(SHORT[k]||l)}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`
     :`<a href="#${k}" class="${r===k?'active':''}" title="${esc(l)}" aria-label="${esc(l)}">${ic(i)}<span class="lbl">${esc(l)}</span><span class="slbl">${esc(SHORT[k]||l)}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`;
   const col=sideCollapsed();
   $('#app').innerHTML=`<div class="app${col?' collapsed':''}">
@@ -1765,11 +1765,11 @@ function render(){
 }
 const meInitials=(u)=>u.email?P.initials(String(u.email).split('@')[0]):P.initials(u.name);
 const acctSub=(u)=>[u.role==='master'?'Proview master':u.rawRole==='owner'?'Owner':P.ROLES[u.role], curOrg()?orgName(curOrg()):visibleOrgs().length===1?visibleOrgs()[0].name:''].filter(Boolean).join(' · ');
-// the master inside a customer's business: a small, clear bar above every page, with the way back to the portal
+// the master inside a location's business: a small, clear bar above every page, with the way back to the portal
 function masterBar(){ const n=orgName((visibleOrgs()[0]||{}).id);
   return `<div class="master-bar" role="status"><span>${ic('eye',16)}<b>Viewing ${esc(n)} as Proview</b><span class="hint"> · you’re acting as its Owner</span></span><a class="btn ghost sm" href="${LIC_URL}" rel="noopener">Back to licence portal</a></div>`; }
 function accountModal(u){
-  const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(meInitials(u))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?(masterNone()?'Proview master: open a customer from the licence portal (Open in Proview Label on the customer’s page).':'Proview master, inside '+esc(orgName((visibleOrgs()[0]||{}).id))+' as its Owner. Open another customer from the licence portal.'):'You can see '+mySiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
+  const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(meInitials(u))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?(masterNone()?'Proview master: open a location from the licence portal (Open in Proview Label on the location’s page).':'Proview master, inside '+esc(orgName((visibleOrgs()[0]||{}).id))+' as its Owner. Open another location from the licence portal.'):'You can see '+mySiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
     m.querySelector('#mo').onclick=()=>{closeModal();signOut();}; m.querySelector('#msync').onclick=()=>{closeModal();doSync(false);}; }
 // ---------- header tray: status dot (sync), search, chat, inbox and notifications ----------
 let SYNC_STATE='ok';
@@ -1875,8 +1875,8 @@ function applyWho(w){ WHO=w; S=P.get(); const op=w.master?openOrgId():null; S.or
 // locked = suspended or no location licensed. Pages work per location: siteState / siteLockMsg below.
 const orgState=(o)=>Cloud.orgState?Cloud.orgState(o):(o&&o.suspended?'suspended':'active');
 const lockMsgOf=(o)=>Cloud.lockMsg?Cloud.lockMsg(o):null;
-// LIC_URL (the licence portal) is for the MASTER's links only ("Open a customer from the licence portal", "Back to licence portal").
-// Customers never see it: they buy with Stripe (buyHtml below) or call Proview.
+// LIC_URL (the licence portal) is for the MASTER's links only ("Open a location from the licence portal", "Back to licence portal").
+// Owners never see it: they buy with Stripe (buyHtml below) or call Proview.
 const LIC_URL=Cloud.LICENCE_URL||'https://license.proviewcrm.co.uk', SUP=Cloud.SUPPORT||{phone:'020 8935 5495',email:'info@proviewtechgroup.co.uk'};
 const supHtml=()=>`<a href="tel:${SUP.phone.replace(/\s/g,'')}">${esc(SUP.phone)}</a> · <a href="mailto:${esc(SUP.email)}">${esc(SUP.email)}</a>`;
 const contactHtml=()=>`Call Proview on ${supHtml()}.`;
@@ -2006,7 +2006,7 @@ async function boot(fresh,newOrg){
       return signOut(NO_ACCESS); }
     TRIAL_SETUP=false;
     // a different person on this device: drop everyone else's cached businesses first
-    // the master's cache is per business opened (each tab can hold another customer); everyone else: per person
+    // the master's cache is per business opened (each tab can hold another location); everyone else: per person
     const store='cloud:'+u.id+(w.master?':'+(openOrgId()||'none'):'');
     if(!w.master) forgetCaches(store);
     P.useStore(store,{blank:true}); applyWho(w);
@@ -2126,7 +2126,7 @@ VIEWS.overview=(el)=>{
     <div class="sitegrid">${P.live('sites').filter(x=>allowedSiteIds().includes(x.id)).sort((a,b)=>siteStats(b.id).expired-siteStats(a.id).expired||a.name.localeCompare(b.name)).map(x=>{const st=siteStats(x.id);return `<button class="sc" data-site="${x.id}"><div class="t"><b>${esc(x.name)}</b>${siteLocked(x.id)?siteTag(x.id):st.expired?`<span class="tag bad">${st.expired} expired</span>`:st.soon?`<span class="tag warn">${st.soon} due</span>`:'<span class="tag ok">All good</span>'}</div><div class="meta"><span class="dot" style="background:${st.online?'#12a150':'#8b8b95'}"></span>${st.devices} device${st.devices!==1?'s':''} · ${st.lastSync?'synced '+P.fmtDate(st.lastSync,true):'never synced'}${st.low?' · <span style="color:#d92d20">'+st.low+' low on labels</span>':''}</div><div class="nums"><div><span>${st.today}</span>labels today</div><div><span>${st.soon}</span>due 24 hrs</div><div><span>${P.money(st.waste7)}</span>waste 7d</div></div><div class="go">Open location →</div></button>`;}).join('')}</div></div>`:'';
   el.innerHTML=`<div class="ph keep"><div class="head-chips"><span class="chip">${siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):siteFilter==='all'?'Your locations':esc(siteName(siteFilter))}</span><span class="chip">${P.fmtDay(new Date())} ${P.fmtDate(new Date())}</span>${multi?`<span class="chip">${allowedSiteIds().length} locations combined</span>`:''}${(()=>{ const v=!multi&&siteInView(); if(!v) return ''; const on=siteStats(v.id).online; return `<span class="chip${on?' ok':''}">${on?'<span class="chip-dot"></span>Devices online':'Devices offline'}</span>`; })()}</div></div><div class="btns"><a class="btn ghost" href="#analyser">Menu analyser</a><a class="btn" href="#products">+ Add product</a></div></div>
   ${expired?`<div class="banner">${ic('clock',20)}<div><b>${expired} expired item${expired!==1?'s':''} still marked active</b><span class="hint">Mark each as used or wasted so the expiry log stays accurate.</span></div><div class="sp"></div><a class="btn ghost sm" href="#expiry">Review</a></div>`:''}
-  ${!allowedSiteIds().length?`<div class="card" style="text-align:center;padding:34px 20px"><h3 style="font-size:18px">Add your first location</h3><p class="hint" style="max-width:520px;margin:8px auto 16px">Add a kitchen, then connect a handheld to it (Menu → Settings → Connect to Proview Label on the device).</p><a class="btn" href="#devices">+ Add location</a></div>`:''}
+  ${!allowedSiteIds().length?`<div class="card" style="text-align:center;padding:34px 20px"><h3 style="font-size:18px">No location yet</h3><p class="hint" style="max-width:520px;margin:8px auto 16px">Locations are set up by Proview. Call Proview to add a location or to link it with another one.</p></div>`:''}
   ${sitesHtml}
   <div class="kpis">
     <div class="kpi"><div class="l">Labels printed today</div><div class="v">${lToday}</div><div class="s">${l7} in the last 7 days</div></div>
@@ -2417,12 +2417,12 @@ VIEWS.orders=(el)=>{
 };
 
 // ---------- the master, signed in without a business (MASTER_OPEN_SPEC.md) ----------
-// No master view: customers are opened from the licence portal (Open in Proview Label), one business per tab.
+// No master view: locations are opened from the licence portal (Open in Proview Label), one business per tab.
 // Nothing of any business is loaded here.
 VIEWS.portal=(el)=>{
   el.innerHTML=`<div class="card" style="max-width:560px;margin:48px auto;text-align:center;padding:36px 28px"><div style="display:inline-grid;place-items:center;width:56px;height:56px;border-radius:16px;background:var(--pri-l);color:var(--pri);margin-bottom:14px">${ic('pvloc',26)}</div>
-    <h1 style="font-size:22px;margin:0 0 8px">Open a customer from the licence portal</h1>
-    <p class="hint" style="max-width:440px;margin:0 auto 20px;font-size:14.5px">As Proview master you work inside one customer’s business at a time. Open the customer in the licence portal and press <b>Open in Proview Label</b>. New businesses are added there too (New customer).</p>
+    <h1 style="font-size:22px;margin:0 0 8px">Open a location from the licence portal</h1>
+    <p class="hint" style="max-width:440px;margin:0 auto 20px;font-size:14.5px">As Proview master you work inside one location at a time (or a group of linked locations). Open the location in the licence portal and press <b>Open in Proview Label</b>. New locations are added and linked there too (New location, Link with another location).</p>
     <a class="btn" id="toPortal" href="${LIC_URL}" rel="noopener">Open licence portal</a></div>`;
 };
 
@@ -2458,11 +2458,10 @@ function licenceForm(siteId){ const x=P.byId('sites',siteId), o=orgOfSite(siteId
 }
 VIEWS.devices=(el)=>{
   const ss=P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(siteFilter==='all'||x.id===siteFilter||siteFilter==='org:'+x.orgId)), ds=bySite(P.live('devices'));
-  const canAddSite=scopeOrgIds().some(o=>['master','owner','admin'].includes(orgRole(o)));
   const orgs=visibleOrgs().filter(o=>scopeOrgIds().includes(o.id)); // the open business only
-  el.innerHTML=`<div class="ph"><div><h1>Locations & devices</h1><p>${isMaster()?esc(orgName(curOrg()))+': its kitchens and the handhelds running Proview Label.':'Your kitchens and the handhelds running Proview Label.'}</p></div><div class="btns">${canAddSite?'<button class="btn ghost" id="addS">+ Add location</button>':''}<button class="btn" id="pairB">+ Pair handheld</button></div></div>
-  ${isMaster()?`<div class="card"><h3>Business</h3><div class="sub">The business you're working in. New businesses are added in the licence portal (New customer).</div><table><thead><tr><th>Business</th><th>Locations</th><th>Devices</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${orgs.map(o=>{ const os=P.live('sites').filter(x=>x.orgId===o.id); return `<tr><td><b>${esc(o.name)}</b>${orgState(o)!=='active'?' '+stateTag(o):''}</td><td>${os.length}</td><td>${P.live('devices').filter(d=>os.some(x=>x.id===d.siteId)).length}</td><td>${P.live('labels').filter(l=>os.some(x=>x.id===l.siteId)&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap"><button class="icbtn" data-eo="${o.id}" title="Rename">✎</button></td></tr>`; }).join('')||'<tr><td colspan="5" class="empty">No business open.</td></tr>'}</tbody></table></div>`:''}
-  <div class="card"><h3>Locations</h3><table><thead><tr><th>Location</th>${multiOrg()?'<th>Business</th>':''}<th>Address (printed on sale labels)</th><th>Device staff</th><th>Labels, last 7 days</th><th>Licence</th><th></th></tr></thead><tbody>${ss.map(s=>`<tr data-lic="${esc(s.id)}"><td><b>${esc(s.name)}</b><div class="hint">${esc(s.region||'')}</div></td>${multiOrg()?`<td class="hint">${esc(orgName(s.orgId))}</td>`:''}<td>${esc(s.address||'')}</td><td>${P.live('users').filter(u=>(u.siteIds||[]).includes(s.id)).length}</td><td>${P.live('labels').filter(l=>l.siteId===s.id&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="white-space:nowrap">${siteTag(s.id)}${isMaster()?` <button class="btn ghost sm" data-licf="${s.id}">Licence…</button>`:canBuy(s.id)&&(siteLocked(s.id)||(siteLic(s.id)||{}).licence_type!=='lifetime')?` <button class="btn sm ${siteLocked(s.id)?'':'ghost'}" data-buy="${s.id}">${siteState(s.id)==='nolicence'?'Buy online':'Renew online'}</button>`:''}</td><td style="text-align:right;white-space:nowrap">${siteFilter!==s.id&&allowedSiteIds().length>1?`<button class="btn ghost sm" data-open="${s.id}">Open</button> `:''}${['master','owner','admin'].includes(orgRole(s.orgId))?`<button class="icbtn" data-es="${s.id}">✎</button>`:''}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No locations yet.</td></tr>'}</tbody></table><p class="hint" style="margin:10px 0 0">Each location needs its own licence. A new location starts with no licence${isMaster()?'':': buy one here once it’s added'}.</p></div>
+  el.innerHTML=`<div class="ph"><div><h1>Locations & devices</h1><p>${isMaster()?esc(orgName(curOrg()))+': its kitchens and the handhelds running Proview Label.':'Your kitchens and the handhelds running Proview Label.'}</p></div><div class="btns"><button class="btn" id="pairB">+ Pair handheld</button></div></div>
+  ${isMaster()?`<div class="card"><h3>Business</h3><div class="sub">The location (or linked locations) you're working in. New locations are added, linked and unlinked in the licence portal.</div><table><thead><tr><th>Business</th><th>Locations</th><th>Devices</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${orgs.map(o=>{ const os=P.live('sites').filter(x=>x.orgId===o.id); return `<tr><td><b>${esc(o.name)}</b>${orgState(o)!=='active'?' '+stateTag(o):''}</td><td>${os.length}</td><td>${P.live('devices').filter(d=>os.some(x=>x.id===d.siteId)).length}</td><td>${P.live('labels').filter(l=>os.some(x=>x.id===l.siteId)&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap"><button class="icbtn" data-eo="${o.id}" title="Rename">✎</button></td></tr>`; }).join('')||'<tr><td colspan="5" class="empty">No business open.</td></tr>'}</tbody></table></div>`:''}
+  <div class="card"><h3>Locations</h3><table><thead><tr><th>Location</th>${multiOrg()?'<th>Business</th>':''}<th>Address (printed on sale labels)</th><th>Device staff</th><th>Labels, last 7 days</th><th>Licence</th><th></th></tr></thead><tbody>${ss.map(s=>`<tr data-lic="${esc(s.id)}"><td><b>${esc(s.name)}</b><div class="hint">${esc(s.region||'')}</div></td>${multiOrg()?`<td class="hint">${esc(orgName(s.orgId))}</td>`:''}<td>${esc(s.address||'')}</td><td>${P.live('users').filter(u=>(u.siteIds||[]).includes(s.id)).length}</td><td>${P.live('labels').filter(l=>l.siteId===s.id&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="white-space:nowrap">${siteTag(s.id)}${isMaster()?` <button class="btn ghost sm" data-licf="${s.id}">Licence…</button>`:canBuy(s.id)&&(siteLocked(s.id)||(siteLic(s.id)||{}).licence_type!=='lifetime')?` <button class="btn sm ${siteLocked(s.id)?'':'ghost'}" data-buy="${s.id}">${siteState(s.id)==='nolicence'?'Buy online':'Renew online'}</button>`:''}</td><td style="text-align:right;white-space:nowrap">${siteFilter!==s.id&&allowedSiteIds().length>1?`<button class="btn ghost sm" data-open="${s.id}">Open</button> `:''}${['master','owner','admin'].includes(orgRole(s.orgId))?`<button class="icbtn" data-es="${s.id}">✎</button>`:''}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No locations yet.</td></tr>'}</tbody></table><p class="hint" style="margin:10px 0 0">Each location needs its own licence. ${isMaster()?'Locations are added and linked in the licence portal (New location, Link with another location).':'Linked locations switch from the location dropdown. To add a location or link one with another, call Proview.'}</p></div>
   <div class="card"><h3>Handhelds</h3><div class="sub">To add one, open Proview Label on the handheld: it shows a pairing code. Tap <b>+ Pair handheld</b> and enter it, or scan the QR code on the handheld with your phone. <b>Mode</b> sets what staff see: Easy (big product buttons, print only) or Detailed (logs, bulk print, wastage, label orders).</div><div id="devs"><div class="hint">Loading…</div></div></div>`;
   // handhelds: paired list from the server (live) or the sample devices (demo), with battery etc. from their sync records
   const devOrgs=scopeOrgIds();
@@ -2499,10 +2498,9 @@ VIEWS.devices=(el)=>{
         audit('updated','Handheld',nm+' ('+(md==='detailed'?'Detailed':'Easy')+')',d.orgId); closeModal(); toast('Saved'); render(); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } }; };
   el.querySelector('#pairB').onclick=()=>withOrg(o=>pairForm(o));
   if(PENDING_PAIR){ const c=PENDING_PAIR; PENDING_PAIR=null; withOrg(o=>pairForm(o,c)); }
-  const siteForm=(s,orgId)=>{ const isNew=!s; s=s||{id:'site_'+P.uid(''),orgId,name:'',address:'',region:''}; const m=modal((isNew?'Add location':'Edit location')+' · '+orgName(s.orgId),`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(s.name)}"></div><div class="fld"><label>Address</label><input class="inp" id="a" value="${esc(s.address||'')}"></div><div class="fld"><label>Area</label><input class="inp" id="g" value="${esc(s.region||'')}" placeholder="e.g. North London"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
-    m.querySelector('#sv').onclick=()=>{ s.name=m.querySelector('#n').value.trim(); s.address=m.querySelector('#a').value.trim(); s.region=m.querySelector('#g').value.trim(); if(!s.name) return toast('Enter a name'); P.upsert('sites',s); audit(isNew?'created':'updated','Site',s.name,s.orgId); closeModal(); render();
-      if(isNew) toast(s.name+' added. It starts with no licence: '+(isMaster()?'give it one with Licence…':'buy one with Buy online')+'. Each location needs its own licence.'); }; };
-  if(canAddSite&&el.querySelector('#addS')) el.querySelector('#addS').onclick=()=>withOrg(o=>{ if(!['master','owner','admin'].includes(orgRole(o))) return toast('Only an owner or admin can add locations.'); siteForm(null,o); });
+  // edit a location's details only: locations are added, linked and unlinked by Proview in the licence portal
+  const siteForm=(s)=>{ if(!s||!s.id) return; const m=modal('Edit location · '+orgName(s.orgId),`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(s.name)}"></div><div class="fld"><label>Address</label><input class="inp" id="a" value="${esc(s.address||'')}"></div><div class="fld"><label>Area</label><input class="inp" id="g" value="${esc(s.region||'')}" placeholder="e.g. North London"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
+    m.querySelector('#sv').onclick=()=>{ s.name=m.querySelector('#n').value.trim(); s.address=m.querySelector('#a').value.trim(); s.region=m.querySelector('#g').value.trim(); if(!s.name) return toast('Enter a name'); P.upsert('sites',s); audit('updated','Site',s.name,s.orgId); closeModal(); render(); }; };
   el.querySelectorAll('[data-es]').forEach(b=>b.onclick=()=>siteForm({...P.byId('sites',b.dataset.es)}));
   el.querySelectorAll('[data-licf]').forEach(b=>b.onclick=()=>licenceForm(b.dataset.licf));
   el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ setSite(b.dataset.open); location.hash='overview'; });
