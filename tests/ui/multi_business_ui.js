@@ -197,6 +197,15 @@ const plain = async (p, who) => {
     ok('master: This location has the select, Licence… and Rename business', !!(await p.$('#tlSite')) && !!(await p.$('#thisLoc [data-licf]')) && !!(await p.$('#thisLoc [data-eo]')) && !!(await p.$('#tlSave')));
   });
 
+  // business wording (owner, 12 Nov 2026: the licence portal says Businesses)
+  await run(browser, { name: 'wording master', email: MASTER, master: true, url: '#overview' }, async (p) => {
+    const t = await p.evaluate(() => document.body.innerText);
+    ok('master direct: "Open a business from the licence portal", businesses added and linked there', /Open a business from the licence portal/.test(t) && /Businesses are added and linked there too \(New business, Link with another business\)/.test(t) && !/Open a location/.test(t), t.slice(0, 300));
+  });
+  await run(browser, { name: 'wording owner', email: ONE, orgs: [org('org_a', 'owner')], url: '#settings' }, async (p) => {
+    ok('owner: This location says businesses are set up by Proview', /Businesses are set up and linked by Proview/.test(await text(p)) && /This location/.test(await text(p)));
+  });
+
   await browser.close(); srv.close();
   console.log(results.join('\n'));
   console.log(`\n${results.filter((r) => r.startsWith('PASS')).length} passed, ${results.filter((r) => r.startsWith('FAIL')).length} failed`);

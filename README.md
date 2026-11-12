@@ -10,7 +10,7 @@ Food labelling for UK kitchens, part of the Proview CRM family (Bookings, Employ
 
 | Who | Signs in with | Sees |
 |---|---|---|
-| **Master** (Proview) | Opens a location from the licence portal (**Open in Proview Label** on the location's page) | One business at a time, exactly as its Owner sees it, with a "Viewing <Business> as Proview" bar. Signed in any other way, the master only sees "Open a location from the licence portal". No master view, no Add business or Add location here. |
+| **Master** (Proview) | Opens a business from the licence portal (**Open in Proview Label** on the business’s page) | One business at a time, exactly as its Owner sees it, with a "Viewing <Business> as Proview" bar. Signed in any other way, the master only sees "Open a business from the licence portal". No master view, no Add business or Add location here. |
 | **Owner / Admin** | Email or Proview account | Their whole business: all its sites, menu, staff and settings. |
 | **Manager** | Email or Proview account | Only their own sites. No Settings page, and can't add sites or logins. |
 | **Device staff** | 4-digit PIN on the handheld | Print, scan, log wastage. A device manager can also edit products. |
@@ -23,17 +23,17 @@ Food labelling for UK kitchens, part of the Proview CRM family (Bookings, Employ
   3. Proview Label's `sso-login` function (`supabase/functions/sso-login`) checks the token and signs them in.
 
 ### Adding a location
-1. In the licence portal: **New location** (the hub's `add_business`). Enter the name, plus the owner's name and email. It makes one business with one location.
+1. In the licence portal: **New business** (the hub's `add_business`). Enter the name, plus the owner's name and email. It makes one business with one location.
    To work inside it, open the location in the portal and press **Open in Proview Label** (sso-assert adds a signed
    `biz` claim; `sso-login` honours it only for the master and replies with `open`; the back-office then sends that
    business in the `x-pl-org` header and keeps it for the tab in sessionStorage `pv_master_open`).
-2. The owner signs in, either with "Sign in with Proview account" or "Create a login" using that email. They add their menu, back-office logins and device staff. Owners can't add or delete locations (migration 011): Proview adds them (New location) and links them in the licence portal.
+2. The owner signs in, either with "Sign in with Proview account" or "Create a login" using that email. They add their menu, back-office logins and device staff. Owners can't add or delete locations (migration 011): Proview adds them (New business) and links them in the licence portal.
 3. On each handheld: open Proview Label. It shows a 6-character pairing code and a QR code. In the back-office go to **Handhelds → + Pair handheld**, enter the code (or scan the QR code with a phone, which opens that dialog with the code filled in), and pick the location, a name and **Easy** or **Detailed** mode. The handheld opens a few seconds later. Products and settings come down to the device. Labels, expiry and wastage go up to the server.
    - No email or password on the handheld. Pairing makes a login used only by that handheld (`supabase/functions/pl-device-pair`, migration `005_device_pairing.sql`). It can only see and change its own location.
    - Mode, name and location can be changed later from the same page; the handheld picks them up within a minute. **Remove** cuts its access at once and it shows a new pairing code.
 
 ### Linking locations (migration 011)
-- Only the master links locations, in the licence portal (**Link with another location…**). The portal calls `hub_call(token, 'link', {into, from})`: business `from` is merged into `into` (locations, menu, staff, labels, wastage, orders, handhelds, licences, members; a person in both keeps the higher role) and `from` is deleted. Owners and managers of either then see both locations together in that one business.
+- Only the master links locations, in the licence portal (**Link with another business…**). The portal calls `hub_call(token, 'link', {into, from})`: business `from` is merged into `into` (locations, menu, staff, labels, wastage, orders, handhelds, licences, members; a person in both keeps the higher role) and `from` is deleted. Owners and managers of either then see both locations together in that one business.
 - **Unlink** (`hub_call(token, 'unlink', {account, site})`) moves one location out into a new business of its own, named after the location: its records, handhelds and licence move, the menu is copied, members are copied. The same action splits a business that already has several locations.
 - Licences stay per location and move with it. Both actions are logged in `hub_private.location_links` and are safe to repeat.
 

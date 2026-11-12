@@ -39,7 +39,7 @@
     return t || 'Something went wrong. Please try again.';
   };
 
-  const LICENCE_URL = 'https://license.proviewcrm.co.uk';   // licence portal: the master's links only (Open a location, Back to licence portal)
+  const LICENCE_URL = 'https://license.proviewcrm.co.uk';   // licence portal: the master's links only (Open a business, Back to licence portal)
   const OPEN_KEY = 'pv_master_open';   // sessionStorage: the business the master opened from the licence portal (MASTER_OPEN_PROTOCOL.md)
   const SUPPORT = { phone: '020 8935 5495', email: 'info@proviewtechgroup.co.uk' };
   // Licence state of a business from whoami: 'suspended', 'nolicence' (never licensed: every new business starts
@@ -84,7 +84,7 @@
     // From the licence portal ("Open in Proview Label") the master's reply also names the business to open (j.open,
     // checked by sso-login against the signed biz claim): it is kept for this tab only (sessionStorage), so a reload
     // stays in that business and another tab can hold another location. A hand-off without it (an old link, or the
-    // dashboard) forgets it: the master then sees "Open a location from the licence portal". An open= in the address
+    // dashboard) forgets it: the master then sees "Open a business from the licence portal". An open= in the address
     // itself is never trusted; it is only removed.
     async consumeSsoHash() {
       const m = (g.location.hash || '').match(/[#&]pv_sso=([^&]+)/);

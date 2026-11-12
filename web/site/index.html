@@ -1094,7 +1094,7 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     return t || 'Something went wrong. Please try again.';
   };
 
-  const LICENCE_URL = 'https://license.proviewcrm.co.uk';   // licence portal: the master's links only (Open a location, Back to licence portal)
+  const LICENCE_URL = 'https://license.proviewcrm.co.uk';   // licence portal: the master's links only (Open a business, Back to licence portal)
   const OPEN_KEY = 'pv_master_open';   // sessionStorage: the business the master opened from the licence portal (MASTER_OPEN_PROTOCOL.md)
   const SUPPORT = { phone: '020 8935 5495', email: 'info@proviewtechgroup.co.uk' };
   // Licence state of a business from whoami: 'suspended', 'nolicence' (never licensed: every new business starts
@@ -1139,7 +1139,7 @@ window.PVL_CONFIG={"SUPABASE_URL":"https://fiqoirnlmhjzicvktdwa.supabase.co","SU
     // From the licence portal ("Open in Proview Label") the master's reply also names the business to open (j.open,
     // checked by sso-login against the signed biz claim): it is kept for this tab only (sessionStorage), so a reload
     // stays in that business and another tab can hold another location. A hand-off without it (an old link, or the
-    // dashboard) forgets it: the master then sees "Open a location from the licence portal". An open= in the address
+    // dashboard) forgets it: the master then sees "Open a business from the licence portal". An open= in the address
     // itself is never trusted; it is only removed.
     async consumeSsoHash() {
       const m = (g.location.hash || '').match(/[#&]pv_sso=([^&]+)/);
@@ -1600,7 +1600,7 @@ function me(){
 }
 const isMaster=()=>!!me()&&me().role==='master';
 const visibleOrgs=()=>(S.orgs||[]).filter(o=>orgRole(o.id));
-// the master signed in without a business from the licence portal: only the "Open a location" page, no business data
+// the master signed in without a business from the licence portal: only the "Open a business" page, no business data
 const masterNone=()=>isMaster()&&!visibleOrgs().length;
 // every site this person may open (the dropdown and access checks)
 function mySiteIds(){
@@ -1639,8 +1639,8 @@ function landSite(v){ if(isMaster()||visibleOrgs().length<2) return v; const bz=
 // the location choice is remembered per person, by email (the master: per business opened)
 const siteKey=()=>'pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId)+(isMaster()?':'+openOrgId():'');
 function setSite(id){ siteFilter=id; lsSet(siteKey(),id); render(); }
-// the master without a business: every menu page is greyed out ("Open a location from the licence portal")
-function openFromPortalFirst(){ toast('Open a location from the licence portal first'); }
+// the master without a business: every menu page is greyed out ("Open a business from the licence portal")
+function openFromPortalFirst(){ toast('Open a business from the licence portal first'); }
 function goPage(k){ if(masterNone()) return openFromPortalFirst(); location.hash=k; }
 function pickSite(id){ setSite(id); }
 // A business must be chosen before creating catalogue items, sites or staff
@@ -1751,7 +1751,7 @@ function render(){
   const r=route(); const u=me(); const off=masterNone();
   const badge={expiry:expiredCount(),orders:bySite(P.live('orders')).filter(o=>o.status==='pending').length,products:byOrg(P.live('products')).filter(p=>p.approved===false).length};
   const title=r==='portal'?'Proview Label':(NAV.flatMap(([,i])=>i).find(x=>x[0]===r)||[])[1]||'Dashboard';
-  const link=([k,l,i])=>off?`<a class="off" role="link" tabindex="0" aria-disabled="true" data-off="${k}" title="${esc(l)} – open a location from the licence portal first" aria-label="${esc(l)} – open a location from the licence portal first">${ic(i)}<span class="lbl">${esc(l)}</span><span class="slbl">${esc(SHORT[k]||l)}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`
+  const link=([k,l,i])=>off?`<a class="off" role="link" tabindex="0" aria-disabled="true" data-off="${k}" title="${esc(l)} – open a business from the licence portal first" aria-label="${esc(l)} – open a business from the licence portal first">${ic(i)}<span class="lbl">${esc(l)}</span><span class="slbl">${esc(SHORT[k]||l)}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`
     :`<a href="#${k}" class="${r===k?'active':''}" title="${esc(l)}" aria-label="${esc(l)}">${ic(i)}<span class="lbl">${esc(l)}</span><span class="slbl">${esc(SHORT[k]||l)}</span>${badge[k]?`<span class="cnt ${k==='expiry'?'red':''}">${badge[k]}</span>`:''}</a>`;
   const col=sideCollapsed();
   $('#app').innerHTML=`<div class="app${col?' collapsed':''}">
@@ -1789,7 +1789,7 @@ const acctSub=(u)=>[u.role==='master'?'Proview master':u.rawRole==='owner'?'Owne
 function masterBar(){ const n=orgName((visibleOrgs()[0]||{}).id);
   return `<div class="master-bar" role="status"><span>${ic('eye',16)}<b>Viewing ${esc(n)} as Proview</b><span class="hint"> · you’re acting as its Owner</span></span><a class="btn ghost sm" href="${LIC_URL}" rel="noopener">Back to licence portal</a></div>`; }
 function accountModal(u){
-  const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(meInitials(u))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?(masterNone()?'Proview master: open a location from the licence portal (Open in Proview Label on the location’s page).':'Proview master, inside '+esc(orgName((visibleOrgs()[0]||{}).id))+' as its Owner. Open another location from the licence portal.'):'You can see '+mySiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
+  const m=modal('Your account',`<div class="row" style="gap:14px"><div class="av ${u.role==='master'?'master':''}" style="width:48px;height:48px;font-size:16px">${esc(meInitials(u))}</div><div><b style="font-size:16px">${esc(u.name)}</b><div class="hint">${esc(u.email||'')} · ${u.rawRole==='owner'?'Owner':P.ROLES[u.role]}</div></div></div><p class="hint" style="margin-top:14px">${u.role==='master'?(masterNone()?'Proview master: open a business from the licence portal (Open in Proview Label on the business’s page).':'Proview master, inside '+esc(orgName((visibleOrgs()[0]||{}).id))+' as its Owner. Open another business from the licence portal.'):'You can see '+mySiteIds().map(siteName).map(esc).join(', ')+'.'}</p>${CLOUD?'<p class="hint">Signed in with your Proview Label login. The same email works with “Sign in with Proview account”. Changes sync to every device automatically; Sync now fetches the latest straight away.</p>':'<p class="hint">Demo mode: sample data saved in this browser only.</p>'}`,`<button class="btn ghost" data-x>Close</button><button class="btn ghost" id="msync">${ic('sync',15)} Sync now</button><button class="btn" id="mo">Sign out</button>`);
     m.querySelector('#mo').onclick=()=>{closeModal();signOut();}; m.querySelector('#msync').onclick=()=>{closeModal();doSync(false);}; }
 // ---------- header tray: status dot (sync), search, chat, inbox and notifications ----------
 let SYNC_STATE='ok';
@@ -1895,7 +1895,7 @@ function applyWho(w){ WHO=w; S=P.get(); const op=w.master?openOrgId():null; S.or
 // locked = suspended or no location licensed. Pages work per location: siteState / siteLockMsg below.
 const orgState=(o)=>Cloud.orgState?Cloud.orgState(o):(o&&o.suspended?'suspended':'active');
 const lockMsgOf=(o)=>Cloud.lockMsg?Cloud.lockMsg(o):null;
-// LIC_URL (the licence portal) is for the MASTER's links only ("Open a location from the licence portal", "Back to licence portal").
+// LIC_URL (the licence portal) is for the MASTER's links only ("Open a business from the licence portal", "Back to licence portal").
 // Owners never see it: they buy with Stripe (buyHtml below) or call Proview.
 const LIC_URL=Cloud.LICENCE_URL||'https://license.proviewcrm.co.uk', SUP=Cloud.SUPPORT||{phone:'020 8935 5495',email:'info@proviewtechgroup.co.uk'};
 const supHtml=()=>`<a href="tel:${SUP.phone.replace(/\s/g,'')}">${esc(SUP.phone)}</a> · <a href="mailto:${esc(SUP.email)}">${esc(SUP.email)}</a>`;
@@ -2147,7 +2147,7 @@ VIEWS.overview=(el)=>{
     <div class="sitegrid">${P.live('sites').filter(x=>allowedSiteIds().includes(x.id)).sort((a,b)=>siteStats(b.id).expired-siteStats(a.id).expired||a.name.localeCompare(b.name)).map(x=>{const st=siteStats(x.id);return `<button class="sc" data-site="${x.id}"><div class="t"><b>${esc(x.name)}</b>${siteLocked(x.id)?siteTag(x.id):st.expired?`<span class="tag bad">${st.expired} expired</span>`:st.soon?`<span class="tag warn">${st.soon} due</span>`:'<span class="tag ok">All good</span>'}</div><div class="meta"><span class="dot" style="background:${st.online?'#12a150':'#8b8b95'}"></span>${st.devices} device${st.devices!==1?'s':''} · ${st.lastSync?'synced '+P.fmtDate(st.lastSync,true):'never synced'}${st.low?' · <span style="color:#d92d20">'+st.low+' low on labels</span>':''}</div><div class="nums"><div><span>${st.today}</span>labels today</div><div><span>${st.soon}</span>due 24 hrs</div><div><span>${P.money(st.waste7)}</span>waste 7d</div></div><div class="go">Open location →</div></button>`;}).join('')}</div></div>`:'';
   el.innerHTML=`<div class="ph keep"><div class="head-chips"><span class="chip">${siteFilter.startsWith('org:')?esc(orgName(siteFilter.slice(4))):siteFilter==='all'?'Your locations':esc(siteName(siteFilter))}</span><span class="chip">${P.fmtDay(new Date())} ${P.fmtDate(new Date())}</span>${multi?`<span class="chip">${allowedSiteIds().length} locations combined</span>`:''}${(()=>{ const v=!multi&&siteInView(); if(!v) return ''; const on=siteStats(v.id).online; return `<span class="chip${on?' ok':''}">${on?'<span class="chip-dot"></span>Devices online':'Devices offline'}</span>`; })()}</div></div><div class="btns"><a class="btn ghost" href="#analyser">Menu analyser</a><a class="btn" href="#products">+ Add product</a></div></div>
   ${expired?`<div class="banner">${ic('clock',20)}<div><b>${expired} expired item${expired!==1?'s':''} still marked active</b><span class="hint">Mark each as used or wasted so the expiry log stays accurate.</span></div><div class="sp"></div><a class="btn ghost sm" href="#expiry">Review</a></div>`:''}
-  ${!allowedSiteIds().length?`<div class="card" style="text-align:center;padding:34px 20px"><h3 style="font-size:18px">No location yet</h3><p class="hint" style="max-width:520px;margin:8px auto 16px">Locations are set up by Proview. Call Proview to add a location or to link it with another one.</p></div>`:''}
+  ${!allowedSiteIds().length?`<div class="card" style="text-align:center;padding:34px 20px"><h3 style="font-size:18px">No location yet</h3><p class="hint" style="max-width:520px;margin:8px auto 16px">Businesses are set up by Proview. Call Proview to add a location or to link it with another business.</p></div>`:''}
   ${sitesHtml}
   <div class="kpis">
     <div class="kpi"><div class="l">Labels printed today</div><div class="v">${lToday}</div><div class="s">${l7} in the last 7 days</div></div>
@@ -2442,8 +2442,8 @@ VIEWS.orders=(el)=>{
 // Nothing of any business is loaded here.
 VIEWS.portal=(el)=>{
   el.innerHTML=`<div class="card" style="max-width:560px;margin:48px auto;text-align:center;padding:36px 28px"><div style="display:inline-grid;place-items:center;width:56px;height:56px;border-radius:16px;background:var(--pri-l);color:var(--pri);margin-bottom:14px">${ic('pvloc',26)}</div>
-    <h1 style="font-size:22px;margin:0 0 8px">Open a location from the licence portal</h1>
-    <p class="hint" style="max-width:440px;margin:0 auto 20px;font-size:14.5px">As Proview master you work inside one location at a time (or a group of linked locations). Open the location in the licence portal and press <b>Open in Proview Label</b>. New locations are added and linked there too (New location, Link with another location).</p>
+    <h1 style="font-size:22px;margin:0 0 8px">Open a business from the licence portal</h1>
+    <p class="hint" style="max-width:440px;margin:0 auto 20px;font-size:14.5px">As Proview master you work inside one business at a time. Open the business in the licence portal and press <b>Open in Proview Label</b>. Businesses are added and linked there too (New business, Link with another business).</p>
     <a class="btn" id="toPortal" href="${LIC_URL}" rel="noopener">Open licence portal</a></div>`;
 };
 
@@ -2610,12 +2610,12 @@ function thisLocationCard(){
   if(!x) return '';
   const ed=['master','owner','admin'].includes(orgRole(x.orgId)), dis=ed?'':' disabled', lic=siteLic(x.id)||{};
   const buy=isMaster()?`<button class="btn ghost sm" data-licf="${esc(x.id)}">Licence…</button>`:canBuy(x.id)&&(siteLocked(x.id)||lic.licence_type!=='lifetime')?`<button class="btn sm ${siteLocked(x.id)?'':'ghost'}" data-buy="${esc(x.id)}">${siteState(x.id)==='nolicence'?'Buy online':'Renew online'}</button>`:'';
-  return `<div class="card" id="thisLoc" style="margin-top:16px"><h3>This location · ${esc(x.name)}</h3><div class="sub">Locations are set up and linked by Proview. ${ed?'You can change this location’s details here.':'Ask your business owner to change these.'}</div>
+  return `<div class="card" id="thisLoc" style="margin-top:16px"><h3>This location · ${esc(x.name)}</h3><div class="sub">Businesses are set up and linked by Proview. ${ed?'You can change this location’s details here.':'Ask your business owner to change these.'}</div>
     <div class="g2"><div class="fld"><label for="tlName">Name</label><input class="inp" id="tlName" value="${esc(x.name)}"${dis}></div><div class="fld"><label for="tlArea">Area</label><input class="inp" id="tlArea" value="${esc(x.region||'')}" placeholder="e.g. North London"${dis}></div></div>
     <div class="fld"><label for="tlAddr">Address <span class="hint">printed on sale labels</span></label><input class="inp" id="tlAddr" value="${esc(x.address||'')}"${dis}></div>
     ${ed?'<div class="row" style="justify-content:flex-end"><button class="btn sm" id="tlSave">Save location</button></div>':''}
     <div class="setrow" id="tlLic"><div><b>Licence</b><span class="hint">${siteTag(x.id)} ${esc(siteLicText(x.id))} · each business needs its own licence</span></div>${buy}</div>
-    ${isMaster()?`<div class="setrow"><div><b>Business</b><span class="hint">${esc(orgName(x.orgId))} · linked and unlinked in the licence portal</span></div><button class="btn ghost sm" data-eo="${esc(x.orgId)}">Rename</button></div>`:''}</div>`;
+    ${isMaster()?`<div class="setrow"><div><b>Business</b><span class="hint">${esc(orgName(x.orgId))} · businesses are linked and unlinked in the licence portal</span></div><button class="btn ghost sm" data-eo="${esc(x.orgId)}">Rename</button></div>`:''}</div>`;
 }
 function bindThisLocation(el){
   const ts=el.querySelector('#tlSite'); if(ts) ts.onchange=()=>{ TL_SITE=ts.value; render(); };

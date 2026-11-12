@@ -84,18 +84,18 @@ const recordCalls = (st) => st.calls.filter((c) => c.includes('/rest/v1/pl_recor
   // 1. master, signed in directly (no business from the portal)
   let p = await run(browser, { name: 'master direct', email: MASTER, master: true, url: '#sites' }, async (p, st) => {
     const t = await text(p);
-    ok('master direct: "Open a location from the licence portal" page', /Open a location from the licence portal/.test(t), t.slice(0, 400));
+    ok('master direct: "Open a business from the licence portal" page', /Open a business from the licence portal/.test(t), t.slice(0, 400));
     ok('master direct: button to the licence portal', await p.$eval('#toPortal', (a) => a.href) === 'https://license.proviewcrm.co.uk/');
     ok('master direct: no business record requested', recordCalls(st).length === 0, recordCalls(st).join('\n'));
     const h = await html(p), s = await store(p);
     ok('master direct: no business name or data on the page', !/Burger Barn|Pizza Palace|Camden K|Leeds|Beef patty|Margherita/.test(h), (h.match(/.{80}(Burger Barn|Pizza Palace|Camden K|Leeds|Beef patty|Margherita).{80}/s)||[])[0]);
     ok('master direct: nothing of any business kept on the device', !/Burger Barn|Pizza Palace|Camden K|Leeds|Beef patty|Margherita/.test(s), s.slice(0, 300));
-    ok('master direct: no Locations page / Add business', !/Add business|All locations \(|Businesses/.test(t));
+    ok('master direct: no Locations page / Add business / Businesses list', !/Add business|All locations \(|^\s*Businesses\s*$|Businesses \(\d/m.test(t));
     ok('master direct: menu pages greyed out', await p.$$eval('.side .nav a', (a) => a.length > 0 && a.every((x) => x.classList.contains('off'))));
     ok('master direct: no location dropdown', !(await p.$('#sitePick')));
     await p.screenshot({ path: SHOTS + '/master-direct.png' });
     await p.click('.side .nav a.off'); await sleep(150);
-    ok('master direct: greyed page says open from the portal', /Open a location from the licence portal first/.test(await p.$eval('#toast', (e) => e.textContent)));
+    ok('master direct: greyed page says open from the portal', /Open a business from the licence portal first/.test(await p.$eval('#toast', (e) => e.textContent)));
   });
   await p.close();
 
@@ -148,12 +148,12 @@ const recordCalls = (st) => st.calls.filter((c) => c.includes('/rest/v1/pl_recor
   // 4. old link / dashboard: an SSO hand-off with no business -> the portal page again
   await run(browser, { name: 'master old link', page: p, email: MASTER, master: true, url: '#pv_sso=TOKEN3', ssoReply: { body: { token_hash: 'h3', email: MASTER } } }, async (p) => {
     const t = await text(p), h = await html(p);
-    ok('master old link: "Open a location from the licence portal"', /Open a location from the licence portal/.test(t));
+    ok('master old link: "Open a business from the licence portal"', /Open a business from the licence portal/.test(t));
     ok('master old link: no business shown', !/Burger Barn|Pizza Palace|Leeds|Camden/.test(h));
   });
   // 5. a business that is not the master's (sso-login said open, but whoami doesn't have it): portal page, nothing loaded
   await run(browser, { name: 'master unknown biz', page: p, email: MASTER, master: true, url: '#pv_sso=TOKEN4', ssoReply: { body: { token_hash: 'h4', email: MASTER, open: 'org_zzz' } } }, async (p, st) => {
-    ok('master unknown biz: portal page', /Open a location from the licence portal/.test(await text(p)));
+    ok('master unknown biz: portal page', /Open a business from the licence portal/.test(await text(p)));
   });
   await p.close();
 
@@ -190,7 +190,7 @@ const recordCalls = (st) => st.calls.filter((c) => c.includes('/rest/v1/pl_recor
   // 9. sso-login refuses (e.g. business gone): the message is shown on sign-in
   p = await run(browser, { name: 'sso refused', wait: 200, email: MASTER, master: true, url: '#pv_sso=BAD', ssoReply: { status: 404, body: { error: 'That business no longer exists in Proview Label. Refresh the licence portal and try again.' } } }, async (p) => {
     ok('sso refused: the reason is shown', /That business no longer exists in Proview Label/.test(await p.$eval('#toast', (e) => e.textContent)));
-    ok('sso refused: no business opened', /Open a location from the licence portal/.test(await text(p)) && !/Burger Barn|Pizza Palace/.test(await html(p)));
+    ok('sso refused: no business opened', /Open a business from the licence portal/.test(await text(p)) && !/Burger Barn|Pizza Palace/.test(await html(p)));
   });
   await p.close();
 
