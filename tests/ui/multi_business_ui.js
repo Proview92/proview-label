@@ -87,9 +87,12 @@ const plain = async (p, who) => {
   // 1. two businesses: business names only; lands in the last-used one
   await run(browser, { name: 'two: last used B', email: TWO, orgs: both(), ls: { [KEY]: 'org:org_b' } }, async (p) => {
     ok('two: dropdown lists business names only, by name', JSON.stringify(await opts(p)) === HDR, JSON.stringify(await opts(p)));
+    ok('two: select aria-label "Business" and a hidden label "Business"', await p.$eval('#sitePick', (s) => s.getAttribute('aria-label') === 'Business' && !s.disabled) && await p.$eval('label[for=sitePick]', (l) => l.textContent.trim() === 'Business' && l.classList.contains('sr')));
     await plain(p, 'two');
     ok('two: lands in the last-used business (Pizza Palace)', await picked(p) === 'Pizza Palace', await picked(p));
     await p.screenshot({ path: SHOTS + '/label-two.png' });
+    await p.click('#tbOut'); await sleep(800);
+    ok('two: the business used last is kept through sign-out', await p.evaluate((k) => localStorage.getItem(k), KEY) === 'org:org_b');
   });
   await run(browser, { name: 'two: remembered location (older build)', email: TWO, orgs: both(), ls: { [KEY]: 'site_b1' } }, async (p) => {
     ok('two: a remembered location opens its whole business', await picked(p) === 'Pizza Palace', await picked(p));
@@ -123,7 +126,7 @@ const plain = async (p, who) => {
   await run(browser, { name: 'fallback locked', email: TWO, orgs: both('owner', { locked: true, licensed: false, no_licence: true }), ls: { [KEY]: 'org:org_a' } }, async (p) => {
     const t = await text(p);
     ok('A locked: lands in Pizza Palace instead (not signed out)', await picked(p) === 'Pizza Palace' && /Pizza Palace/.test(t) && !/Burger Barn/.test(t), await picked(p));
-    ok('A locked: A still in the dropdown', JSON.stringify(await opts(p)) === HDR);
+    ok('A locked: only usable businesses listed, one left = disabled box (07:55)', await box(p) === 'Pizza Palace', JSON.stringify(await opts(p)));
     ok('A locked: fallback not saved over the last-used business', await p.evaluate((k) => localStorage.getItem(k), KEY) === 'org:org_a');
   });
   await run(browser, { name: 'fallback suspended', email: TWO, orgs: both('owner', { suspended: true }), ls: { [KEY]: 'site_a2' } }, async (p) => {
@@ -171,7 +174,10 @@ const plain = async (p, who) => {
     await noLoc(p, 'owner');
     await page(p, 'settings');
     ok('owner: Settings has a location select (A has 2 locations), default the first', JSON.stringify(await p.$$eval('#tlSite option', (o) => o.map((x) => x.textContent))) === JSON.stringify(['Camden Kitchen', 'Soho Kitchen']) && await p.$eval('#tlName', (i) => i.value) === 'Camden Kitchen');
+    ok('owner: the page\'s location select has aria-label "Location", no "All" entry', await p.$eval('#tlSite', (s) => s.getAttribute('aria-label') === 'Location' && ![...s.options].some((o) => /All/.test(o.textContent))));
     await choose(p, 'Soho Kitchen', '#tlSite');
+    await p.reload({ waitUntil: 'networkidle0' }); await sleep(900); await page(p, 'settings');
+    ok('owner: the page\'s location choice is remembered per business on the device', await p.$eval('#tlSite', (s) => s.options[s.selectedIndex].textContent) === 'Soho Kitchen');
     ok('owner: This location shows the chosen location', await p.$eval('#tlName', (i) => i.value) === 'Soho Kitchen' && await p.$eval('#tlAddr', (i) => i.value) === 'Soho Kitchen road');
     ok('owner: This location shows its licence, in business wording', /Lifetime/.test(await p.$eval('#tlLic', (e) => e.innerText)) && /each business needs its own licence/.test(await p.$eval('#tlLic', (e) => e.innerText)));
     ok('owner: header still the business only', await picked(p) === 'Burger Barn');
