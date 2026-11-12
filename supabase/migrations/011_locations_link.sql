@@ -1,4 +1,5 @@
--- 011: locations, not customers. Only the master links them (owner, 12 Nov 2026, LOCATIONS_LINK_SPEC.md).
+-- 011: locations, not customers. Only the master links them (owner, 12 Nov 2026, LOCATIONS_LINK_SPEC.md; hub contract
+-- LOCATIONS_LINK_PROTOCOL.md).
 --
 -- A business (pl_orgs) holds 1..N locations (pl_records kind 'sites'). From now on:
 --   * nobody adds or deletes a location in the app: not owners, admins, managers, nor the master inside a business.
@@ -6,18 +7,20 @@
 --     business (pl_add_business = the licence portal's New location via hub 'add_business', and pl_start_trial =
 --     the free self sign-up). A location's settings (name, address, area) stay editable as before.
 --   * the licence portal (hub token only) links and unlinks locations:
---       hub_call(token, 'link',   {into: A, from: B}) -> {ok, account: A, moved_sites: [site ids]}
+--       hub_call(token, 'link',   {into: A, from: B}) -> {ok, account: A, from: B, moved_sites: [site ids], already, renamed_units: []}
 --         merges business B into A in one transaction: every record (locations, menu, staff, labels, wastage,
 --         orders, audit), the handhelds and their pairings, the location licences and the members move to A; a person
---         in both keeps the higher role; managers of either side also get the other side's locations; B's settings
---         fill in what A has not set; B is deleted. Idempotent: B already merged into A returns the same answer.
---       hub_call(token, 'unlink', {account: A, site: S}) -> {ok, account: N, site: S}
+--         in both keeps the higher role; owners, admins and managers of either side get every location of the merged
+--         business (device staff keep exactly their locations); B's settings fill in what A has not set; B is deleted.
+--         Idempotent: B already merged into A returns the same answer with already: true.
+--       hub_call(token, 'unlink', {account: A, site: S}) -> {ok, account: N, from: A, site: S, already, renamed_units: []}
 --         moves location S out of A into a new business N named after the location: S, its records (labels,
 --         wastage, orders, device records), handhelds, pairings and licence move; the menu (categories, products,
 --         rules) is COPIED (new ids, references re-pointed in the copies and in S's labels / wastage); device staff
---         only at S move, staff at S and elsewhere are copied to N for S; members are copied (owners / admins as they
---         are, managers of S with S only); A's managers lose S (and A's membership if S was their only location).
---         Refused when S is A's only location. Idempotent: S already moved out of A returns the same answer.
+--         (PINs, always tied to locations) only at S move, staff at S and elsewhere are copied to N for S only; logins
+--         are copied (owners / admins as they are, managers of S with S only) and A keeps them (S removed from A's
+--         managers). Refused when S is A's only location. Idempotent: S already moved out of A returns the same
+--         answer with already: true. Location ids never change, so renamed_units is always [].
 --     Both are logged in hub_private.location_links.
 --   * licences stay per location (pl_site_licences, 009): they move with their location, nothing else changes.
 -- Unchanged: 'list', 'set', 'add_business', the master-open scoping (010), every read rule.
@@ -78,18 +81,22 @@ declare a public.pl_orgs; b public.pl_orgs; lg hub_private.location_links; moved
   rk constant jsonb := '{"owner":3,"admin":2,"manager":1}';
   bm public.pl_members; am public.pl_members;
 begin
-  if coalesce(p_into, '') = '' or coalesce(p_from, '') = '' then raise exception 'link needs into and from.'; end if;
-  if p_into = p_from then raise exception 'A location can''t be linked with itself.'; end if;
+  if coalesce(trim(p_into), '') = '' or coalesce(trim(p_from), '') = '' then raise exception 'link needs into and from.'; end if;
+  if p_into = p_from then raise exception 'An account can''t be linked to itself.'; end if;
   select * into a from public.pl_orgs where id = p_into for update;
   select * into b from public.pl_orgs where id = p_from for update;
   if b.id is null then
     select * into lg from hub_private.location_links where action = 'link' and from_account = p_from order by id desc limit 1;
-    if lg.id is not null and lg.into_account = p_into and a.id is not null then
-      return jsonb_build_object('ok', true, 'account', p_into, 'moved_sites', lg.moved_sites, 'already', true);
+    if lg.id is not null and lg.into_account <> p_into then
+      raise exception '% was already linked into %, not %.', p_from, lg.into_account, p_into;
     end if;
-    raise exception 'Account % not found in Proview Label.', p_from;
+    if lg.id is not null and a.id is not null then
+      return jsonb_build_object('ok', true, 'account', p_into, 'from', p_from, 'moved_sites', lg.moved_sites, 'already', true,
+                                'renamed_units', '[]'::jsonb);
+    end if;
+    raise exception 'Account not found: %', case when a.id is null then p_into else p_from end;
   end if;
-  if a.id is null then raise exception 'Account % not found in Proview Label.', p_into; end if;
+  if a.id is null then raise exception 'Account not found: %', p_into; end if;
 
   perform set_config('pl.hub_move', '1', true);
   select coalesce(array_agg(id order by id), '{}') into a_sites from public.pl_records where org_id = a.id and kind = 'sites' and not deleted;
@@ -103,18 +110,16 @@ begin
   update public.pl_site_licences set org_id = a.id, updated_at = now() where org_id = b.id;
   update public.pl_trials set org_id = a.id where org_id = b.id;
 
-  -- members: someone in both keeps the higher role; managers of either side also get the other side's locations
-  update public.pl_members m set site_ids = (select coalesce(array_agg(distinct x), '{}') from unnest(m.site_ids || b_sites) x)
-   where m.org_id = a.id and m.role = 'manager'
-     and not exists (select 1 from public.pl_members y where y.org_id = b.id and y.email = m.email);
+  -- members: someone in both keeps the higher role; owners, admins and managers of either side get every location
+  -- of the merged business (owners and admins see them all anyway; managers get them in site_ids)
+  update public.pl_members m set site_ids = (select coalesce(array_agg(distinct x order by x), '{}') from unnest(m.site_ids || a_sites || b_sites) x)
+   where m.org_id = a.id and m.role = 'manager';
   for bm in select * from public.pl_members where org_id = b.id loop
     select * into am from public.pl_members where org_id = a.id and email = bm.email;
     if am.id is not null then
       update public.pl_members set
         role = case when (rk->>bm.role)::int > (rk->>am.role)::int then bm.role else am.role end,
-        site_ids = (select coalesce(array_agg(distinct x), '{}') from unnest(am.site_ids || bm.site_ids
-                     || case when am.role = 'manager' then b_sites else '{}'::text[] end
-                     || case when bm.role = 'manager' then a_sites else '{}'::text[] end) x),
+        site_ids = (select coalesce(array_agg(distinct x order by x), '{}') from unnest(am.site_ids || bm.site_ids || a_sites || b_sites) x),
         user_id = coalesce(am.user_id, bm.user_id),
         name = coalesce(nullif(am.name, ''), bm.name),
         mobile = coalesce(am.mobile, bm.mobile)
@@ -122,7 +127,7 @@ begin
       delete from public.pl_members where id = bm.id;
     else
       update public.pl_members set org_id = a.id,
-        site_ids = case when bm.role = 'manager' then (select coalesce(array_agg(distinct x), '{}') from unnest(bm.site_ids || a_sites) x) else site_ids end
+        site_ids = case when bm.role = 'manager' then (select coalesce(array_agg(distinct x order by x), '{}') from unnest(bm.site_ids || a_sites || b_sites) x) else site_ids end
        where id = bm.id;
     end if;
   end loop;
@@ -131,7 +136,7 @@ begin
   delete from public.pl_orgs where id = b.id;
   insert into hub_private.location_links(action, from_account, into_account, moved_sites) values ('link', b.id, a.id, moved);
   perform set_config('pl.hub_move', '', true);
-  return jsonb_build_object('ok', true, 'account', a.id, 'moved_sites', moved);
+  return jsonb_build_object('ok', true, 'account', a.id, 'from', b.id, 'moved_sites', moved, 'already', false, 'renamed_units', '[]'::jsonb);
 end $$;
 revoke all on function hub_private.pl_link_orgs(text, text) from public, anon, authenticated;
 
@@ -141,19 +146,20 @@ language plpgsql security definer set search_path = public as $$
 declare a public.pl_orgs; s public.pl_records; lg hub_private.location_links; nid text; sfx text; n_sites int;
   idmap jsonb := '{}'::jsonb; r record; nm text;
 begin
-  if coalesce(p_org, '') = '' or coalesce(p_site, '') = '' then raise exception 'unlink needs account and site.'; end if;
+  if coalesce(trim(p_org), '') = '' or coalesce(trim(p_site), '') = '' then raise exception 'unlink needs account and site.'; end if;
   select * into a from public.pl_orgs where id = p_org for update;
   select * into s from public.pl_records where id = p_site and kind = 'sites' and not deleted;
   if a.id is null or s.id is null or s.org_id <> a.id then
     select * into lg from hub_private.location_links where action = 'unlink' and from_account = p_org and site_id = p_site order by id desc limit 1;
-    if lg.id is not null and exists (select 1 from public.pl_records where id = p_site and org_id = lg.into_account) then
-      return jsonb_build_object('ok', true, 'account', lg.into_account, 'site', p_site, 'already', true);
+    if lg.id is not null and exists (select 1 from public.pl_records where id = p_site and org_id = lg.into_account and kind = 'sites' and not deleted) then
+      return jsonb_build_object('ok', true, 'account', lg.into_account, 'from', p_org, 'site', p_site, 'already', true, 'renamed_units', '[]'::jsonb);
     end if;
-    if a.id is null then raise exception 'Account % not found in Proview Label.', p_org; end if;
-    raise exception 'Location % is not in account %.', p_site, p_org;
+    if a.id is null then raise exception 'Account not found: %', p_org; end if;
+    if s.id is null then raise exception 'Location not found: %', p_site; end if;
+    raise exception 'That location is not in account %.', p_org;
   end if;
   select count(*) into n_sites from public.pl_records where org_id = a.id and kind = 'sites' and not deleted;
-  if n_sites < 2 then raise exception 'This location is already on its own: there is nothing to unlink.'; end if;
+  if n_sites < 2 then raise exception '% has only that one location, so there is nothing to unlink.', a.name; end if;
 
   perform set_config('pl.hub_move', '1', true);
   nm := left(coalesce(nullif(trim(s.data->>'name'), ''), a.name), 120);
@@ -192,19 +198,17 @@ begin
            coalesce((select jsonb_agg(e) from jsonb_array_elements(data->'siteIds') e where e <> to_jsonb(s.id)), '[]'::jsonb))
    where org_id = a.id and kind = 'users' and site_id is null and jsonb_typeof(data->'siteIds') = 'array' and data->'siteIds' ? s.id;
 
-  -- members: copied (owners and admins as they are; managers of this location with it only)
+  -- logins: copied, A keeps them too (owners and admins as they are; managers of this location with it only)
   insert into public.pl_members(org_id, email, user_id, name, mobile, role, site_ids, features)
     select nid, m.email, m.user_id, m.name, m.mobile, m.role,
            case when m.role = 'manager' then array[s.id] else '{}'::text[] end, m.features
       from public.pl_members m where m.org_id = a.id and (m.role <> 'manager' or s.id = any(m.site_ids));
   update public.pl_members set site_ids = array_remove(site_ids, s.id) where org_id = a.id and role = 'manager' and s.id = any(site_ids);
-  delete from public.pl_members where org_id = a.id and role = 'manager' and site_ids = '{}'
-     and exists (select 1 from public.pl_members n where n.org_id = nid and n.email = pl_members.email);
 
   insert into hub_private.location_links(action, from_account, into_account, site_id, moved_sites)
     values ('unlink', a.id, nid, s.id, jsonb_build_array(s.id));
   perform set_config('pl.hub_move', '', true);
-  return jsonb_build_object('ok', true, 'account', nid, 'site', s.id);
+  return jsonb_build_object('ok', true, 'account', nid, 'from', a.id, 'site', s.id, 'already', false, 'renamed_units', '[]'::jsonb);
 end $$;
 revoke all on function hub_private.pl_unlink_site(text, text) from public, anon, authenticated;
 
@@ -238,7 +242,7 @@ begin
   elsif p_action = 'link' then
     return hub_private.pl_link_orgs(p_args->>'into', p_args->>'from');
   elsif p_action = 'unlink' then
-    return hub_private.pl_unlink_site(p_args->>'account', coalesce(p_args->>'site', p_args->>'unit'));
+    return hub_private.pl_unlink_site(p_args->>'account', regexp_replace(coalesce(p_args->>'site', p_args->>'unit', ''), '^loc/', ''));
   else
     raise exception 'unknown action %', p_action;
   end if;

@@ -128,7 +128,8 @@ begin
   execute 'set local role anon';
   r := public.hub_call(tok, 'link', '{"into":"org_ll_a","from":"org_ll_b"}');
   execute 'reset role';
-  select * into ok, bad from pg_temp.chk(r->>'ok' = 'true' and r->>'account' = 'org_ll_a' and r->'moved_sites' = '["ll_b1"]', 'link result ' || r::text, ok, bad);
+  select * into ok, bad from pg_temp.chk(r->>'ok' = 'true' and r->>'account' = 'org_ll_a' and r->>'from' = 'org_ll_b' and r->'moved_sites' = '["ll_b1"]'
+    and r->>'already' = 'false' and r->'renamed_units' = '[]', 'link result ' || r::text, ok, bad);
   select * into ok, bad from pg_temp.chk(not exists (select 1 from public.pl_orgs where id = 'org_ll_b'), 'B deleted', ok, bad);
   select * into ok, bad from pg_temp.chk(not exists (select 1 from public.pl_records where org_id = 'org_ll_b')
     and (select org_id from public.pl_records where id = 'll_b1') = 'org_ll_a'
@@ -138,7 +139,7 @@ begin
   select * into ok, bad from pg_temp.chk((select role from public.pl_members where org_id = 'org_ll_a' and email = 'll-owner@test.invalid') = 'owner'
     and (select count(*) from public.pl_members where email = 'll-owner@test.invalid') = 1, 'person in both keeps the higher role', ok, bad);
   select * into ok, bad from pg_temp.chk((select role from public.pl_members where org_id = 'org_ll_a' and email = 'll-ownerb@test.invalid') = 'owner', 'B owner becomes owner of A', ok, bad);
-  select * into ok, bad from pg_temp.chk((select site_ids from public.pl_members where org_id = 'org_ll_a' and email = 'll-mgr@test.invalid') @> '{ll_a1,ll_b1}', 'A manager also gets B location', ok, bad);
+  select * into ok, bad from pg_temp.chk((select site_ids from public.pl_members where org_id = 'org_ll_a' and email = 'll-mgr@test.invalid') = '{ll_a1,ll_a2,ll_b1}', 'A manager gets every location', ok, bad);
   select * into ok, bad from pg_temp.chk((select settings from public.pl_orgs where id = 'org_ll_a') = '{"currency":"GBP","logo":"b.png"}', 'settings: A wins, B fills in', ok, bad);
   -- B's owner now sees both locations, with the dropdown
   perform pg_temp.as_(ub);
@@ -146,7 +147,11 @@ begin
   perform pg_temp.svc();
   select * into ok, bad from pg_temp.chk(jsonb_array_length(r2->'orgs') = 1 and jsonb_array_length(r2->'orgs'->0->'sites') = 3, 'B owner sees the 3 linked locations', ok, bad);
   r2 := public.hub_call(tok, 'link', '{"into":"org_ll_a","from":"org_ll_b"}');
-  select * into ok, bad from pg_temp.chk(r2->>'ok' = 'true' and r2->'moved_sites' = '["ll_b1"]', 'link again: same answer', ok, bad);
+  select * into ok, bad from pg_temp.chk(r2->>'ok' = 'true' and r2->'moved_sites' = '["ll_b1"]' and r2->>'already' = 'true', 'link again: same answer, already', ok, bad);
+  begin perform public.hub_call(tok, 'link', '{"into":"org_ll_x","from":"org_ll_b"}'); bad := bad || 'link B again into another account';
+  exception when others then select * into ok, bad from pg_temp.chk(sqlerrm = 'org_ll_b was already linked into org_ll_a, not org_ll_x.', 'linked elsewhere: message ' || sqlerrm, ok, bad); end;
+  begin perform public.hub_call(tok, 'link', '{"into":"org_ll_a","from":"org_ll_a"}'); bad := bad || 'link to itself';
+  exception when others then select * into ok, bad from pg_temp.chk(sqlerrm = 'An account can''t be linked to itself.', 'itself: message', ok, bad); end;
   r2 := public.hub_call(tok, 'list', '{}');
   select * into ok, bad from pg_temp.chk((select count(*) from jsonb_array_elements(r2->'units') u where u->>'account_id' = 'org_ll_a') = 3
     and not exists (select 1 from jsonb_array_elements(r2->'accounts') x where x->>'id' = 'org_ll_b'), 'list shows the merged business', ok, bad);
@@ -154,7 +159,8 @@ begin
   -- 3) unlink Alpha Two
   r := public.hub_call(tok, 'unlink', '{"account":"org_ll_a","site":"ll_a2"}');
   nid := r->>'account';
-  select * into ok, bad from pg_temp.chk(r->>'ok' = 'true' and nid like 'org_%' and nid <> 'org_ll_a' and r->>'site' = 'll_a2', 'unlink result ' || r::text, ok, bad);
+  select * into ok, bad from pg_temp.chk(r->>'ok' = 'true' and nid like 'org_%' and nid <> 'org_ll_a' and r->>'site' = 'll_a2' and r->>'from' = 'org_ll_a'
+    and r->>'already' = 'false', 'unlink result ' || r::text, ok, bad);
   select * into ok, bad from pg_temp.chk((select name from public.pl_orgs where id = nid) = 'Alpha Two', 'new business named after the location', ok, bad);
   select * into ok, bad from pg_temp.chk((select org_id from public.pl_records where id = 'll_a2') = nid and (select org_id from public.pl_records where id = 'll_la2') = nid
     and (select data->>'orgId' from public.pl_records where id = 'll_la2') = nid, 'location and its labels moved', ok, bad);
@@ -169,11 +175,14 @@ begin
     and (select data->'siteIds' from public.pl_records where id = 'll_u_both') = '["ll_a1"]'
     and exists (select 1 from public.pl_records where org_id = nid and kind = 'users' and data->>'name' = 'Both' and data->'siteIds' = '["ll_a2"]'), 'device staff moved / copied', ok, bad);
   select * into ok, bad from pg_temp.chk((select count(*) from public.pl_members where org_id = nid and role = 'owner') = 2, 'owners copied', ok, bad);
-  select * into ok, bad from pg_temp.chk(not exists (select 1 from public.pl_members where org_id = nid and email = 'll-mgr@test.invalid'), 'manager not at that location not copied', ok, bad);
   r2 := public.hub_call(tok, 'unlink', '{"account":"org_ll_a","site":"ll_a2"}');
-  select * into ok, bad from pg_temp.chk(r2->>'account' = nid, 'unlink again: same answer', ok, bad);
+  select * into ok, bad from pg_temp.chk(r2->>'account' = nid and r2->>'already' = 'true', 'unlink again: same answer, already', ok, bad);
   begin perform public.hub_call(tok, 'unlink', jsonb_build_object('account', nid, 'site', 'll_a2')); bad := bad || 'unlink the only location';
-  exception when others then select * into ok, bad from pg_temp.chk(sqlerrm like '%already on its own%', 'only location: message', ok, bad); end;
+  exception when others then select * into ok, bad from pg_temp.chk(sqlerrm like '%only that one location%', 'only location: message', ok, bad); end;
+  begin perform public.hub_call(tok, 'unlink', '{"account":"org_ll_a","site":"ll_nope"}'); bad := bad || 'unlink a missing location';
+  exception when others then select * into ok, bad from pg_temp.chk(sqlerrm = 'Location not found: ll_nope', 'missing location: message', ok, bad); end;
+  select * into ok, bad from pg_temp.chk((select site_ids from public.pl_members where org_id = 'org_ll_a' and email = 'll-mgr@test.invalid') = '{ll_a1,ll_b1}'
+    and (select site_ids from public.pl_members where org_id = nid and email = 'll-mgr@test.invalid') = '{ll_a2}', 'manager copied with that location only, A keeps them', ok, bad);
   -- the split owner sees Alpha Two on its own
   perform pg_temp.as_(ub);
   r2 := public.pl_whoami();
