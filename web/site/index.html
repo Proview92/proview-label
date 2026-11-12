@@ -1573,7 +1573,7 @@ const day=864e5;
 const Cloud=window.PVLCloud||{enabled:false};
 const CLOUD=!!Cloud.enabled;
 let PENDING_PAIR=null;
-function takePairHash(){ const m=(location.hash||'').match(/[#&]pair=([A-Za-z0-9]{4,10})/); if(!m) return false; PENDING_PAIR=m[1].toUpperCase(); history.replaceState(null,'',location.pathname+location.search+'#devices'); return true; }
+function takePairHash(){ const m=(location.hash||'').match(/[#&]pair=([A-Za-z0-9]{4,10})/); if(!m) return false; PENDING_PAIR=m[1].toUpperCase(); history.replaceState(null,'',location.pathname+location.search+'#handhelds'); return true; }
 takePairHash();
 if(CLOUD){ P.useStore('signed-out',{blank:true}); S=P.get(); }
 const SKEY='pvl-session';
@@ -1618,13 +1618,25 @@ function allowedSiteIds(){ const o=scopeOrgIds(); return mySiteIds().filter(id=>
 const orgName=(id)=>(((S.orgs||[]).find(o=>o.id===id))||{}).name||'—';
 function fixSite(){
   const a=mySiteIds(), orgs=visibleOrgs();
+  // the header picks a whole business: a remembered location (older builds) means its business
+  if(siteFilter!=='all'&&!siteFilter.startsWith('org:')){ const so=a.includes(siteFilter)&&(P.byId('sites',siteFilter)||{}).orgId; siteFilter=so?'org:'+so:'all'; }
   if(siteFilter.startsWith('org:')){ if(!orgs.some(o=>'org:'+o.id===siteFilter)) siteFilter='all'; }
-  else if(siteFilter!=='all'&&!a.includes(siteFilter)) siteFilter='all';
-  if(siteFilter==='all'&&a.length===1) siteFilter=a[0];
-  else if(siteFilter==='all'){ // one business open at a time (the master: the business opened from the licence portal)
-    const o=orgs.length===1?orgs[0].id:((P.byId('sites',a[0])||{}).orgId||(orgs[0]||{}).id); if(o) siteFilter='org:'+o; }
+  if(siteFilter==='all'){ // one business open at a time (the master: the business opened from the licence portal)
+    const o=orgs.length===1?orgs[0].id:(myBizOrder()[0]||(orgs[0]||{}).id); if(o) siteFilter='org:'+o; }
 }
-// the location choice is remembered per person (the master: per business opened)
+// the businesses this person has a location in, by name (the dropdown's order)
+function myBizOrder(){ const a=mySiteIds(); return [...new Set(a.map(id=>(P.byId('sites',id)||{}).orgId).filter(Boolean))].sort((x,y)=>String(orgName(x)).localeCompare(String(orgName(y)))); }
+// usable = not locked or suspended, and has a location this person can open (MULTI_BUSINESS_PICKER_STANDARD.md)
+function orgUsable(id){ const o=(S.orgs||[]).find(x=>x.id===id); if(!o||o.suspended||o.locked) return false; return myBizOrder().includes(id); }
+// on sign-in (password, Proview account or invite): the last-used business if it is usable, otherwise the next usable one.
+// Only on sign-in: a business picked later from the dropdown stays open even if it is locked (its banner says why).
+function landSite(v){ if(isMaster()||visibleOrgs().length<2) return v; const bz=myBizOrder();
+  const cur=v==='all'?null:v.startsWith('org:')?v.slice(4):(P.byId('sites',v)||{}).orgId;
+  if(cur&&bz.includes(cur)&&orgUsable(cur)) return v;
+  const names=visibleOrgs().map(o=>o.id).sort((x,y)=>String(orgName(x)).localeCompare(String(orgName(y))));
+  const i=cur?names.indexOf(cur):-1, nx=[...names.slice(i+1),...names.slice(0,i+1)].find(orgUsable);
+  return nx?'org:'+nx:(cur&&bz.includes(cur))?v:bz.length?'org:'+bz[0]:v; }
+// the location choice is remembered per person, by email (the master: per business opened)
 const siteKey=()=>'pvl-site:'+(CLOUD?(WHO&&WHO.email):sessionId)+(isMaster()?':'+openOrgId():'');
 function setSite(id){ siteFilter=id; lsSet(siteKey(),id); render(); }
 // the master without a business: every menu page is greyed out ("Open a location from the licence portal")
@@ -1645,7 +1657,7 @@ async function setOrgSetting(orgId,k,v){ const o=(S.orgs||[]).find(x=>x.id===org
 const NAV=[
   ['Service',[['overview','Dashboard','home'],['expiry','Expiry log','clock'],['printlog','Print log','print'],['wastage','Wastage','bin']]],
   ['Menu & labels',[['products','Products','tag'],['categories','Categories','grid'],['matrix','Allergen matrix','shield'],['analyser','Menu analyser','spark'],['rules','Expiry rules','snow']]],
-  ['Manage',[['orders','Label orders','box'],['devices','Locations & devices','device'],['users','Users & permissions','users'],['history','Amendment history','hist'],['settings','Settings','gear']]]
+  ['Manage',[['orders','Label orders','box'],['handhelds','Handhelds','device'],['users','Users & permissions','users'],['history','Amendment history','hist'],['settings','Settings','gear']]]
 ];
 const ICON={
   home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
@@ -1677,8 +1689,8 @@ const ICON={
 };
 const ic=(k,s)=>`<svg width="${s||17}" height="${s||17}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[k]||''}</svg>`;
 // Feature switches for managers (owners/admins always have everything). Keep keys in step with supabase/migrations/002.
-const FEATURES=[['expiry','Expiry log'],['printlog','Print log'],['wastage','Wastage'],['products','Products, categories, allergens & menu analyser'],['rules','Expiry rules'],['orders','Label orders'],['devices','Locations & devices'],['users','Device staff (add, edit, remove)'],['history','Amendment history']];
-const VIEW_FEATURE={expiry:'expiry',printlog:'printlog',wastage:'wastage',products:'products',categories:'products',matrix:'products',analyser:'products',rules:'rules',orders:'orders',devices:'devices',users:'users',history:'history'};
+const FEATURES=[['expiry','Expiry log'],['printlog','Print log'],['wastage','Wastage'],['products','Products, categories, allergens & menu analyser'],['rules','Expiry rules'],['orders','Label orders'],['devices','Handhelds'],['users','Device staff (add, edit, remove)'],['history','Amendment history']];
+const VIEW_FEATURE={expiry:'expiry',printlog:'printlog',wastage:'wastage',products:'products',categories:'products',matrix:'products',analyser:'products',rules:'rules',orders:'orders',handhelds:'devices',users:'users',history:'history'};
 // true if the signed-in manager has this feature in at least one business they can see (missing key = on)
 function hasFeature(f){ const u=me(); if(!u) return false; if(u.role!=='manager') return true;
   if(CLOUD){ return (WHO.orgs||[]).filter(o=>o.role==='manager').some(o=>((o.features||{})[f])!==false); }
@@ -1708,28 +1720,22 @@ function siteStats(id){
     devices: devs.length, low: devs.filter(d=>d.labelsLeft<60).length, lastSync: last,
     online: devs.some(d=>d.lastSync&&Date.now()-new Date(d.lastSync)<6*3600e3) };
 }
-// Site dropdown in the header, straight after the page title: the one Proview standard (PICKER_STANDARD.md).
-// Owner/admin/manager (and the master inside the business they opened) with several sites: "All my locations (N)" and
-// each site. Exactly one site: a disabled box with its name.
+// Business dropdown in the header, straight after the page title (MULTI_BUSINESS_PICKER_STANDARD.md, OWNER UPDATE 07:47:
+// "Only write businesses name no need for location breakdown"). Business names only, one per business this person has
+// a location in, by name; picking one opens the whole business (all its locations, never two businesses together).
+// One business (and the master inside the business opened from the licence portal): its name in a disabled box.
+// Pages that need one location (Settings → This location) have their own select in the page.
 function pickerHtml(){
   if(masterNone()) return '';
-  const byName=(x,y)=>String(x.name).localeCompare(String(y.name));
-  const a=mySiteIds(); const sites=P.live('sites').filter(s=>a.includes(s.id)).sort(byName);
-  const sel=(v)=>siteFilter===v?' selected':'';
-  if(!sites.length) return '';
-  if(sites.length===1) return `<select id="sitePick" aria-label="Choose location" disabled><option>${esc(sites[0].name)}</option></select>`;
-  const orgs=[...new Set(sites.map(s=>s.orgId))];
-  if(orgs.length>1){ // a login in several businesses: one business at a time, never all of them together
-    const bz=orgs.map(o=>({o,n:orgName(o)})).sort(byName);
-    return `<select id="sitePick" aria-label="Choose location">${bz.map(b=>`<option value="org:${esc(b.o)}"${sel('org:'+b.o)}>${esc(b.n)} (all locations)</option>`).join('')}${sites.map(s=>`<option value="${esc(s.id)}"${sel(s.id)}>${esc(s.name)} · ${esc(orgName(s.orgId))}</option>`).join('')}</select>`;
-  }
-  const allVal='org:'+orgs[0];
-  return `<select id="sitePick" aria-label="Choose location"><option value="${allVal}"${sel(allVal)}>All my locations (${sites.length})</option>${sites.map(s=>`<option value="${esc(s.id)}"${sel(s.id)}>${esc(s.name)}</option>`).join('')}</select>`;
+  const bz=myBizOrder(); if(!bz.length) return '';
+  if(bz.length===1) return `<select id="sitePick" aria-label="Business" disabled><option>${esc(orgName(bz[0]))}</option></select>`;
+  const cur=curOrg();
+  return `<select id="sitePick" aria-label="Choose business">${bz.map(o=>`<option value="org:${esc(o)}"${cur===o?' selected':''}>${esc(orgName(o))}</option>`).join('')}</select>`;
 }
 function scopeLabel(){ if(siteFilter==='all') return 'all locations'; if(siteFilter.startsWith('org:')) return orgName(siteFilter.slice(4)); return siteName(siteFilter); }
 
 // short names under each icon on the iPad and phone rail (same idea as Proview Bookings)
-const SHORT={overview:'Dashboard',expiry:'Expiry',printlog:'Print log',wastage:'Wastage',products:'Products',categories:'Categories',matrix:'Allergens',analyser:'Analyser',rules:'Rules',orders:'Orders',devices:'Devices',users:'Users',history:'History',settings:'Settings'};
+const SHORT={overview:'Dashboard',expiry:'Expiry',printlog:'Print log',wastage:'Wastage',products:'Products',categories:'Categories',matrix:'Allergens',analyser:'Analyser',rules:'Rules',orders:'Orders',handhelds:'Handhelds',users:'Users',history:'History',settings:'Settings'};
 // desktop menu: COLLAPSE to an icon rail (remembered on this device, as in Proview Signage)
 const sideCollapsed=()=>lsGet('pvl.sideCollapsed')==='1';
 function toggleSide(){ const on=!sideCollapsed(); lsSet('pvl.sideCollapsed',on?'1':'0'); const a=$('.app'); if(a) a.classList.toggle('collapsed',on); const b=$('#sfCollapse'); if(b){ b.title=on?'Expand menu':'Collapse menu'; b.setAttribute('aria-label',b.title); } }
@@ -1803,12 +1809,12 @@ function attention(){
     act.filter(l=>P.expiryStatus(l)==='expired').sort((a,b)=>new Date(a.expiry)-new Date(b.expiry)).forEach(l=>out.push({lvl:'bad',icon:'clock',title:`${l.name} has expired`,sub:`${siteName(l.siteId)} · ${l.code||''} · use by ${P.fmtDate(l.expiry,true)}`,at:l.expiry,go:'expiry'}));
     act.filter(l=>P.expiryStatus(l)==='today').sort((a,b)=>new Date(a.expiry)-new Date(b.expiry)).forEach(l=>out.push({lvl:'warn',icon:'clock',title:`${l.name} expires within 24 hrs`,sub:`${siteName(l.siteId)} · ${l.code||''} · use by ${P.fmtDate(l.expiry,true)}`,at:l.expiry,go:'expiry'}));
   }
-  if(canView('devices')) bySite(P.live('devices')).forEach(d=>{
-    if(d.labelsLeft<60) out.push({lvl:'bad',icon:'print',title:`${d.name} is low on labels`,sub:`${siteName(d.siteId)} · ${d.labelsLeft} left on the roll`,go:canView('orders')?'orders':'devices'});
-    if(d.lastSync&&Date.now()-new Date(d.lastSync)>24*3600e3) out.push({lvl:'warn',icon:'device',title:`${d.name} hasn’t synced since ${P.fmtDate(d.lastSync,true)}`,sub:siteName(d.siteId),at:d.lastSync,go:'devices'}); });
+  if(canView('handhelds')) bySite(P.live('devices')).forEach(d=>{
+    if(d.labelsLeft<60) out.push({lvl:'bad',icon:'print',title:`${d.name} is low on labels`,sub:`${siteName(d.siteId)} · ${d.labelsLeft} left on the roll`,go:canView('orders')?'orders':'handhelds'});
+    if(d.lastSync&&Date.now()-new Date(d.lastSync)>24*3600e3) out.push({lvl:'warn',icon:'device',title:`${d.name} hasn’t synced since ${P.fmtDate(d.lastSync,true)}`,sub:siteName(d.siteId),at:d.lastSync,go:'handhelds'}); });
   allowedSiteIds().forEach(id=>{ const m=siteLockMsg(id), st=siteState(id), l=siteLic(id)||{};
-    if(m) out.push({lvl:'bad',icon:'shield',title:`${siteName(id)}: ${m.title}`,sub:m.text,go:'devices'});
-    else if(st==='trial'||st==='expiring') out.push({lvl:'warn',icon:'shield',title:`${siteName(id)}: ${st==='trial'?'trial':'licence ends soon'}`,sub:'Ends '+P.fmtDate(l.licence_expires_at,true),go:'devices'}); });
+    if(m) out.push({lvl:'bad',icon:'shield',title:`${siteName(id)}: ${m.title}`,sub:m.text,go:canView('settings')?'settings':'overview'});
+    else if(st==='trial'||st==='expiring') out.push({lvl:'warn',icon:'shield',title:`${siteName(id)}: ${st==='trial'?'trial':'licence ends soon'}`,sub:'Ends '+P.fmtDate(l.licence_expires_at,true),go:canView('settings')?'settings':'overview'}); });
   return out;
 }
 function bellBtn(){ const n=attention().filter(x=>x.lvl==='bad').length; const b=document.createElement('button'); b.type='button'; b.id='tbBell'; b.className='bell'; b.title='Notifications'; b.setAttribute('aria-label','Notifications');
@@ -1831,7 +1837,7 @@ function inboxItems(){ if(!me()) return []; const out=[];
 function searchItems(q){ if(!me()) return []; const out=[]; const has=(x)=>String(x||'').toLowerCase().includes(q);
   NAV.flatMap(([,i])=>i).filter(([k,l])=>canView(k)&&(!q||has(l)||has(SHORT[k]))).forEach(([k,l])=>out.push({group:'Pages',icon:'page',label:l,run:()=>goPage(k)}));
   if(!q) return out;
-  P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(has(x.name)||has(x.address))).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,8).forEach(x=>out.push({group:'Locations',icon:ICON.pin,label:x.name,hint:[orgName(x.orgId),x.address].filter(Boolean).join(' · '),run:()=>{ setSite(x.id); if(!canView((location.hash||'').slice(1))) location.hash='overview'; }}));
+  if(canView('settings')) P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(has(x.name)||has(x.address))).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,8).forEach(x=>out.push({group:'Locations',icon:ICON.pin,label:x.name,hint:[orgName(x.orgId),x.address].filter(Boolean).join(' · '),run:()=>{ TL_SITE=x.id; location.hash='settings'; render(); }}));   // a location's settings (the header picks businesses only)
   if(canView('products')){ byOrg(P.live('products')).filter(p=>has(p.name)||has(p.barcode)).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,8).forEach(p=>out.push({group:'Products',icon:ICON.tag,label:p.name,hint:(catOf(p).name||'')+(p.approved===false?' · awaiting approval':''),run:()=>{ location.hash='products'; }}));
     byOrg(P.live('categories')).filter(c=>has(c.name)).slice(0,6).forEach(c=>out.push({group:'Categories',icon:ICON.grid,label:c.name,hint:c.type||'',run:()=>{ location.hash='categories'; }})); }
   if(canView('users')){ const oi=scopeOrgIds(), a=allowedSiteIds(); P.live('users').filter(x=>!x.email&&x.role!=='master'&&oi.includes(x.orgId)&&(x.siteIds||[]).some(id=>a.includes(id))&&has(x.name)).slice(0,6).forEach(x=>out.push({group:'People',av:true,label:x.name,hint:'Device staff · '+(x.siteIds||[]).filter(id=>a.includes(id)).map(siteName).join(', '),run:()=>{ location.hash='users'; }})); }
@@ -1855,7 +1861,7 @@ async function doSync(quiet){ applyScope();
   if(syncing){ SYNC_AGAIN=true; return; } syncing=true; SYNC_STATE='saving'; paintDot();
   try{ let changed=false; if(!quiet){ if(!(await checkAccess())) return; changed=true; }
     const r=await Cloud.sync(P,{full:!quiet}); S=P.get(); SYNC_STATE='ok'; if(!quiet) toast(`Synced · ${r.pushed} sent, ${r.pulled} received`); if(r.pulled||r.dropped||changed) render(); }
-  catch(e){ SYNC_STATE=navigator.onLine?'error':'ok'; const lo=allowedSiteIds().find(siteLocked); if(lo&&!isMaster()){ if(!quiet||!lockToastShown){ lockToastShown=true; toast(siteName(lo)+': '+siteLockMsg(lo).title+'. Changes there can’t be saved until it has a licence (Locations & devices → Buy online).'); } } else toast(Cloud.friendly(e)); }
+  catch(e){ SYNC_STATE=navigator.onLine?'error':'ok'; const lo=allowedSiteIds().find(siteLocked); if(lo&&!isMaster()){ if(!quiet||!lockToastShown){ lockToastShown=true; toast(siteName(lo)+': '+siteLockMsg(lo).title+'. Changes there can’t be saved until it has a licence (Settings → This location → Buy online).'); } } else toast(Cloud.friendly(e)); }
   finally{ syncing=false; if(SYNC_STATE==='saving') SYNC_STATE='ok'; paintDot(); if(SYNC_AGAIN){ SYNC_AGAIN=false; setTimeout(()=>doSync(true),0); } }
 }
 // push changes shortly after any edit; pull every minute
@@ -1883,7 +1889,7 @@ async function checkAccess(){
   applyWho(w); return true;
 }
 // the master keeps only the business opened from the licence portal: no other business is kept or shown
-function applyWho(w){ WHO=w; S=P.get(); const op=w.master?openOrgId():null; S.orgs=(w.orgs||[]).filter(o=>!w.master||o.id===op).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role,suspended:o.suspended,licensed:o.licensed!==false,no_licence:!!o.no_licence,trial_ends_at:o.trial_ends_at||null,trial_expired:!!o.trial_expired,sites:Array.isArray(o.sites)?o.sites:null})); P.prune(S.orgs.map(o=>o.id)); S=P.get(); }
+function applyWho(w){ WHO=w; S=P.get(); const op=w.master?openOrgId():null; S.orgs=(w.orgs||[]).filter(o=>!w.master||o.id===op).map(o=>({id:o.id,name:o.name,settings:o.settings||{},role:o.role,suspended:o.suspended,licensed:o.licensed!==false,no_licence:!!o.no_licence,trial_ends_at:o.trial_ends_at||null,trial_expired:!!o.trial_expired,locked:!!o.locked,sites:Array.isArray(o.sites)?o.sites:null})); P.prune(S.orgs.map(o=>o.id)); S=P.get(); }
 // ---------- licence: one per LOCATION (migration 009; no free trials: a new location starts with no licence) ----------
 // The business-level state (orgState / lockMsg, shared with the handheld) is derived by the server from its locations:
 // locked = suspended or no location licensed. Pages work per location: siteState / siteLockMsg below.
@@ -1908,7 +1914,7 @@ function siteState(id){ const o=orgOfSite(id); if(!o) return 'active'; if(o.susp
   return l.licence_type==='trial'?'trial':left<30*day?'expiring':'active'; }
 const siteLocked=(id)=>['suspended','nolicence','expired'].includes(siteState(id));
 function siteLockMsg(id){ const st=siteState(id), s=P.byId('sites',id)||{}, n=s.name||'This location', l=siteLic(id)||{}, tr=l.licence_type==='trial';
-  if(st==='nolicence') return {title:'No licence yet',text:`${n} has no licence yet: buy one to start using Proview Label there (each location needs its own licence). Nothing can be changed or synced at ${n} until it has one.`};
+  if(st==='nolicence') return {title:'No licence yet',text:`${n} has no licence yet: buy one to start using Proview Label there (each business needs its own licence). Nothing can be changed or synced at ${n} until it has one.`};
   if(st==='expired') return {title:tr?'Trial ended':'Licence expired',text:`${n}’s ${tr?'trial':'licence'} ended ${P.fmtDate(l.licence_expires_at,true)}. Your data is safe, but nothing can be changed or synced at ${n} until it’s renewed.`};
   if(st==='suspended') return {title:'Account suspended',text:`${orgName(s.orgId)} is suspended. Your data is safe, but nothing can be changed or synced until the licence is renewed.`};
   return null; }
@@ -1947,7 +1953,7 @@ function buyHtml(siteId){ if(!canBuy(siteId)) return `<p class="hint" style="mar
   const st=siteState(siteId), buying=st==='nolicence', list=buyPlans();
   if(!list.length) return `<p class="hint" style="margin:8px 0 0" data-buyfor="${esc(siteId)}">Online payment isn’t available yet. ${contactHtml()}</p>`;
   return `<div class="buy-plans" data-buyfor="${esc(siteId)}">${list.map(p=>`<a class="buy-card" href="${esc(buyUrl(p,siteId))}" target="_blank" rel="noopener" data-plan="${esc(p.plan)}"><b>${esc(p.label||LIC_TYPES[p.plan]||p.plan)}</b><span class="bp">${esc(money(p))}</span><small>${buying?'Buy online':'Renew online'}</small></a>`).join('')}</div>
-    <p class="hint" style="margin:8px 0 0">${buying?'You pay securely with Stripe; the location is licensed within about 5 minutes.':'Time is added on top of the current licence. You pay securely with Stripe; it updates within about 5 minutes.'} Or call Proview on ${supHtml()}.</p>`; }
+    <p class="hint" style="margin:8px 0 0">${buying?'You pay securely with Stripe; the business is licensed within about 5 minutes.':'Time is added on top of the current licence. You pay securely with Stripe; it updates within about 5 minutes.'} Or call Proview on ${supHtml()}.</p>`; }
 document.addEventListener('click',e=>{ const a=e.target.closest&&e.target.closest('.buy-card'); if(a) setTimeout(()=>toast('Finish paying in the Stripe tab. The licence updates within about 5 minutes; then press Sync now.'),50); });
 // banner above the page: the locations in view that are locked (no licence / ended / suspended), each with Buy online;
 // or a trial / licence running out soon
@@ -1956,8 +1962,8 @@ function trialBanner(){
   const locked=inView.filter(siteLocked), soon=inView.filter(id=>['trial','expiring'].includes(siteState(id)));
   if(locked.length){ const one=locked.length===1, m=siteLockMsg(locked[0]);
     const head=one?m.title+(inView.length>1?' · '+esc(siteName(locked[0])):''):`${locked.length} of ${inView.length} locations need a licence`;
-    const body=one?`<p style="margin:6px 0 0">${esc(m.text)}${isMaster()?' As master you can give it a licence with Licence… in Locations & devices.':''}</p>${isMaster()?'':buyHtml(locked[0])}`
-      :`<p style="margin:6px 0 0">Each location needs its own licence. ${isMaster()?'As master you can give them a licence with Licence… in Locations & devices.':'The others keep working.'}</p>${locked.map(id=>`<div class="lic-row"><div class="lic-h"><b>${esc(siteName(id))}</b> ${siteTag(id)}</div>${isMaster()?'':buyHtml(id)}</div>`).join('')}`;
+    const body=one?`<p style="margin:6px 0 0">${esc(m.text)}${isMaster()?' As master you can give it a licence with Licence… in Settings (This location).':''}</p>${isMaster()?'':buyHtml(locked[0])}`
+      :`<p style="margin:6px 0 0">Each business needs its own licence. ${isMaster()?'As master you can give them a licence with Licence… in Settings (This location).':'The others keep working.'}</p>${locked.map(id=>`<div class="lic-row"><div class="lic-h"><b>${esc(siteName(id))}</b> ${siteTag(id)}</div>${isMaster()?'':buyHtml(id)}</div>`).join('')}`;
     return `<div class="card lic-banner" role="alert" style="border-color:var(--bad);background:var(--badl);margin-bottom:16px"><h3 style="color:var(--bad)">${head}</h3>${body}</div>`; }
   if(soon.length&&!isMaster()){ const id=soon[0], l=siteLic(id)||{};
     return `<div class="card" style="border-color:var(--warn);background:var(--warnl);margin-bottom:16px;padding:12px 16px"><b>${siteState(id)==='trial'?'Trial':'Licence ends soon'}</b> · ${esc(siteName(id))} · ends ${esc(P.fmtDate(l.licence_expires_at,true))}.${canBuy(id)?` <button class="btn sm" data-buy="${esc(id)}">Renew online</button>`:` Ask your business owner to renew it, or call Proview on ${supHtml()}.`}</div>`; }
@@ -2027,6 +2033,7 @@ async function boot(fresh,newOrg){
     siteFilter=lsGet('pvl-site:'+w.email+(w.master?':'+openOrgId():''))||'all';
     applyScope(); await Cloud.sync(P,{full:true}); S=P.get();
     if(newOrg){ P.ensureRules(newOrg); siteFilter=lsGet('pvl-site:'+w.email)||siteFilter; }
+    siteFilter=landSite(siteFilter);   // several businesses: the last used, or the next usable one
     // a manager with no sites they can open has nothing to work on: back to sign-in
     if(!w.master&&!mySiteIds().length&&!(w.orgs||[]).some(o=>o.role==='owner'||o.role==='admin')){ P.forget('cloud:'+u.id); return signOut(NO_ACCESS); }
     if(!location.hash||location.hash==='#sites') location.hash='overview';
@@ -2157,7 +2164,7 @@ VIEWS.overview=(el)=>{
     ${byOrg(P.live('products')).filter(p=>p.approved===false).map(p=>`<tr><td><b>${esc(p.name)}</b><div class="hint">New product awaiting approval</div></td><td><span class="tag blue">Approval</span></td><td><a href="#products">Review</a></td></tr>`).join('')}</tbody></table></div></div>
   <div class="card"><h3>Recent changes</h3><div class="sub">Amendment history</div><table><tbody>${bySite(P.live('audit')).sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,6).map(a=>`<tr><td class="hint" style="width:140px">${P.fmtDate(a.at,true)}</td><td><b>${esc(a.user)}</b> ${esc(a.action)} ${esc(a.entity)}</td><td>${esc(a.detail)}</td></tr>`).join('')}</tbody></table></div>`;
   barChart(el.querySelector('#ch1'),days,{label:'Labels printed per day',unit:'labels'});
-  el.querySelectorAll('[data-site]').forEach(b=>b.onclick=()=>setSite(b.dataset.site));
+  el.querySelectorAll('[data-site]').forEach(b=>b.onclick=()=>{ if(!canView('settings')) return; TL_SITE=b.dataset.site; location.hash='settings'; });
 };
 
 let pf={q:'',type:'all',cat:'all'};
@@ -2452,7 +2459,7 @@ function licenceForm(siteId){ const x=P.byId('sites',siteId), o=orgOfSite(siteId
     <div class="fld"><label>Licence</label><select class="inp" id="lt">${opts}</select></div>
     <div class="fld" id="ldw" style="display:none"><label id="ldl">Ends on</label><input class="inp" type="date" id="ld" value="${ymd(Date.now()+3*day)}"></div>
     <label class="row" id="lxw" style="gap:8px;margin:0 0 10px;${running?'':'display:none'}"><input type="checkbox" id="lx" checked> Add to the current end (${esc(P.fmtDate(l.licence_expires_at))})</label>
-    <p class="hint">Each location needs its own licence; the business’s other locations aren’t changed. A licence ends at the end of its last day; after it the location is read-only, its handhelds lock, and its people see Buy online and Proview’s contact details. Owners can also buy or renew online.</p>`,
+    <p class="hint">Each business needs its own licence. This changes this location only; the business’s other locations aren’t changed. A licence ends at the end of its last day; after it the location is read-only, its handhelds lock, and its people see Buy online and Proview’s contact details. Owners can also buy or renew online.</p>`,
     `<button class="btn ghost" data-x>Cancel</button>${st!=='nolicence'?'<button class="btn ghost" id="lnone" style="color:var(--bad)">Remove licence</button>':''}<button class="btn" id="lsv">Save licence</button>`);
   const sel=m.querySelector('#lt'), sync=()=>{ const v=sel.value; m.querySelector('#ldw').style.display=v==='custom'||v==='trial'?'':'none';
     m.querySelector('#ldl').textContent=v==='trial'?'Trial ends on':'Ends on'; m.querySelector('#lxw').style.display=running&&/^m\d+$/.test(v)?'':'none'; };
@@ -2470,12 +2477,10 @@ function licenceForm(siteId){ const x=P.byId('sites',siteId), o=orgOfSite(siteId
   m.querySelector('#lsv').onclick=()=>save(sel.value);
   const nn=m.querySelector('#lnone'); if(nn) nn.onclick=()=>save(null);
 }
-VIEWS.devices=(el)=>{
-  const ss=P.live('sites').filter(x=>allowedSiteIds().includes(x.id)&&(siteFilter==='all'||x.id===siteFilter||siteFilter==='org:'+x.orgId)), ds=bySite(P.live('devices'));
-  const orgs=visibleOrgs().filter(o=>scopeOrgIds().includes(o.id)); // the open business only
-  el.innerHTML=`<div class="ph"><div><h1>Locations & devices</h1><p>${isMaster()?esc(orgName(curOrg()))+': its kitchens and the handhelds running Proview Label.':'Your kitchens and the handhelds running Proview Label.'}</p></div><div class="btns"><button class="btn" id="pairB">+ Pair handheld</button></div></div>
-  ${isMaster()?`<div class="card"><h3>Business</h3><div class="sub">The location (or linked locations) you're working in. New locations are added, linked and unlinked in the licence portal.</div><table><thead><tr><th>Business</th><th>Locations</th><th>Devices</th><th>Labels, last 7 days</th><th></th></tr></thead><tbody>${orgs.map(o=>{ const os=P.live('sites').filter(x=>x.orgId===o.id); return `<tr><td><b>${esc(o.name)}</b>${orgState(o)!=='active'?' '+stateTag(o):''}</td><td>${os.length}</td><td>${P.live('devices').filter(d=>os.some(x=>x.id===d.siteId)).length}</td><td>${P.live('labels').filter(l=>os.some(x=>x.id===l.siteId)&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="text-align:right;white-space:nowrap"><button class="icbtn" data-eo="${o.id}" title="Rename">✎</button></td></tr>`; }).join('')||'<tr><td colspan="5" class="empty">No business open.</td></tr>'}</tbody></table></div>`:''}
-  <div class="card"><h3>Locations</h3><table><thead><tr><th>Location</th>${multiOrg()?'<th>Business</th>':''}<th>Address (printed on sale labels)</th><th>Device staff</th><th>Labels, last 7 days</th><th>Licence</th><th></th></tr></thead><tbody>${ss.map(s=>`<tr data-lic="${esc(s.id)}"><td><b>${esc(s.name)}</b><div class="hint">${esc(s.region||'')}</div></td>${multiOrg()?`<td class="hint">${esc(orgName(s.orgId))}</td>`:''}<td>${esc(s.address||'')}</td><td>${P.live('users').filter(u=>(u.siteIds||[]).includes(s.id)).length}</td><td>${P.live('labels').filter(l=>l.siteId===s.id&&Date.now()-new Date(l.printedAt)<7*day).reduce((a,l)=>a+(+l.qty||1),0)}</td><td style="white-space:nowrap">${siteTag(s.id)}${isMaster()?` <button class="btn ghost sm" data-licf="${s.id}">Licence…</button>`:canBuy(s.id)&&(siteLocked(s.id)||(siteLic(s.id)||{}).licence_type!=='lifetime')?` <button class="btn sm ${siteLocked(s.id)?'':'ghost'}" data-buy="${s.id}">${siteState(s.id)==='nolicence'?'Buy online':'Renew online'}</button>`:''}</td><td style="text-align:right;white-space:nowrap">${siteFilter!==s.id&&allowedSiteIds().length>1?`<button class="btn ghost sm" data-open="${s.id}">Open</button> `:''}${['master','owner','admin'].includes(orgRole(s.orgId))?`<button class="icbtn" data-es="${s.id}">✎</button>`:''}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No locations yet.</td></tr>'}</tbody></table><p class="hint" style="margin:10px 0 0">Each location needs its own licence. ${isMaster()?'Locations are added and linked in the licence portal (New location, Link with another location).':'Linked locations switch from the location dropdown. To add a location or link one with another, call Proview.'}</p></div>
+// Handhelds (was "Locations & devices"). No Locations page (owner, 12 Nov 2026: "Remove locations"): a location's name,
+// address and licence are in Settings → This location; the header dropdown is the only switcher.
+VIEWS.handhelds=(el)=>{
+  el.innerHTML=`<div class="ph"><div><h1>Handhelds</h1><p>${isMaster()?esc(orgName(curOrg()))+': the handhelds running Proview Label.':'The handhelds running Proview Label at your locations.'}</p></div><div class="btns"><button class="btn" id="pairB">+ Pair handheld</button></div></div>
   <div class="card"><h3>Handhelds</h3><div class="sub">To add one, open Proview Label on the handheld: it shows a pairing code. Tap <b>+ Pair handheld</b> and enter it, or scan the QR code on the handheld with your phone. <b>Mode</b> sets what staff see: Easy (big product buttons, print only) or Detailed (logs, bulk print, wastage, label orders).</div><div id="devs"><div class="hint">Loading…</div></div></div>`;
   // handhelds: paired list from the server (live) or the sample devices (demo), with battery etc. from their sync records
   const devOrgs=scopeOrgIds();
@@ -2512,15 +2517,6 @@ VIEWS.devices=(el)=>{
         audit('updated','Handheld',nm+' ('+(md==='detailed'?'Detailed':'Easy')+')',d.orgId); closeModal(); toast('Saved'); render(); }catch(e){ toast(Cloud.friendly?Cloud.friendly(e):e.message); } }; };
   el.querySelector('#pairB').onclick=()=>withOrg(o=>pairForm(o));
   if(PENDING_PAIR){ const c=PENDING_PAIR; PENDING_PAIR=null; withOrg(o=>pairForm(o,c)); }
-  // edit a location's details only: locations are added, linked and unlinked by Proview in the licence portal
-  const siteForm=(s)=>{ if(!s||!s.id) return; const m=modal('Edit location · '+orgName(s.orgId),`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(s.name)}"></div><div class="fld"><label>Address</label><input class="inp" id="a" value="${esc(s.address||'')}"></div><div class="fld"><label>Area</label><input class="inp" id="g" value="${esc(s.region||'')}" placeholder="e.g. North London"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
-    m.querySelector('#sv').onclick=()=>{ s.name=m.querySelector('#n').value.trim(); s.address=m.querySelector('#a').value.trim(); s.region=m.querySelector('#g').value.trim(); if(!s.name) return toast('Enter a name'); P.upsert('sites',s); audit('updated','Site',s.name,s.orgId); closeModal(); render(); }; };
-  el.querySelectorAll('[data-es]').forEach(b=>b.onclick=()=>siteForm({...P.byId('sites',b.dataset.es)}));
-  el.querySelectorAll('[data-licf]').forEach(b=>b.onclick=()=>licenceForm(b.dataset.licf));
-  el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ setSite(b.dataset.open); location.hash='overview'; });
-  el.querySelectorAll('[data-openorg]').forEach(b=>b.onclick=()=>{ setSite('org:'+b.dataset.openorg); location.hash='overview'; });
-  el.querySelectorAll('[data-eo]').forEach(b=>b.onclick=()=>{ const o=S.orgs.find(x=>x.id===b.dataset.eo); const m=modal('Rename business',`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(o.name)}"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
-    m.querySelector('#sv').onclick=async()=>{ const n=m.querySelector('#n').value.trim(); if(!n) return; try{ if(CLOUD) await Cloud.renameOrg(o.id,n); o.name=n; P.save(); closeModal(); render(); }catch(e){ toast(Cloud.friendly(e)); } }; });
   const cfg=el.querySelector('#cfg'); if(cfg) cfg.onclick=()=>{ const all=JSON.parse(P.exportJSON()), o=curOrg(); COLL_KEYS.forEach(k=>{ if(Array.isArray(all[k])) all[k]=all[k].filter(r=>r.orgId===o); }); if(all.orgs) all.orgs=all.orgs.filter(x=>x.id===o); const data=JSON.stringify(all); const m=modal('Device config file',`<p class="hint">Copy this to the device, or save it as a .json file and use Settings → Import data in the app.</p><textarea class="inp" style="min-height:200px;font-family:monospace;font-size:11px" readonly>${esc(data)}</textarea>`,`<button class="btn ghost" id="dl">Download .json</button><button class="btn" id="cp">Copy</button>`);
     m.querySelector('#cp').onclick=()=>{ m.querySelector('textarea').select(); (navigator.clipboard?navigator.clipboard.writeText(data):Promise.reject()).then(()=>toast('Copied')).catch(()=>{try{document.execCommand('copy');toast('Copied');}catch(e){}}); };
     m.querySelector('#dl').onclick=()=>{ try{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([data],{type:'application/json'})); a.download='proview-label-config.json'; document.body.appendChild(a); a.click(); a.remove(); }catch(e){} toast('If nothing downloaded, use Copy'); }; };
@@ -2599,9 +2595,39 @@ VIEWS.users=(el)=>{
   el.querySelectorAll('[data-set]').forEach(b=>b.onclick=async()=>{ if(!org||b.disabled) return; await setOrgSetting(org,b.dataset.set,!st[b.dataset.set]); audit('updated','Permission',b.dataset.set+': '+(!st[b.dataset.set]?'on':'off'),org); render(); });
 };
 
+// Settings → This location (it replaces the old Locations page): one location of the open business, chosen with the
+// select at the top of Settings when the business has several. Name, address and
+// area (printed on sale labels), its licence with Buy / renew online (owners) or Licence… (the master), and, for the
+// master, the business's name.
+let TL_SITE=null;   // the location chosen in Settings' own select (the header picks businesses only)
+const tlSites=()=>{ const ids=allowedSiteIds(); return P.live('sites').filter(x=>ids.includes(x.id)).sort((x,y)=>String(x.name).localeCompare(String(y.name))); };
+const tlSite=()=>{ const ss=tlSites(); return ss.find(x=>x.id===TL_SITE)||ss[0]||null; };
+// several locations: a small select at the top of Settings; one location: used without asking
+function tlSelectHtml(){ const ss=tlSites(), x=tlSite(); if(ss.length<2) return '';
+  return `<div class="btns"><label class="hint" for="tlSite" style="margin-right:6px">Location</label><select class="inp" id="tlSite" style="width:auto">${ss.map(s=>`<option value="${esc(s.id)}"${x&&x.id===s.id?' selected':''}>${esc(s.name)}</option>`).join('')}</select></div>`; }
+function thisLocationCard(){
+  const x=tlSite();
+  if(!x) return '';
+  const ed=['master','owner','admin'].includes(orgRole(x.orgId)), dis=ed?'':' disabled', lic=siteLic(x.id)||{};
+  const buy=isMaster()?`<button class="btn ghost sm" data-licf="${esc(x.id)}">Licence…</button>`:canBuy(x.id)&&(siteLocked(x.id)||lic.licence_type!=='lifetime')?`<button class="btn sm ${siteLocked(x.id)?'':'ghost'}" data-buy="${esc(x.id)}">${siteState(x.id)==='nolicence'?'Buy online':'Renew online'}</button>`:'';
+  return `<div class="card" id="thisLoc" style="margin-top:16px"><h3>This location · ${esc(x.name)}</h3><div class="sub">Locations are set up and linked by Proview. ${ed?'You can change this location’s details here.':'Ask your business owner to change these.'}</div>
+    <div class="g2"><div class="fld"><label for="tlName">Name</label><input class="inp" id="tlName" value="${esc(x.name)}"${dis}></div><div class="fld"><label for="tlArea">Area</label><input class="inp" id="tlArea" value="${esc(x.region||'')}" placeholder="e.g. North London"${dis}></div></div>
+    <div class="fld"><label for="tlAddr">Address <span class="hint">printed on sale labels</span></label><input class="inp" id="tlAddr" value="${esc(x.address||'')}"${dis}></div>
+    ${ed?'<div class="row" style="justify-content:flex-end"><button class="btn sm" id="tlSave">Save location</button></div>':''}
+    <div class="setrow" id="tlLic"><div><b>Licence</b><span class="hint">${siteTag(x.id)} ${esc(siteLicText(x.id))} · each business needs its own licence</span></div>${buy}</div>
+    ${isMaster()?`<div class="setrow"><div><b>Business</b><span class="hint">${esc(orgName(x.orgId))} · linked and unlinked in the licence portal</span></div><button class="btn ghost sm" data-eo="${esc(x.orgId)}">Rename</button></div>`:''}</div>`;
+}
+function bindThisLocation(el){
+  const ts=el.querySelector('#tlSite'); if(ts) ts.onchange=()=>{ TL_SITE=ts.value; render(); };
+  const sv=el.querySelector('#tlSave'); if(sv) sv.onclick=()=>{ const x=tlSite(); if(!x) return; const n=el.querySelector('#tlName').value.trim(); if(!n) return toast('Enter a name');
+    P.upsert('sites',{...x,name:n,address:el.querySelector('#tlAddr').value.trim(),region:el.querySelector('#tlArea').value.trim()}); audit('updated','Site',n,x.orgId); toast('Location saved'); render(); };
+  el.querySelectorAll('[data-licf]').forEach(b=>b.onclick=()=>licenceForm(b.dataset.licf));
+  el.querySelectorAll('[data-eo]').forEach(b=>b.onclick=()=>{ const o=S.orgs.find(x=>x.id===b.dataset.eo); const m=modal('Rename business',`<div class="fld"><label>Name</label><input class="inp" id="n" value="${esc(o.name)}"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
+    m.querySelector('#sv').onclick=async()=>{ const n=m.querySelector('#n').value.trim(); if(!n) return; try{ if(CLOUD) await Cloud.renameOrg(o.id,n); o.name=n; P.save(); closeModal(); render(); }catch(e){ toast(Cloud.friendly(e)); } }; });
+}
 VIEWS.settings=(el)=>{
   const sy=S.settings.sync;
-  el.innerHTML=`<div class="ph"><div><h1>Settings</h1><p>Your account, the connection devices sync through, and data tools.</p></div></div>
+  el.innerHTML=`<div class="ph"><div><h1>Settings</h1><p>Your account, the connection devices sync through, and this location.</p></div>${tlSelectHtml()}</div>
   <div class="cols eq">
     <div class="card"><h3>Your account</h3><div class="sub">${esc(me().email||me().name)} · ${me().rawRole==='owner'?'Owner':P.ROLES[me().role]}</div>
       ${CLOUD?`<div class="setrow"><div><b>Password</b><span class="hint">Change the password for this Proview Label login.</span></div><button class="btn ghost sm" id="chg">Change</button></div>
@@ -2613,7 +2639,9 @@ VIEWS.settings=(el)=>{
         <div class="setrow"><div><b>Connect a handheld</b><span class="hint">On the device: Menu → Settings → Connect to Proview Label, then sign in with a back-office login and pick the location.</span></div></div>`
       :`<div class="sub">This preview runs on sample data saved in this browser. The hosted back-office (label.proviewcrm.co.uk) uses live accounts and syncs with every device.</div>
         <div class="setrow"><div><b>Sample data</b><span class="hint">Put back the demo businesses, locations, products and 14 days of activity.</span></div><button class="btn red sm" id="rst">Reset demo data</button></div>`}
-    </div></div>`;
+    </div></div>
+  ${thisLocationCard()}`;
+  bindThisLocation(el);
   const chg=el.querySelector('#chg'); if(chg) chg.onclick=()=>{ const m=modal('Change password',`<div class="fld"><label>New password</label><input class="inp" id="a" type="password" autocomplete="new-password"></div><div class="fld"><label>Confirm</label><input class="inp" id="b" type="password" autocomplete="new-password"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
     m.querySelector('#sv').onclick=async()=>{ const a=m.querySelector('#a').value; if(a.length<8) return toast('Use at least 8 characters'); if(a!==m.querySelector('#b').value) return toast('The passwords don’t match'); try{ await Cloud.setPassword(a); closeModal(); toast('Password changed'); }catch(e){ toast(Cloud.friendly(e)); } }; };
   const sn=el.querySelector('#sn'); if(sn) sn.onclick=()=>doSync(false);

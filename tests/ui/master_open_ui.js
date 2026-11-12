@@ -107,8 +107,7 @@ const recordCalls = (st) => st.calls.filter((c) => c.includes('/rest/v1/pl_recor
     ok('master biz: banner "Viewing Burger Barn as Proview"', /Viewing Burger Barn as Proview/.test(t), t.slice(0, 300));
     ok('master biz: Back to licence portal link', await p.$eval('.master-bar a', (a) => a.textContent.trim() === 'Back to licence portal' && a.href === 'https://license.proviewcrm.co.uk/'));
     ok('master biz: dashboard of the business', /Your locations/.test(t) && /Camden Kitchen/.test(t) && /Soho Kitchen/.test(t));
-    const opts = await p.$$eval('#sitePick option', (o) => o.map((x) => x.textContent));
-    ok('master biz: dropdown = the business\'s locations as the owner sees them', JSON.stringify(opts) === JSON.stringify(['All my locations (2)', 'Camden Kitchen', 'Soho Kitchen']), JSON.stringify(opts));
+    ok('master biz: dropdown = the business name in a disabled box (OWNER UPDATE 07:47)', await p.$eval('#sitePick', (s) => s.disabled && s.textContent.trim() === 'Burger Barn'));
     const rc = recordCalls(st);
     ok('master biz: every record request names Burger Barn only', rc.length > 0 && rc.every((c) => c.includes('org_id=eq.org_a') && c.endsWith('[org_a]')), rc.join('\n'));
     ok('master biz: whoami sent x-pl-org org_a (migration 010)', (st.whoHdr || []).length > 0 && st.whoHdr.every((h) => h === 'org_a'), JSON.stringify(st.whoHdr));
@@ -119,12 +118,17 @@ const recordCalls = (st) => st.calls.filter((c) => c.includes('/rest/v1/pl_recor
     await p.screenshot({ path: SHOTS + '/master-biz.png' });
     await p.evaluate(() => { location.hash = 'products'; }); await sleep(400);
     ok('master biz: Products works for the business', /Beef patty secret/.test(await text(p)) && !/Margherita/.test(await text(p)));
+    // no Locations page (owner, 12 Nov 2026): #devices (old "Locations & devices") goes home; Handhelds and Settings → This location instead
     await p.evaluate(() => { location.hash = 'devices'; }); await sleep(400);
+    ok('master biz: old #devices (Locations & devices) goes to the Dashboard', /Your locations/.test(await text(p)) && !/Locations & devices/.test(await text(p)));
+    ok('master biz: no Locations item in the menu', !(await p.$$eval('.side .nav a', (a) => a.some((x) => /Locations/.test(x.textContent)))));
+    await p.evaluate(() => { location.hash = 'handhelds'; }); await sleep(400);
     const d = await text(p);
-    ok('master biz: Locations & devices with Licence… (master tool kept)', /Locations & devices/.test(d) && (await p.$$('[data-licf]')).length === 2);
-    ok('master biz: Business card says locations are added and linked in the portal', /New locations are added, linked and unlinked in the licence portal/.test(d));
-    ok('master biz: no "+ Add location" inside the business', !/Add location/.test(d) && !(await p.$('#addS')));
-    await p.click('[data-licf]'); await sleep(200);
+    ok('master biz: Handhelds page, no Locations or Business card', /Handhelds/.test(d) && !/Address \(printed/.test(d) && !(await p.$('[data-es]')) && !/Add location/.test(d) && !(await p.$('#addS')));
+    await p.evaluate(() => { location.hash = 'settings'; }); await sleep(400);
+    ok('master biz: Settings → This location has its own location select', JSON.stringify(await p.$$eval('#tlSite option', (o) => o.map((x) => x.textContent))) === JSON.stringify(['Camden Kitchen', 'Soho Kitchen']));
+    ok('master biz: This location has Licence… (master tool kept) and Rename business', (await p.$$('#thisLoc [data-licf]')).length === 1 && !!(await p.$('#thisLoc [data-eo]')) && /linked and unlinked in the licence portal/.test(await text(p)));
+    await p.click('#thisLoc [data-licf]'); await sleep(200);
     ok('master biz: Licence… pop-up has the trial tool', /Trial \(set by hand\)/.test(await p.$eval('#modal', (e) => e.innerText)));
     await p.keyboard.press('Escape'); await p.evaluate(() => { const x = document.querySelector('#modal [data-x]'); if (x) x.click(); });
     await p.evaluate(() => { location.hash = 'sites'; }); await sleep(300);
@@ -137,9 +141,9 @@ const recordCalls = (st) => st.calls.filter((c) => c.includes('/rest/v1/pl_recor
   // 3. same tab: the portal opens another location (Pizza Palace)
   await run(browser, { name: 'master switch', page: p, email: MASTER, master: true, url: '#pv_sso=TOKEN2', ssoReply: { body: { token_hash: 'h2', email: MASTER, open: 'org_b' } } }, async (p, st) => {
     const t = await text(p), h = await html(p);
-    ok('master switch: now inside Pizza Palace', /Viewing Pizza Palace as Proview/.test(t) && /Leeds Pizzeria/.test(t), t.slice(0, 200));
+    ok('master switch: now inside Pizza Palace', /Viewing Pizza Palace as Proview/.test(t), t.slice(0, 200));
     ok('master switch: Burger Barn no longer on the page', !/Burger Barn|Camden|Beef patty/.test(h));
-    ok('master switch: one location = disabled box with its name', await p.$eval('#sitePick', (s) => s.disabled && s.textContent.trim() === 'Leeds Pizzeria'));
+    ok('master switch: disabled box with the business name', await p.$eval('#sitePick', (s) => s.disabled && s.textContent.trim() === 'Pizza Palace'));
   });
   // 4. old link / dashboard: an SSO hand-off with no business -> the portal page again
   await run(browser, { name: 'master old link', page: p, email: MASTER, master: true, url: '#pv_sso=TOKEN3', ssoReply: { body: { token_hash: 'h3', email: MASTER } } }, async (p) => {
@@ -158,16 +162,18 @@ const recordCalls = (st) => st.calls.filter((c) => c.includes('/rest/v1/pl_recor
     const t = await text(p);
     ok('owner: dashboard of their business', /Your locations/.test(t) && /Camden Kitchen/.test(t));
     ok('owner: no master banner', !(await p.$('.master-bar')));
-    const opts = await p.$$eval('#sitePick option', (o) => o.map((x) => x.textContent));
-    ok('owner: dropdown "All my locations (2)" + sites', JSON.stringify(opts) === JSON.stringify(['All my locations (2)', 'Camden Kitchen', 'Soho Kitchen']), JSON.stringify(opts));
+    ok('owner: dropdown = the business name in a disabled box (OWNER UPDATE 07:47)', await p.$eval('#sitePick', (s) => s.disabled && s.textContent.trim() === 'Burger Barn'));
     ok('owner: full sync, no x-pl-org', recordCalls(st).length > 0 && recordCalls(st).every((c) => c.endsWith('[]')), recordCalls(st).join('\n'));
     ok('owner: menu has Settings, no Locations', !!(await p.$('.side .nav a[href="#settings"]')) && !(await p.$('.side .nav a[href="#sites"]')));
     await p.screenshot({ path: SHOTS + '/owner.png' });
-    // LOCATIONS_LINK_SPEC: no adding locations; editing one stays
+    // LOCATIONS_LINK_SPEC + "Remove locations": no Locations page; a location is edited in Settings → This location
     await p.evaluate(() => { location.hash = 'devices'; }); await sleep(400);
+    ok('owner: old #devices goes to the Dashboard', /Your locations/.test(await text(p)));
+    await p.evaluate(() => { location.hash = 'handhelds'; }); await sleep(400);
     const dt = await text(p);
-    ok('owner: Locations & devices has no "+ Add location"', /Locations & devices/.test(dt) && !/Add location/.test(dt) && !(await p.$('#addS')), dt.slice(0, 300));
-    ok('owner: a location can still be edited', !!(await p.$('[data-es]')));
+    ok('owner: Handhelds has no locations list and no "+ Add location"', /Pair handheld/.test(dt) && !/Add location/.test(dt) && !(await p.$('#addS')) && !(await p.$('[data-es]')), dt.slice(0, 300));
+    await p.evaluate(() => { location.hash = 'settings'; }); await sleep(400);
+    ok('owner: a location can still be edited (Settings → This location)', !!(await p.$('#tlSave')) && await p.$eval('#tlName', (i) => i.value) === 'Camden Kitchen');
   });
   await p.close();
   // 7. owner arriving by SSO: a reply without open is normal; nothing changes
@@ -177,7 +183,7 @@ const recordCalls = (st) => st.calls.filter((c) => c.includes('/rest/v1/pl_recor
   await p.close();
   // 8. manager: unchanged (their one location, no Settings)
   p = await run(browser, { name: 'manager', email: 'mgr@burgerbarn.test', role: 'manager', url: '#overview' }, async (p) => {
-    ok('manager: their location only (disabled box)', await p.$eval('#sitePick', (s) => s.disabled && s.textContent.trim() === 'Camden Kitchen'));
+    ok('manager: their business only (disabled box)', await p.$eval('#sitePick', (s) => s.disabled && s.textContent.trim() === 'Burger Barn'));
     ok('manager: no Settings, no banner', !(await p.$('.side .nav a[href="#settings"]')) && !(await p.$('.master-bar')));
   });
   await p.close();

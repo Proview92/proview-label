@@ -473,7 +473,7 @@ const L = (coll) => P.live(coll).filter(x => !x.orgId || !ORG() || x.orgId === O
 const up = (coll, rec) => P.upsert(coll, { orgId: ORG(), ...rec });
 const orgSet = (k) => { const o=(S.orgs||[]).find(x=>x.id===ORG()); const v=o&&o.settings?o.settings[k]:undefined; return v!==undefined?v:S.settings[k]; };
 const rule = (id) => P.byId('rules', id) || L('rules').find(r=>r.name==='Fridge') || L('rules')[0] || { id:'_fridge', name:'Fridge', units:2, period:'days' };
-// Easy or Detailed is set per handheld in the back-office (Locations & devices). Easy unless set there.
+// Easy or Detailed is set per handheld in the back-office (Handhelds). Easy unless set there.
 const modeFor = () => ((connected() ? CONN.mode : (P.byId('devices', S.deviceId) || {}).mode) === 'detailed' ? 'detailed' : 'easy');
 // names of categories / products in the screen language, when the back-office has them; labels always print the English name
 const tn = (x, f) => { f = f || 'name'; const l = T.lang(), t = x && x.i18n && x.i18n[l]; return (t && t[f]) || (x && x[f]) || ''; };
@@ -834,7 +834,7 @@ screens.settings = () => {
   const pr=S.settings.printer, sy=S.settings.sync;
   $('#main').innerHTML = `<div style="padding:14px">
     <div class="sect" style="margin-top:0">Site</div>
-    ${connected()?`<div class="card" style="margin-bottom:10px"><b style="font-size:15px">${esc(site().name)}</b><div class="hint">Change the location in the back-office: Locations &amp; devices.</div></div>`
+    ${connected()?`<div class="card" style="margin-bottom:10px"><b style="font-size:15px">${esc(site().name)}</b><div class="hint">Change the location in the back-office: Handhelds.</div></div>`
     :`<div class="fld"><select class="inp" id="site">${P.live('sites').map(s=>`<option value="${s.id}" ${s.id===S.currentSiteId?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>`}
     <div class="sect">Printer</div>
     <div class="seg sm" id="pm" style="margin:0 0 12px"><button data-m="builtin" class="${pr.mode==='builtin'?'on':''}">Built-in</button><button data-m="preview" class="${pr.mode==='preview'?'on':''}">Preview</button><button data-m="bluetooth" class="${pr.mode==='bluetooth'?'on':''}">Bluetooth</button><button data-m="tcp" class="${pr.mode==='tcp'?'on':''}">Network</button></div>
@@ -1299,7 +1299,7 @@ setInterval(async()=>{
 window.addEventListener('online',()=>{ if(connected()) trySync(); });
 
 // ---------- pairing (first open, or after being removed / unpaired) ----------
-// The handheld shows a 6-character code and a QR code. In the back-office: Locations & devices → Pair handheld.
+// The handheld shows a 6-character code and a QR code. In the back-office: Handhelds → Pair handheld.
 const PAIR_KEY='pvl-pair-secret', PAIR_URL='https://label.proviewcrm.co.uk/#pair=';
 let pairing=null;   // { code, t, err } while the pairing screen is up
 function pairSecret(){ let s=localStorageGet(PAIR_KEY); if(!s||s.length<64){ const r=new Uint8Array(32); crypto.getRandomValues(r); s=[...r].map(x=>x.toString(16).padStart(2,'0')).join(''); localStorageSet(PAIR_KEY,s); } return s; }
@@ -1310,7 +1310,7 @@ function drawPair(){
   el.innerHTML=`<div class="pairscreen"><button class="langBtn" id="pLang" aria-label="Language" data-notr>${T.FLAGS[T.lang()]}</button>
     <div class="pv-logo"><div class="mk">PV</div><div class="wd">PROVIEW<span>LABEL</span></div></div>
     <h2>Pair this handheld</h2>
-    <p>In the back-office at label.proviewcrm.co.uk, go to Locations &amp; devices → Pair handheld and enter this code.</p>
+    <p>In the back-office at label.proviewcrm.co.uk, go to Handhelds → Pair handheld and enter this code.</p>
     ${c?`<div class="paircode" data-notr>${esc(shown)}</div><div class="pairqr">${qrSVG(PAIR_URL+c)}</div><p style="margin-top:12px">Or scan the QR code with your phone.</p>`:'<div class="paircode" data-notr>··· ···</div>'}
     <div class="pairwait"><span class="spin" style="border-color:#26262e;border-top-color:#8fb3f2"></span>${c?'Waiting to be paired…':'Getting a code…'}</div>
     ${pairing.err?`<div class="pairerr">${esc(pairing.err)}</div>`:''}</div>`;

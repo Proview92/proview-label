@@ -28,14 +28,20 @@ Food labelling for UK kitchens, part of the Proview CRM family (Bookings, Employ
    `biz` claim; `sso-login` honours it only for the master and replies with `open`; the back-office then sends that
    business in the `x-pl-org` header and keeps it for the tab in sessionStorage `pv_master_open`).
 2. The owner signs in, either with "Sign in with Proview account" or "Create a login" using that email. They add their menu, back-office logins and device staff. Owners can't add or delete locations (migration 011): Proview adds them (New location) and links them in the licence portal.
-3. On each handheld: open Proview Label. It shows a 6-character pairing code and a QR code. In the back-office go to **Locations & devices → + Pair handheld**, enter the code (or scan the QR code with a phone, which opens that dialog with the code filled in), and pick the location, a name and **Easy** or **Detailed** mode. The handheld opens a few seconds later. Products and settings come down to the device. Labels, expiry and wastage go up to the server.
+3. On each handheld: open Proview Label. It shows a 6-character pairing code and a QR code. In the back-office go to **Handhelds → + Pair handheld**, enter the code (or scan the QR code with a phone, which opens that dialog with the code filled in), and pick the location, a name and **Easy** or **Detailed** mode. The handheld opens a few seconds later. Products and settings come down to the device. Labels, expiry and wastage go up to the server.
    - No email or password on the handheld. Pairing makes a login used only by that handheld (`supabase/functions/pl-device-pair`, migration `005_device_pairing.sql`). It can only see and change its own location.
    - Mode, name and location can be changed later from the same page; the handheld picks them up within a minute. **Remove** cuts its access at once and it shows a new pairing code.
 
 ### Linking locations (migration 011)
-- Only the master links locations, in the licence portal (**Link with another location…**). The portal calls `hub_call(token, 'link', {into, from})`: business `from` is merged into `into` (locations, menu, staff, labels, wastage, orders, handhelds, licences, members; a person in both keeps the higher role) and `from` is deleted. Owners and managers of either then see both locations and switch with the location dropdown.
+- Only the master links locations, in the licence portal (**Link with another location…**). The portal calls `hub_call(token, 'link', {into, from})`: business `from` is merged into `into` (locations, menu, staff, labels, wastage, orders, handhelds, licences, members; a person in both keeps the higher role) and `from` is deleted. Owners and managers of either then see both locations together in that one business.
 - **Unlink** (`hub_call(token, 'unlink', {account, site})`) moves one location out into a new business of its own, named after the location: its records, handhelds and licence move, the menu is copied, members are copied. The same action splits a business that already has several locations.
 - Licences stay per location and move with it. Both actions are logged in `hub_private.location_links` and are safe to repeat.
+
+### A person in several businesses, and no Locations page (12 Nov 2026)
+- **Header dropdown:** business names only, by name. Picking one opens the whole business (all its locations, never two businesses together). With one business it is a disabled box with the business name (the master inside an opened business too).
+- **Sign-in** (email, Proview account or invite) opens the business last used, remembered per email in this browser (`pvl-site:<email>`). If it is locked, suspended or has no location this person can open, the next usable business opens instead (not saved over the last used one).
+- **No Locations page.** The old *Locations & devices* page is now **Handhelds** (pairing and handhelds only); `#devices` and `#sites` go to the Dashboard. A location's name, address, area and licence (Buy / Renew online; the master: Licence… and Rename business) are in **Settings → This location**, with a location select at the top of Settings when the business has more than one.
+- Tests: `node tests/ui/multi_business_ui.js web/site` and `node tests/ui/master_open_ui.js web/site`.
 
 ## What's in the box
 
