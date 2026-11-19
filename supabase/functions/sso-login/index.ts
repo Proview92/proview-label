@@ -5,6 +5,7 @@
 // the signature, checks the email is a Proview master or a back-office login here (public.sso_entitled), and returns a
 // one-time magic-link token the app exchanges for a normal session with
 // supabase.auth.verifyOtp({ token_hash, type: "magiclink" }). Device staff (PIN only) have no back-office login.
+// One password (19 Nov 2026): every back-office login opens Label from the dashboard; a login on hold is refused.
 //
 //   POST { assertion } → { token_hash, email }      (assertion mode "login", single use)
 //   POST { assertion } → { ok, reason }             (assertion mode "check": can this person sign in?)

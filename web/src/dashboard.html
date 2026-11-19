@@ -936,7 +936,7 @@ function renderLogin(){
   const mode=LOGIN.mode, up=mode==='signup', reset=mode==='reset', newpw=mode==='newpw';
   const accts=CLOUD?[]:P.live('users').filter(u=>u.email&&u.password);
   const title=newpw?'Choose a new password':reset?'Reset your password':up?'Create your login':'Sign in';
-  const sub=newpw?'At least 8 characters.':reset?'We’ll email you a link to choose a new password.':up?'Use the email your business owner or Proview added for you. New to Proview Label? Create a login to set up your business.':'Manage products, allergens, expiry and wastage across your locations.';
+  const sub=newpw?'At least 8 characters. Your password is the same on all Proview sites, so this changes it everywhere.':reset?'We’ll email you a link to choose a new password. Your password is the same on all Proview sites.':up?'Use the email your business owner or Proview added for you. New to Proview Label? Create a login to set up your business.':'Manage products, allergens, expiry and wastage across your locations.';
   $('#app').innerHTML=`<div class="auth2">${loginArt()}
     <div class="auth2-form"><div>
       <form id="lf" autocomplete="on" novalidate>
@@ -1448,7 +1448,7 @@ VIEWS.users=(el)=>{
         <p class="hint">Owners and admins always have every feature. Settings is owner/admin only.</p></div>
       <div class="fld" style="margin-top:14px"><label>${isNew?'Password':'New password'} <span class="hint">${isNew?'optional · set one and they can sign in straight away, no email needed':'optional · leave empty to keep their current password'}</span></label>
         <div style="display:flex;gap:8px"><input class="inp" id="pw" type="text" autocomplete="new-password" placeholder="At least 8 characters" style="flex:1;font-family:ui-monospace,Menlo,monospace"><button class="btn ghost" id="pwg" type="button">Generate</button></div>
-        <div class="hint" style="margin-top:6px">Give it to them in person or by phone. They can change it any time with “Forgot password?”.</div></div>
+        <div class="hint" style="margin-top:6px">Give it to them in person or by phone. The password is the same on all Proview sites, so this becomes their password everywhere. They can change it any time with “Forgot password?”.</div></div>
       ${isNew?'<p class="hint" style="margin-top:12px">Without a password they sign in at label.proviewcrm.co.uk with “Sign in with Proview account” (same login as your other Proview apps), or “Create a login” with this email.</p>':''}`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">${isNew?'Add login':'Save'}</button>`);
     const sync=()=>md.querySelector('#sb').style.display=md.querySelector('#r').value==='manager'?'':'none'; sync(); md.querySelector('#r').onchange=sync;
     md.querySelector('#pwg').onclick=()=>{ const A='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', r=new Uint32Array(12); crypto.getRandomValues(r); md.querySelector('#pw').value=[...r].map(x=>A[x%A.length]).join(''); };
@@ -1526,8 +1526,8 @@ VIEWS.settings=(el)=>{
     </div></div>
   ${thisLocationCard()}`;
   bindThisLocation(el);
-  const chg=el.querySelector('#chg'); if(chg) chg.onclick=()=>{ const m=modal('Change password',`<div class="fld"><label>New password</label><input class="inp" id="a" type="password" autocomplete="new-password"></div><div class="fld"><label>Confirm</label><input class="inp" id="b" type="password" autocomplete="new-password"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
-    m.querySelector('#sv').onclick=async()=>{ const a=m.querySelector('#a').value; if(a.length<8) return toast('Use at least 8 characters'); if(a!==m.querySelector('#b').value) return toast('The passwords don’t match'); try{ await Cloud.setPassword(a); closeModal(); toast('Password changed'); }catch(e){ toast(Cloud.friendly(e)); } }; };
+  const chg=el.querySelector('#chg'); if(chg) chg.onclick=()=>{ const m=modal('Change password',`<p class="hint" style="margin:0 0 10px">Your password is the same on all Proview sites, so this changes it everywhere.</p><div class="fld"><label>New password</label><input class="inp" id="a" type="password" autocomplete="new-password"></div><div class="fld"><label>Confirm</label><input class="inp" id="b" type="password" autocomplete="new-password"></div>`,`<button class="btn ghost" data-x>Cancel</button><button class="btn" id="sv">Save</button>`);
+    m.querySelector('#sv').onclick=async()=>{ const a=m.querySelector('#a').value; if(a.length<8) return toast('Use at least 8 characters'); if(a!==m.querySelector('#b').value) return toast('The passwords don’t match'); try{ await Cloud.setPassword(a); closeModal(); toast('Password changed on all Proview sites'); }catch(e){ toast(Cloud.friendly(e)); } }; };
   const sn=el.querySelector('#sn'); if(sn) sn.onclick=()=>doSync(false);
   const rst=el.querySelector('#rst'); if(rst) rst.onclick=()=>confirmM('Reset demo data?','All changes in this browser are replaced with the sample data.','Reset',()=>{P.reset();toast('Demo data restored');render();});
 };
