@@ -72,7 +72,7 @@ const picked = (p) => p.$eval('#sitePick', (s) => s.options[s.selectedIndex].tex
 const box = (p) => p.$eval('#sitePick', (s) => s.disabled ? s.textContent.trim() : null).catch(() => null);
 const choose = async (p, label, sel = '#sitePick') => { await p.evaluate((l, q) => { const s = document.querySelector(q); const o = [...s.options].find((x) => x.textContent === l); s.value = o.value; s.dispatchEvent(new Event('change')); }, label, sel); await sleep(400); };
 const page = async (p, h) => { await p.evaluate((x) => { location.hash = x; }, h); await sleep(400); return text(p); };
-const both = (role = 'owner', a = {}, b = {}) => [org('org_a', role, a), org('org_b', role, b)];
+const both = (role = 'admin', a = {}, b = {}) => [org('org_a', role, a), org('org_b', role, b)];
 const KEY = 'pvl-site:' + TWO;
 const HDR = JSON.stringify(['Burger Barn', 'Pizza Palace']);
 const plain = async (p, who) => {
@@ -123,21 +123,21 @@ const plain = async (p, who) => {
   });
 
   // 3. fallback when A is unusable
-  await run(browser, { name: 'fallback locked', email: TWO, orgs: both('owner', { locked: true, licensed: false, no_licence: true }), ls: { [KEY]: 'org:org_a' } }, async (p) => {
+  await run(browser, { name: 'fallback locked', email: TWO, orgs: both('admin', { locked: true, licensed: false, no_licence: true }), ls: { [KEY]: 'org:org_a' } }, async (p) => {
     const t = await text(p);
     ok('A locked: lands in Pizza Palace instead (not signed out)', await picked(p) === 'Pizza Palace' && /Pizza Palace/.test(t) && !/Burger Barn/.test(t), await picked(p));
     ok('A locked: only usable businesses listed, one left = disabled box (07:55)', await box(p) === 'Pizza Palace', JSON.stringify(await opts(p)));
     ok('A locked: fallback not saved over the last-used business', await p.evaluate((k) => localStorage.getItem(k), KEY) === 'org:org_a');
   });
-  await run(browser, { name: 'fallback suspended', email: TWO, orgs: both('owner', { suspended: true }), ls: { [KEY]: 'site_a2' } }, async (p) => {
+  await run(browser, { name: 'fallback suspended', email: TWO, orgs: both('admin', { suspended: true }), ls: { [KEY]: 'site_a2' } }, async (p) => {
     ok('A suspended: lands in Pizza Palace', await picked(p) === 'Pizza Palace', await picked(p));
   });
-  await run(browser, { name: 'fallback no locations', email: TWO, orgs: [org('org_a', 'manager', { site_ids: [] }), org('org_b', 'owner')], ls: { [KEY]: 'org:org_a' } }, async (p) => {
+  await run(browser, { name: 'fallback no locations', email: TWO, orgs: [org('org_a', 'manager', { site_ids: [] }), org('org_b', 'admin')], ls: { [KEY]: 'org:org_a' } }, async (p) => {
     ok('A has no locations for them: lands in Pizza Palace (one business left: disabled box)', await box(p) === 'Pizza Palace', JSON.stringify(await opts(p)));
     const t0 = await text(p), t1 = await page(p, 'products');
     ok('A has no locations: not signed out, nothing of A', /Labels printed today/.test(t0) && !/Beef patty/.test(t1), t0.slice(0, 200));
   });
-  await run(browser, { name: 'fallback B locked', email: TWO, orgs: both('owner', {}, { locked: true }), ls: { [KEY]: 'org:org_b' } }, async (p) => {
+  await run(browser, { name: 'fallback B locked', email: TWO, orgs: both('admin', {}, { locked: true }), ls: { [KEY]: 'org:org_b' } }, async (p) => {
     ok('B locked, last used B: lands in Burger Barn', await picked(p) === 'Burger Barn', await picked(p));
   });
   await run(browser, { name: 'none usable', email: TWO, orgs: [org('org_a', 'manager', { site_ids: [] }), org('org_b', 'manager', { site_ids: [] })] }, async (p) => {
@@ -145,12 +145,12 @@ const plain = async (p, who) => {
   });
 
   // 4. one business: its name in a disabled box
-  await run(browser, { name: 'one business', email: ONE, orgs: [org('org_a', 'owner')] }, async (p) => {
+  await run(browser, { name: 'one business', email: ONE, orgs: [org('org_a', 'admin')] }, async (p) => {
     ok('one business (2 locations): disabled box with the business name', await box(p) === 'Burger Barn', JSON.stringify(await opts(p)));
     await plain(p, 'one business');
     ok('one business: both locations on the dashboard', /Camden Kitchen/.test(await text(p)) && /Soho Kitchen/.test(await text(p)));
   });
-  await run(browser, { name: 'one location', email: ONE, orgs: [org('org_b', 'owner')] }, async (p) => {
+  await run(browser, { name: 'one location', email: ONE, orgs: [org('org_b', 'admin')] }, async (p) => {
     ok('one business (1 location): disabled box with the business name', await box(p) === 'Pizza Palace');
   });
 
@@ -190,7 +190,7 @@ const plain = async (p, who) => {
     const t = await page(p, 'handhelds');
     ok('owner: Handhelds page kept (pairing), no locations list', /Pair handheld/.test(t) && !/Address \(printed/.test(t));
   });
-  await run(browser, { name: 'no Locations: locked', email: ONE, orgs: [org('org_b', 'owner', { sites: [{ id: 'site_b1', licence_type: null }] })], url: '#settings' }, async (p) => {
+  await run(browser, { name: 'no Locations: locked', email: ONE, orgs: [org('org_b', 'admin', { sites: [{ id: 'site_b1', licence_type: null }] })], url: '#settings' }, async (p) => {
     ok('owner: This location offers Buy online for an unlicensed location', /Buy online/.test(await p.$eval('#tlLic', (e) => e.innerText)) && !!(await p.$('#tlLic [data-buy]')));
     ok('07:47b: banner says each business needs its own licence', /each business needs its own licence/.test(await text(p)) && !/each location needs its own licence/i.test(await text(p)));
   });
@@ -208,7 +208,7 @@ const plain = async (p, who) => {
     const t = await p.evaluate(() => document.body.innerText);
     ok('master direct: "Open a business from the licence portal", businesses added and linked there', /Open a business from the licence portal/.test(t) && /Businesses are added and linked there too \(New business, Link with another business\)/.test(t) && !/Open a location/.test(t), t.slice(0, 300));
   });
-  await run(browser, { name: 'wording owner', email: ONE, orgs: [org('org_a', 'owner')], url: '#settings' }, async (p) => {
+  await run(browser, { name: 'wording owner', email: ONE, orgs: [org('org_a', 'admin')], url: '#settings' }, async (p) => {
     ok('owner: This location says businesses are set up by Proview', /Businesses are set up and linked by Proview/.test(await text(p)) && /This location/.test(await text(p)));
   });
 

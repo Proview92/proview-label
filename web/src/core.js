@@ -564,7 +564,7 @@
       const res = await fetch(base + '?on_conflict=id', { method: 'POST', headers: { ...headers, 'x-pl-org': chunk[0].org_id, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(chunk) });
       if (!res.ok) {
         const t = (await res.text()).slice(0, 300);
-        if (res.status === 401 || res.status === 403 || /row-level security/i.test(t)) throw new Error('You don’t have permission to change some of these records. Ask an owner or Proview.');
+        if (res.status === 401 || res.status === 403 || /row-level security/i.test(t)) throw new Error('You don’t have permission to change some of these records. Ask your business admin or Proview.');
         throw new Error('Couldn’t save to the server (' + res.status + ').');
       }
       chunk.forEach((row) => { const r = s[row.kind].find((x) => x.id === row.id); if (r) r._dirty = false; });

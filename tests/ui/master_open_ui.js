@@ -158,7 +158,7 @@ const recordCalls = (st) => st.calls.filter((c) => c.includes('/rest/v1/pl_recor
   await p.close();
 
   // 6. owner: unchanged (no banner, own business, Users)
-  p = await run(browser, { name: 'owner', email: 'owner@burgerbarn.test', role: 'owner', url: '#overview' }, async (p, st) => {
+  p = await run(browser, { name: 'owner', email: 'owner@burgerbarn.test', role: 'admin', url: '#overview' }, async (p, st) => {
     const t = await text(p);
     ok('owner: dashboard of their business', /Your locations/.test(t) && /Camden Kitchen/.test(t));
     ok('owner: no master banner', !(await p.$('.master-bar')));
@@ -177,7 +177,7 @@ const recordCalls = (st) => st.calls.filter((c) => c.includes('/rest/v1/pl_recor
   });
   await p.close();
   // 7. owner arriving by SSO: a reply without open is normal; nothing changes
-  p = await run(browser, { name: 'owner sso', email: 'owner@burgerbarn.test', role: 'owner', url: '#pv_sso=TOK', ssoReply: { body: { token_hash: 'h', email: 'owner@burgerbarn.test' } } }, async (p) => {
+  p = await run(browser, { name: 'owner sso', email: 'owner@burgerbarn.test', role: 'admin', url: '#pv_sso=TOK', ssoReply: { body: { token_hash: 'h', email: 'owner@burgerbarn.test' } } }, async (p) => {
     ok('owner sso: signed in to their business', /Camden Kitchen/.test(await text(p)) && !(await p.$('.master-bar')));
   });
   await p.close();

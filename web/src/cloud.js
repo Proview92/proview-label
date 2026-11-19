@@ -54,7 +54,7 @@
   };
   const lockMsg = (o) => {
     const st = orgState(o), n = (o && o.name) || 'This business';
-    if (st === 'nolicence') return { title: 'No licence yet', text: 'This handheld has no licence yet (' + n + '). Each handheld needs its own licence: your business owner can buy it in the Proview Label back-office (Handhelds). Nothing can be printed or synced until it has one.' };
+    if (st === 'nolicence') return { title: 'No licence yet', text: 'This handheld has no licence yet (' + n + '). Each handheld needs its own licence: your business admin can buy it in the Proview Label back-office (Handhelds). Nothing can be printed or synced until it has one.' };
     if (st === 'expired') return { title: 'Licence ended', text: 'This handheld’s licence has ended (' + n + '). Your data is safe, but nothing can be printed or synced until it is renewed in the back-office (Handhelds).' };
     if (st === 'suspended') return { title: 'Account suspended', text: n + ' is suspended. Your data is safe, but nothing can be changed or synced until the licence is renewed.' };
     return null;
@@ -153,12 +153,12 @@
     async saveOrgSettings(id, settings) { const { error } = await sb.from('pl_orgs').update({ settings }).eq('id', id); if (error) throw error; },
     async members(orgIds) { let q = sb.from('pl_members').select('*').order('name'); if (orgIds) q = q.in('org_id', orgIds); const { data, error } = await q; if (error) throw error; return data || []; },
     async saveMember(m) {
-      const row = { org_id: m.org_id, email: String(m.email || '').trim().toLowerCase(), name: m.name || '', role: m.role, site_ids: m.site_ids || [], features: m.role === 'manager' ? (m.features || {}) : {} };
+      const row = { org_id: m.org_id, email: String(m.email || '').trim().toLowerCase(), name: m.name || '', role: m.role, site_ids: m.site_ids || [], features: ['manager', 'staff'].includes(m.role) ? (m.features || {}) : {} };
       const q = (m.id ? sb.from('pl_members').update(row).eq('id', m.id) : sb.from('pl_members').insert(row)).select('id').single();
       const { data, error } = await q; if (error) throw new Error(/duplicate/i.test(error.message) ? 'That email already has a login for this business.' : error.message);
       return data && data.id;
     },
-    // owner/admin (or master) sets someone's password, so they can sign in straight away with no email
+    // an admin (or master) sets someone's password, so they can sign in straight away with no email
     async setMemberPassword(memberId, password) {
       const t = await Cloud.token(); if (!t) throw new Error('Please sign in again.');
       const r = await fetch(C.SUPABASE_URL + '/functions/v1/pl-set-password', { method: 'POST',
