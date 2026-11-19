@@ -2693,7 +2693,7 @@ VIEWS.settings=(el)=>{
   <div class="cols eq">
     <div class="card"><h3>Your account</h3><div class="sub">${esc(me().email||me().name)} · ${me().rawRole==='owner'?'Owner':P.ROLES[me().role]}</div>
       ${CLOUD?`<div class="setrow"><div><b>Password</b><span class="hint">Change the password for this Proview Label login.</span></div><button class="btn ghost sm" id="chg">Change</button></div>
-      <div class="setrow"><div><b>Proview account</b><span class="hint">The same email signs in to Bookings, Employee, Signage and WiFi via dashboard.proviewcrm.co.uk.</span></div><a class="btn ghost sm" href="https://dashboard.proviewcrm.co.uk/" target="_blank" rel="noopener">Open</a></div>`:`<p class="hint">Demo account. In the hosted back-office you sign in with your email or your Proview account.</p>`}
+      <div class="setrow"><div><b>Proview account</b><span class="hint"><!-- on hold (owner, 19 Nov 2026): Bookings and Employee left out; was "Bookings, Employee, Signage and WiFi" -->The same email signs in to Signage, WiFi and your other Proview apps via dashboard.proviewcrm.co.uk.</span></div><a class="btn ghost sm" href="https://dashboard.proviewcrm.co.uk/" target="_blank" rel="noopener">Open</a></div>`:`<p class="hint">Demo account. In the hosted back-office you sign in with your email or your Proview account.</p>`}
       <div class="setrow"><div><b>Proview support</b><span class="hint">020 8935 5495 · info@proviewtechgroup.co.uk · Mon–Fri 9am–5pm</span></div></div></div>
     <div class="card"><h3>Cloud</h3>
       ${CLOUD?`<div class="sub">Connected to the Proview Label server (London). Devices and this back-office stay in step automatically.</div>
