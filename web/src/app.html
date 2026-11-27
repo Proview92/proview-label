@@ -65,7 +65,7 @@ body.framed .hdr{padding-top:24px}
 .ptile:active{background:var(--blue-l)}
 .chips{display:flex;flex-wrap:wrap;gap:3px;justify-content:center}
 .chip{font-size:9.5px;font-weight:600;background:#FFF1E0;color:#9A5B00;border-radius:4px;padding:1px 4px;text-transform:uppercase}
-.addnew{display:flex;justify-content:center;padding:4px 0 18px}
+.addnew{display:flex;justify-content:center;gap:10px;padding:4px 0 18px}
 .addnew button{border:1.5px dashed #9AA5B1;border-radius:10px;padding:12px 22px;font-weight:600;font-size:17px;display:flex;align-items:center;gap:6px;color:var(--ink2)}
 .empty{text-align:center;color:var(--mute);padding:40px 24px}
 .empty b{display:block;color:var(--ink);font-size:18px;margin:10px 0 4px}
@@ -327,6 +327,14 @@ body.framed .device{border-color:#000;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 
 .ezq button{width:64px;height:64px;border-radius:50%;font-size:32px;font-weight:700;background:#fff;border:1px solid var(--line);color:#141418}
 .ezq b{font-size:44px;min-width:70px;text-align:center}
 .ezbig{width:100%;min-height:64px;font-size:21px!important}
+.tile.misc{background:#fff;color:#141418;border:2px dashed #b9bfc9;box-shadow:none;display:flex;align-items:center;justify-content:center;gap:8px}
+.mrow{display:flex;gap:14px;margin-top:12px}.mrow>div{flex:1}
+.mstep{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:12px;background:#fff;margin-top:4px}
+.mstep button{width:52px;height:52px;font-size:28px;font-weight:700;background:none;border:0;color:#141418}
+.mstep b{font-size:24px}
+.mal{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px}
+.mal button{min-height:46px;border-radius:10px;border:1px solid var(--line);background:#fff;color:#141418;font-size:14px;font-weight:600;padding:4px}
+.mal button.on{background:#C62828;border-color:#C62828;color:#fff}
 .ezinfo{background:#f4f3ef;border-radius:12px;padding:12px 14px;font-size:15px;line-height:1.5}
 /* ---------- pairing screen ---------- */
 .pairscreen{position:absolute;inset:0;z-index:78;background:#141418;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 22px;text-align:center;overflow-y:auto}
@@ -400,7 +408,7 @@ const P = window.PVL;
 const T = window.PVLi18n;
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = P.esc;
-const APP_VERSION = '1.5.6';
+const APP_VERSION = '1.5.7';
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const Native = () => (window.Capacitor && window.Capacitor.Plugins) || {};
 
@@ -592,9 +600,30 @@ function bindSeg(after){ $('#seg').querySelectorAll('button').forEach(b=>b.oncli
 // ---------- Easy mode: categories → products → − 1 + → Print ----------
 function easyHome(){
   const cats=[...catsFor('prep'),...catsFor('sale')];
-  $('#main').innerHTML = cats.length?`<div class="grid ezcats">${cats.map(c=>`<button class="tile" data-c="${c.id}" style="background:${c.color||'#546E7A'}">${esc(tn(c))}</button>`).join('')}</div>`
-    :`<div class="empty">${I.box}<b>No categories yet</b>A manager can add them in Detailed mode or on label.proviewcrm.co.uk.</div>`;
+  $('#main').innerHTML = cats.length?`<div class="grid ezcats">${cats.map(c=>`<button class="tile" data-c="${c.id}" style="background:${c.color||'#546E7A'}">${esc(tn(c))}</button>`).join('')}<button class="tile misc" id="miscBtn">${I.plus} Misc item</button></div>`
+    :`<div class="empty">${I.box}<b>No categories yet</b>A manager can add them in Detailed mode or on label.proviewcrm.co.uk.</div><div class="grid ezcats"><button class="tile misc" id="miscBtn">${I.plus} Misc item</button></div>`;
   $('#main').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{ const c=P.byId('categories',b.dataset.c); ui.tab=c.type; go('ezprod',{category:c}); });
+  $('#miscBtn').onclick=miscItem;
+}
+// A one-off label for something that isn't a product: name, days and allergens typed in on the spot. Nothing is added to the product list.
+function miscItem(){
+  if(connected()&&LOCK) return applyLock();
+  let days=1, qty=1; const al=new Set();
+  const step=(id,v)=>`<div class="mstep"><button data-s="${id}" data-d="-1" aria-label="Less">−</button><b id="${id}">${v}</b><button data-s="${id}" data-d="1" aria-label="More">+</button></div>`;
+  const body=`<div class="fld"><div class="lbl">Product name</div><input class="inp" id="mName" maxlength="40" autocomplete="off" autocapitalize="words" placeholder="e.g. Staff lunch"></div>
+    <div class="mrow"><div><div class="lbl">Use by (days)</div>${step('mDays',1)}</div><div><div class="lbl">Labels</div>${step('mQty',1)}</div></div>
+    <p class="hint" id="mDate" style="margin:6px 0 12px"></p>
+    <div class="lbl">Allergens <span style="font-weight:500;color:#6b7280">(tap any that apply)</span></div>
+    <div class="mal">${P.ALLERGENS.map(a=>`<button data-a="${a}">${esc(P.ALLERGEN_LABEL[a]||a)}</button>`).join('')}</div>`;
+  const sh=openSheet('Misc item', body, `<button class="btn blue ezbig" id="mGo">${I.print} Print</button>`);
+  const prod=()=>({ id:null, name:sh.querySelector('#mName').value.trim(), categoryId:null, allergens:[...al], customExpiry:{units:days,period:'days'} });
+  const upd=()=>{ sh.querySelector('#mDays').textContent=days; sh.querySelector('#mQty').textContent=qty;
+    const e=P.computeExpiry(P.customRule(prod())); sh.querySelector('#mDate').textContent='Use by '+P.fmtDay(e)+' '+P.fmtDate(e); };
+  sh.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{ const d=+b.dataset.d; if(b.dataset.s==='mDays') days=Math.max(1,Math.min(365,days+d)); else qty=Math.max(1,Math.min(99,qty+d)); upd(); });
+  sh.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{ const a=b.dataset.a; al.has(a)?al.delete(a):al.add(a); b.classList.toggle('on',al.has(a)); });
+  sh.querySelector('#mGo').onclick=()=>{ const p=prod(); if(!p.name){ toast('Type a product name'); sh.querySelector('#mName').focus(); return; }
+    enqueue({...buildJob(p,{}),misc:true,qty}); closeSheet(); };
+  upd();
 }
 screens.ezprod = () => {
   const c=ui.category; if(!c) return root('home');
@@ -623,8 +652,8 @@ screens.home = () => {
   const cats=catsFor(ui.tab);
   $('#main').innerHTML = segHTML() + `<div class="grid">${cats.map(c=>`<button class="tile" data-c="${c.id}" style="background:${c.color||'#546E7A'}">${esc(tn(c))}</button>`).join('')}</div>
     ${cats.length?'':'<div class="empty">No categories yet</div>'}
-    <div class="addnew"><button id="addCat">${I.plus} Add new</button></div>`;
-  bindSeg();
+    <div class="addnew"><button id="addCat">${I.plus} Add new</button><button id="miscBtn">${I.plus} Misc item</button></div>`;
+  bindSeg(); $('#miscBtn').onclick=miscItem;
   $('#main').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>go('products',{category:P.byId('categories',b.dataset.c)}));
   $('#addCat').onclick=()=>needManager(newCategory);
 };
