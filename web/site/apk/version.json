@@ -1,5 +1,5 @@
 {
-  "version": "1.5.6",
+  "version": "1.5.7",
   "url": "https://label.proviewcrm.co.uk/ProviewLabel.apk",
-  "notes": "Printing several of the same label no longer pauses between labels."
+  "notes": "New Misc item button: print a one-off label by typing a name, days and allergens."
 }
